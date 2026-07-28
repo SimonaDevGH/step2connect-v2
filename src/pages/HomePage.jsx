@@ -38,15 +38,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Bot box placeholder */}
+      {/* LivePerson engagement container */}
       <section className="bot-section">
-        <div className="bot-card">
-          <div className="bot-avatar">🤖</div>
-          <div>
-            <p className="bot-title">{t('botTitle')}</p>
-            <p className="bot-desc">{t('botDesc')}</p>
-          </div>
-        </div>
+        <div id="LP_DIV_1785254130672" />
       </section>
 
       {/* Services grid */}
