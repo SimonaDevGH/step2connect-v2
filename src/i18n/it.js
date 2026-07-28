@@ -36,7 +36,7 @@ export default {
 
   // Home
   heroTitle: 'Benvenuto in Italia',
-  heroSubtitle: 'Siamo qui per aiutarti',
+  heroSubtitle: 'Con te, passo dopo passo, in ogni momento della tua vita in Italia.',
   botTitle: 'Assistente virtuale',
   botDesc: 'Chiedimi qualsiasi cosa — sono qui per aiutarti',
   botPlaceholder: 'Scrivi un messaggio...',
