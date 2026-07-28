@@ -12,7 +12,15 @@ export default function AnalyzeDocumentPage() {
 
   return (
     <div className="page-content analyze-page">
-      <div className="page-hero" style={{ background: 'var(--navy)' }}>
+      <div
+        className="page-hero"
+        style={{
+          backgroundImage: 'url(/analyze-document.jpg)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
+        <div className="page-hero-overlay" />
         <button className="back-btn" onClick={() => navigate(-1)}>
           <ChevronLeft size={24} /> {t('menu')}
         </button>

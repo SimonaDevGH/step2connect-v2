@@ -72,7 +72,7 @@ function AppShell() {
           <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
           <Route path="/translator" element={<ProtectedRoute><TranslatorPage /></ProtectedRoute>} />
           <Route path="/privacy" element={<ProtectedRoute><PrivacyPage /></ProtectedRoute>} />
-          <Route path="/analyze" element={<ProtectedRoute><AnalyzeDocumentPage /></ProtectedRoute>} />
+          <Route path="/analyze-document" element={<ProtectedRoute><AnalyzeDocumentPage /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
       </main>

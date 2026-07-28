@@ -17,10 +17,10 @@ export default function SideMenu({ open, onClose }) {
   const go = (path) => { navigate(path); onClose(); };
 
   const navItems = [
-    { icon: <Home size={20} />,        label: t('home'),           path: '/home',          color: '#1D3557' },
+    { icon: <Home size={20} />,        label: t('home'),           path: '/home',          color: '#ffffff' },
     { icon: <BookOpen size={20} />,    label: t('guidesTitle'),    path: '/guides',        color: '#06A77D' },
     { icon: <HelpCircle size={20} />,  label: t('quiz'),           path: '/quiz',          color: '#E9C46A' },
-    { icon: <FileSearch size={20} />,  label: t('analyzeTitle'),   path: '/analyze',       color: '#457B9D' },
+    { icon: <FileSearch size={20} />,  label: t('analyzeTitle'),   path: '/analyze-document', color: '#457B9D' },
     { icon: <MapPin size={20} />,      label: t('findOffices'),    path: '/offices',       color: '#6A4C93' },
     { icon: <Bell size={20} />,        label: t('notifications'),  path: '/notifications', color: '#E76F51' },
   ];
