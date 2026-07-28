@@ -45,6 +45,7 @@ export const GUIDE_CATEGORIES = [
   },
   {
     id: 'school',
+    heroImage: '/guides-school.jpg',
     icon: GraduationCap,
     color: '#2A9D8F',
     emoji: '🎓',

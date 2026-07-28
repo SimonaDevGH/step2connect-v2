@@ -22,7 +22,7 @@ export default function GuideCategoryPage() {
         {cat.heroImage && (
           <img src={cat.heroImage} alt="" className="page-hero-img" />
         )}
-        <div className="page-hero-overlay" style={cat.heroImage ? { background: `${cat.color}cc` } : {}}>
+        <div className="page-hero-overlay" style={cat.heroImage ? { background: 'rgba(10,30,58,0.45)' } : {}}>
           <button className="back-btn" onClick={() => navigate('/guides')}>
             <ChevronLeft size={24} /> {t('guidesTitle')}
           </button>
