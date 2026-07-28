@@ -45,7 +45,6 @@ export default {
   heroSubtitle: 'Con te, passo dopo passo, in ogni momento della tua vita in Italia.',
   botTitle: 'Assistente virtuale',
   botDesc: 'Chiedi all\'AI dove puoi trovare l\'informazione che necessiti, scrivi direttamente la tua domanda.',
-  botDesc: 'Chiedimi qualsiasi cosa — sono qui per aiutarti',
   botPlaceholder: 'Scrivi un messaggio...',
   botSend: 'Invia',
   botNote: '(Bot LivePerson — da collegare)',
