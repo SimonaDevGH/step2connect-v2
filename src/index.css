@@ -1030,6 +1030,25 @@ input, textarea { font-family: inherit; }
   100% { background-position: -200% 0; }
 }
 
+/* ── Privacy Page ─────────────────────────────────────────────────────── */
+.privacy-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 0;
+}
+.privacy-iframe {
+  flex: 1;
+  width: 100%;
+  border: none;
+  min-height: calc(100vh - var(--top-h) - var(--bottom-h) - 90px);
+}
+.side-menu-privacy {
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+  padding-top: 12px;
+}
+
 /* ── Scrollbar ────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }

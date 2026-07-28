@@ -178,6 +178,9 @@ export default {
   'guideItem_mediator_title': 'Un mediatore che parla la tua lingua',
   'guideItem_mediator_desc': 'Aiuto per capirsi meglio',
 
+  // Privacy
+  privacyTitle: 'Privacy Policy',
+
   // Notifications
   notificationsTitle: 'Notifiche',
   noNotifications: 'Nessuna notifica',

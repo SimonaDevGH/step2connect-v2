@@ -15,6 +15,7 @@ import GuideCategoryPage from './pages/GuideCategoryPage';
 import GuideDetailPage from './pages/GuideDetailPage';
 import NotificationsPage from './pages/NotificationsPage';
 import TranslatorPage from './pages/TranslatorPage';
+import PrivacyPage from './pages/PrivacyPage';
 
 import BottomBar from './components/BottomBar';
 import SideMenu from './components/SideMenu';
@@ -69,6 +70,7 @@ function AppShell() {
           <Route path="/guides/:category/:item" element={<ProtectedRoute><GuideDetailPage /></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
           <Route path="/translator" element={<ProtectedRoute><TranslatorPage /></ProtectedRoute>} />
+          <Route path="/privacy" element={<ProtectedRoute><PrivacyPage /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
       </main>

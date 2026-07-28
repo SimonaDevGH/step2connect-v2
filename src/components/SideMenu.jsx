@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { X, Heart, Briefcase, GraduationCap, FileText, MapPin, Newspaper, HelpCircle, BookOpen, Bell, Languages, LogOut } from 'lucide-react';
+import { X, Heart, Briefcase, GraduationCap, FileText, MapPin, Newspaper, HelpCircle, BookOpen, Bell, Languages, LogOut, ShieldCheck } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -48,6 +48,12 @@ export default function SideMenu({ open, onClose }) {
             </button>
           ))}
         </nav>
+
+        {/* Privacy link */}
+        <button className="side-menu-item side-menu-privacy" onClick={() => go('/privacy')}>
+          <span className="side-menu-icon" style={{ color: '#6b7280' }}><ShieldCheck size={20} /></span>
+          <span>{t('privacyTitle')}</span>
+        </button>
 
         <div className="side-menu-footer">
           <div className="side-menu-lang">

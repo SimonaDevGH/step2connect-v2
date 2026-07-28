@@ -168,6 +168,7 @@ export default {
   'guideItem_mediator_title': 'A mediator who speaks your language',
   'guideItem_mediator_desc': 'Help to communicate better',
 
+  privacyTitle: 'Privacy Policy',
   notificationsTitle: 'Notifications',
   noNotifications: 'No notifications',
 

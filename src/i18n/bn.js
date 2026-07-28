@@ -168,6 +168,7 @@ export default {
   'guideItem_mediator_title': 'আপনার ভাষায় কথা বলে একজন মধ্যস্থতাকারী',
   'guideItem_mediator_desc': 'ভালোভাবে যোগাযোগের সাহায্য',
 
+  privacyTitle: 'গোপনীয়তা নীতি',
   notificationsTitle: 'বিজ্ঞপ্তি',
   noNotifications: 'কোনো বিজ্ঞপ্তি নেই',
 
