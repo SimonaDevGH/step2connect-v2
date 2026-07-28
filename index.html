@@ -22,14 +22,25 @@
       font-src    'self' data:
                   https://*.liveperson.net
                   https://lpsnmedia.net https://*.lpsnmedia.net;
+      media-src   'self' blob:
+                  https://lpsnmedia.net https://*.lpsnmedia.net
+                  https://*.liveperson.net;
       connect-src 'self'
                   https://*.liveperson.net wss://*.liveperson.net
+                  https://*.tokenizer.liveperson.net
+                  https://*.idp.liveperson.net
+                  https://*.msghist.liveperson.net
+                  https://*.shiftstatus.liveperson.net
+                  https://*.mtagconfig.liveperson.net
+                  https://*.csds.liveperson.net
                   https://lpsnmedia.net https://*.lpsnmedia.net;
       frame-src   'self'
                   https://*.liveperson.net
+                  https://*.tokenizer.liveperson.net
+                  https://*.idp.liveperson.net
+                  https://*.shiftstatus.liveperson.net
                   https://lpsnmedia.net https://*.lpsnmedia.net;
       worker-src  'self' blob:;
-      media-src   'self' blob:;
     " />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
