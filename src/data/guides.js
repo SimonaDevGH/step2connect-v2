@@ -25,6 +25,7 @@ export const GUIDE_CATEGORIES = [
     icon: Heart,
     color: '#E63946',
     emoji: '❤️',
+    heroImage: '/guides-health.jpg',
     items: [
       'healthSystem',
       'emergency',

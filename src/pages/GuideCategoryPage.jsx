@@ -15,15 +15,23 @@ export default function GuideCategoryPage() {
 
   return (
     <div className="page-content">
-      <div className="page-hero" style={{ background: cat.color }}>
-        <button className="back-btn" onClick={() => navigate('/guides')}>
-          <ChevronLeft size={24} /> {t('guidesTitle')}
-        </button>
-        <div className="page-hero-icon">
-          <Icon size={40} color="#fff" />
+      <div
+        className={`page-hero${cat.heroImage ? ' page-hero--image' : ''}`}
+        style={cat.heroImage ? {} : { background: cat.color }}
+      >
+        {cat.heroImage && (
+          <img src={cat.heroImage} alt="" className="page-hero-img" />
+        )}
+        <div className="page-hero-overlay" style={cat.heroImage ? { background: `${cat.color}cc` } : {}}>
+          <button className="back-btn" onClick={() => navigate('/guides')}>
+            <ChevronLeft size={24} /> {t('guidesTitle')}
+          </button>
+          <div className="page-hero-icon">
+            <Icon size={40} color="#fff" />
+          </div>
+          <h2 className="page-hero-title">{t(`guideCat_${cat.id}`)}</h2>
+          <p className="page-hero-sub">{t(`guideCat_${cat.id}Desc`)}</p>
         </div>
-        <h2 className="page-hero-title">{t(`guideCat_${cat.id}`)}</h2>
-        <p className="page-hero-sub">{t(`guideCat_${cat.id}Desc`)}</p>
       </div>
 
       {cat.empty ? (
