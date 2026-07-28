@@ -484,6 +484,15 @@ input, textarea { font-family: inherit; }
 
 /* ── Bot Section ──────────────────────────────────────────────────────── */
 .bot-section { padding: 16px; }
+.assistant-section {
+  padding: 20px 16px 4px;
+}
+.assistant-desc {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  margin: 4px 0 12px;
+  line-height: 1.5;
+}
 .lp-engagement-container {
   display: block;
   width: 100%;

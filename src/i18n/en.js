@@ -40,6 +40,7 @@ export default {
   heroTitle: 'Welcome to Italy',
   heroSubtitle: 'With you, step by step, at every moment of your life in Italy.',
   botTitle: 'Virtual assistant',
+  botDesc: 'Ask the AI where to find the information you need — type your question directly.',
   botDesc: 'Ask me anything — I am here to help you',
   botPlaceholder: 'Type a message...',
   botSend: 'Send',

@@ -38,8 +38,12 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* LivePerson engagement container */}
-      <div id="LP_DIV_1785257734021" className="lp-engagement-container"></div>
+      {/* Virtual assistant section */}
+      <section className="assistant-section">
+        <h3 className="section-title">{t('botTitle')}</h3>
+        <p className="assistant-desc">{t('botDesc')}</p>
+        <div id="LP_DIV_1785257734021" className="lp-engagement-container"></div>
+      </section>
 
       {/* Services grid */}
       <section className="services-section">
