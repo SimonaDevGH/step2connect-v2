@@ -24,7 +24,7 @@ export default function SideMenu({ open, onClose }) {
     { icon: <MapPin size={20} />, label: t('findOffices'), path: '/offices', color: '#6A4C93' },
     { icon: <Newspaper size={20} />, label: t('news'), path: '/news', color: '#1D3557' },
     { icon: <HelpCircle size={20} />, label: t('quiz'), path: '/quiz', color: '#E9C46A' },
-    { icon: <BookOpen size={20} />, label: t('library'), path: '/library', color: '#06A77D' },
+    { icon: <BookOpen size={20} />, label: t('guidesTitle'), path: '/guides', color: '#06A77D' },
     { icon: <Bell size={20} />, label: t('notifications'), path: '/notifications', color: '#E76F51' },
     { icon: <Languages size={20} />, label: t('translator'), path: '/translator', color: '#118AB2' },
   ];

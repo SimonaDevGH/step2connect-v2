@@ -7,16 +7,16 @@ import { useAuth } from '../context/AuthContext';
 import LivePersonBubble from '../components/LivePersonBubble';
 
 const SERVICES = [
-  { key: 'health',    icon: Heart,         color: '#E63946', path: '/service/health' },
-  { key: 'work',      icon: Briefcase,     color: '#F4A261', path: '/service/work' },
-  { key: 'school',    icon: GraduationCap, color: '#2A9D8F', path: '/service/school' },
-  { key: 'documents', icon: FileText,      color: '#457B9D', path: '/service/documents' },
+  { key: 'health',    icon: Heart,         color: '#E63946', path: '/guides/health' },
+  { key: 'work',      icon: Briefcase,     color: '#F4A261', path: '/guides/work' },
+  { key: 'school',    icon: GraduationCap, color: '#2A9D8F', path: '/guides/school' },
+  { key: 'documents', icon: FileText,      color: '#457B9D', path: '/guides/documents' },
 ];
 
 const TOOLS = [
   { key: 'news',          icon: Newspaper,  color: '#1D3557', path: '/news' },
   { key: 'quiz',          icon: HelpCircle, color: '#E9C46A', path: '/quiz' },
-  { key: 'library',       icon: BookOpen,   color: '#06A77D', path: '/library' },
+  { key: 'guidesTitle',   icon: BookOpen,   color: '#06A77D', path: '/guides' },
   { key: 'notifications', icon: Bell,       color: '#E76F51', path: '/notifications' },
   { key: 'translator',    icon: Languages,  color: '#118AB2', path: '/translator' },
 ];

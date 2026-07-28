@@ -1,0 +1,77 @@
+Aggiorna la sezione "Libreria digitale" (che ora chiameremo "Guide pratiche" 
+in tutta l'interfaccia — menu laterale, home, titoli di pagina) con questa 
+struttura.
+
+STRUTTURA DI NAVIGAZIONE:
+- Guide pratiche → pagina con le 5 categorie (card cliccabili, icona + nome 
+  categoria)
+- Ogni categoria → pagina con l'elenco delle sue voci (stesso formato dello 
+  screenshot "Healthcare" già nel progetto: icona, titolo grande, sottotitolo 
+  descrittivo, poi lista di card cliccabili con icona + titolo + sottotitolo)
+- Ogni voce → pagina di dettaglio con il contenuto (per ora testo placeholder, 
+  verrà sostituito in seguito con i contenuti reali migrati dal sito 
+  attuale — non scrivere contenuti veri ora, basta struttura + placeholder)
+
+Le card "Servizi per te" già presenti in home page devono continuare a 
+funzionare come scorciatoie dirette a queste stesse categorie (non sono 
+una sezione separata, sono un accesso rapido alle categorie più 
+importanti).
+
+CATEGORIE (nome — icona suggerita):
+
+1. Documenti e permessi — icona documento/id-card
+2. Salute e pronto soccorso — icona cuore (stessa già in uso per Sanità)
+3. Casa e bollette — icona casa
+4. Scuola e famiglia — icona cappello di laurea (stessa già in uso)
+5. Vivere in città — icona mappa/edifici
+6. Lavoro e busta paga — icona valigetta (stessa già in uso). QUESTA 
+   CATEGORIA VA CREATA VUOTA per ora: mostra la card della categoria, ma 
+   quando si apre mostra un messaggio tipo "Contenuti in arrivo" invece 
+   della lista di voci. Non generare contenuti finti per questa categoria.
+
+VOCI PER CATEGORIA (titolo — sottotitolo):
+
+── Documenti e permessi ──
+- Come richiedere il permesso di soggiorno — Documenti necessari e dove andare
+- Come rinnovare il permesso di soggiorno — Quando farlo e cosa serve
+- Come richiedere la carta d'identità — Documenti e tempi di attesa
+- Come rinnovare la carta d'identità — Quando scade e come rifarla
+- Come prendere la patente di guida — Foglio rosa, esame e guida
+- Come rinnovare la patente di guida — Scadenza e visita medica
+
+── Salute e pronto soccorso ──
+- Come funziona la sanità in Italia — Tessera sanitaria e diritti
+- Cosa fare in caso di emergenza — Numeri utili e pronto soccorso
+- Il medico di base: come iscriverti — Scegliere e prenotare visite
+- Le vaccinazioni: cosa devi sapere — Per te e per i tuoi figli
+- Come prenotare una visita o un esame — Tempi e modalità
+- Controlli medici gratuiti (screening) — Prevenzione a costo zero
+- Farmaci e ticket: come funzionano — Ricette e pagamento in farmacia
+
+── Casa e bollette ──
+- Trovare casa in affitto e fare la residenza — Contratto e registrazione
+- Vivere in condominio: le regole di casa — Diritti e doveri
+- TARI e rifiuti: cosa sapere — Raccolta differenziata e tassa
+- ISEE: cos'è e a cosa serve — Calcolarlo e richiederlo
+
+── Scuola e famiglia ──
+- Guida per i neo-genitori — I primi passi in Italia
+- Crescere i figli in Italia: consigli utili — Educazione e buone pratiche
+- Come iscrivere i figli a scuola — Documenti e scadenze
+
+── Vivere in città ──
+- Servizi e supporto per le donne — Aiuto e assistenza dedicata
+- La biblioteca: cosa offre gratis — Libri, corsi e spazi
+- Come muoverti con bus e treni — Biglietti e abbonamenti
+- Fare sport nella tua città — Impianti e associazioni
+- La sicurezza sulla strada — Regole per pedoni e ciclisti
+- Un mediatore che parla la tua lingua — Aiuto per capirsi meglio
+
+── Lavoro e busta paga ──
+(vuota per ora, vedi nota sopra)
+
+IMPORTANTE: tutti questi testi (nomi categorie, titoli, sottotitoli) devono 
+passare dal sistema di traduzione IT/EN/BN già esistente, non essere 
+hardcoded solo in italiano — anche se per ora hai solo l'italiano pronto, 
+lascia la struttura (chiavi di traduzione) già impostata così aggiungiamo 
+EN e BN dopo senza toccare il codice.
