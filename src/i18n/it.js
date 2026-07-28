@@ -14,6 +14,12 @@ export default {
   hasAccount: 'Hai già un account?',
   nameLabel: 'Nome',
   namePlaceholder: 'Il tuo nome',
+  firstNamePlaceholder: 'Nome *',
+  lastNamePlaceholder: 'Cognome *',
+  emailPlaceholder: 'Email (opzionale)',
+  selectCompany: 'Azienda per cui lavori *',
+  selectSite: 'Cantiere in cui lavori *',
+  back: 'Indietro',
   otpSent: 'Codice inviato al numero',
   otpHint: 'Inserisci qualsiasi codice per continuare (demo)',
 

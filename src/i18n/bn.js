@@ -13,6 +13,12 @@ export default {
   hasAccount: 'ইতিমধ্যে অ্যাকাউন্ট আছে?',
   nameLabel: 'নাম',
   namePlaceholder: 'আপনার নাম',
+  firstNamePlaceholder: 'নাম *',
+  lastNamePlaceholder: 'পদবি *',
+  emailPlaceholder: 'ইমেইল (ঐচ্ছিক)',
+  selectCompany: 'আপনি যে কোম্পানিতে কাজ করেন *',
+  selectSite: 'আপনি যে শিপইয়ার্ডে কাজ করেন *',
+  back: 'পেছনে',
   otpSent: 'কোড পাঠানো হয়েছে',
   otpHint: 'যেকোনো কোড দিয়ে এগিয়ে যান (ডেমো)',
 

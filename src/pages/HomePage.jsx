@@ -1,11 +1,8 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, Newspaper, HelpCircle, BookOpen, Bell, Languages } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { GUIDE_CATEGORIES } from '../data/guides';
-
-import LivePersonBubble from '../components/LivePersonBubble';
 
 // Single source of truth: pull the 4 featured categories directly from
 // GUIDE_CATEGORIES so labels, colors and paths are never duplicated.
@@ -25,7 +22,6 @@ export default function HomePage() {
   const { t, lang } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [botOpen, setBotOpen] = useState(false);
 
   return (
     <div className="page-content home-page">
@@ -34,10 +30,9 @@ export default function HomePage() {
         <img src="/hero-venezia.jpg" alt="Famiglia a Venezia" className="hero-img" />
         <div className="hero-overlay">
           <div className={`hero-text-block lang-${lang}`}>
-            <h2 className="hero-title">{t('heroTitle')}</h2>
-            {user?.name && (
-              <p className="hero-subtitle">{user.name}</p>
-            )}
+            <h2 className="hero-title">
+              {t('heroTitle')}{user?.firstName ? `, ${user.firstName}` : ''}
+            </h2>
             <p className="hero-subtitle">{t('heroSubtitle')}</p>
           </div>
         </div>
@@ -45,7 +40,7 @@ export default function HomePage() {
 
       {/* Bot box placeholder */}
       <section className="bot-section">
-        <div className="bot-card" onClick={() => setBotOpen(true)}>
+        <div className="bot-card">
           <div className="bot-avatar">🤖</div>
           <div>
             <p className="bot-title">{t('botTitle')}</p>
@@ -101,8 +96,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* LivePerson bubble */}
-      <LivePersonBubble open={botOpen} onClose={() => setBotOpen(false)} />
     </div>
   );
 }

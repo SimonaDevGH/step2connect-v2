@@ -14,11 +14,18 @@ async function sendOTP(phone) {
   return { success: true };
 }
 
-async function verifyOTP(phone, code, name) {
+async function verifyOTP(phone, code, userData) {
   // MOCK: any 4-6 digit code is accepted
-  console.log('[AUTH] verifyOTP called', { phone, code, name });
+  console.log('[AUTH] verifyOTP called', { phone, code, userData });
   if (code.length >= 4) {
-    return { success: true, user: { phone, name: name || phone } };
+    const { firstName, lastName, email, company, site } = userData || {};
+    const displayName = firstName
+      ? `${firstName}${lastName ? ' ' + lastName : ''}`
+      : phone;
+    return {
+      success: true,
+      user: { phone, firstName, lastName, email, company, site, name: displayName },
+    };
   }
   return { success: false, error: 'Codice non valido' };
 }
@@ -33,8 +40,8 @@ export function AuthProvider({ children }) {
     }
   });
 
-  const login = async (phone, code, name) => {
-    const result = await verifyOTP(phone, code, name);
+  const login = async (phone, code, userData) => {
+    const result = await verifyOTP(phone, code, userData);
     if (result.success) {
       localStorage.setItem('s2c_user', JSON.stringify(result.user));
       setUser(result.user);

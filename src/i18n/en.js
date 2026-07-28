@@ -13,6 +13,12 @@ export default {
   hasAccount: 'Already have an account?',
   nameLabel: 'Name',
   namePlaceholder: 'Your name',
+  firstNamePlaceholder: 'First name *',
+  lastNamePlaceholder: 'Last name *',
+  emailPlaceholder: 'Email (optional)',
+  selectCompany: 'Company you work for *',
+  selectSite: 'Shipyard you work at *',
+  back: 'Back',
   otpSent: 'Code sent to',
   otpHint: 'Enter any code to continue (demo)',
 

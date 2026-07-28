@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Phone, Hash, User } from 'lucide-react';
+import { Phone, Hash, User, Mail, Building2, HardHat } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -10,21 +10,55 @@ const LANGS = [
   { code: 'bn', label: 'বাং', flag: '🇧🇩' },
 ];
 
+const COMPANIES = [
+  'Fincantieri S.p.A.',
+  'Altra azienda',
+];
+
+const SITES = [
+  'Monfalcone (GO)',
+  'Marghera – Venezia (VE)',
+  'Castellammare di Stabia (NA)',
+  'Genova Sestri Ponente (GE)',
+  'Riva Trigoso – La Spezia (SP)',
+  'Palermo (PA)',
+  'Ancona (AN)',
+  'Trieste (TS)',
+];
+
 export default function LoginPage() {
   const { t, lang, changeLang } = useLanguage();
   const { login, requestOTP } = useAuth();
   const navigate = useNavigate();
 
   const [mode, setMode] = useState('login'); // 'login' | 'register'
-  const [step, setStep] = useState('phone'); // 'phone' | 'otp'
+  const [step, setStep] = useState('form');  // 'form' | 'otp'
+
+  // Shared
   const [phone, setPhone] = useState('');
-  const [name, setName] = useState('');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Register-only fields
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [company, setCompany] = useState('');
+  const [site, setSite] = useState('');
+
+  const resetForm = (newMode) => {
+    setMode(newMode);
+    setStep('form');
+    setError('');
+    setOtp('');
+  };
+
+  const isRegisterValid =
+    firstName.trim() && lastName.trim() && phone.trim() && company && site;
+  const isLoginValid = phone.trim();
+
   const handleSendOTP = async () => {
-    if (!phone.trim()) return;
     setLoading(true);
     setError('');
     await requestOTP(phone);
@@ -36,7 +70,10 @@ export default function LoginPage() {
     if (!otp.trim()) return;
     setLoading(true);
     setError('');
-    const result = await login(phone, otp, mode === 'register' ? name : undefined);
+    const userData = mode === 'register'
+      ? { firstName, lastName, email, company, site }
+      : undefined;
+    const result = await login(phone, otp, userData);
     setLoading(false);
     if (result.success) {
       navigate('/home');
@@ -75,50 +112,137 @@ export default function LoginPage() {
         <div className="login-tabs">
           <button
             className={`login-tab ${mode === 'login' ? 'active' : ''}`}
-            onClick={() => { setMode('login'); setStep('phone'); setError(''); }}
+            onClick={() => resetForm('login')}
           >
             {t('loginTitle')}
           </button>
           <button
             className={`login-tab ${mode === 'register' ? 'active' : ''}`}
-            onClick={() => { setMode('register'); setStep('phone'); setError(''); }}
+            onClick={() => resetForm('register')}
           >
             {t('registerTitle')}
           </button>
         </div>
 
-        {step === 'phone' ? (
+        {step === 'form' ? (
           <>
-            {mode === 'register' && (
-              <div className="input-group">
-                <User size={18} className="input-icon" />
-                <input
-                  className="text-input"
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder={t('namePlaceholder')}
-                />
-              </div>
+            {mode === 'register' ? (
+              <>
+                {/* Nome */}
+                <div className="input-group">
+                  <User size={18} className="input-icon" />
+                  <input
+                    className="text-input"
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    placeholder={t('firstNamePlaceholder')}
+                    required
+                  />
+                </div>
+
+                {/* Cognome */}
+                <div className="input-group">
+                  <User size={18} className="input-icon" />
+                  <input
+                    className="text-input"
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    placeholder={t('lastNamePlaceholder')}
+                    required
+                  />
+                </div>
+
+                {/* Telefono */}
+                <div className="input-group">
+                  <Phone size={18} className="input-icon" />
+                  <input
+                    className="text-input"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder={t('phonePlaceholder')}
+                    inputMode="tel"
+                    required
+                  />
+                </div>
+
+                {/* Email (opzionale) */}
+                <div className="input-group">
+                  <Mail size={18} className="input-icon" />
+                  <input
+                    className="text-input"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder={t('emailPlaceholder')}
+                  />
+                </div>
+
+                {/* Azienda */}
+                <div className="input-group">
+                  <Building2 size={18} className="input-icon" />
+                  <select
+                    className="text-input select-input"
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    required
+                  >
+                    <option value="">{t('selectCompany')}</option>
+                    {COMPANIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Cantiere */}
+                <div className="input-group">
+                  <HardHat size={18} className="input-icon" />
+                  <select
+                    className="text-input select-input"
+                    value={site}
+                    onChange={(e) => setSite(e.target.value)}
+                    required
+                  >
+                    <option value="">{t('selectSite')}</option>
+                    {SITES.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  className="btn-primary"
+                  onClick={handleSendOTP}
+                  disabled={loading || !isRegisterValid}
+                >
+                  {loading ? '...' : t('sendOtp')}
+                </button>
+              </>
+            ) : (
+              <>
+                {/* Login: solo telefono */}
+                <div className="input-group">
+                  <Phone size={18} className="input-icon" />
+                  <input
+                    className="text-input"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder={t('phonePlaceholder')}
+                    inputMode="tel"
+                  />
+                </div>
+                <button
+                  className="btn-primary"
+                  onClick={handleSendOTP}
+                  disabled={loading || !isLoginValid}
+                >
+                  {loading ? '...' : t('sendOtp')}
+                </button>
+              </>
             )}
-            <div className="input-group">
-              <Phone size={18} className="input-icon" />
-              <input
-                className="text-input"
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder={t('phonePlaceholder')}
-                inputMode="tel"
-              />
-            </div>
-            <button
-              className="btn-primary"
-              onClick={handleSendOTP}
-              disabled={loading || !phone.trim()}
-            >
-              {loading ? '...' : t('sendOtp')}
-            </button>
           </>
         ) : (
           <>
@@ -144,7 +268,7 @@ export default function LoginPage() {
             >
               {loading ? '...' : t('verifyOtp')}
             </button>
-            <button className="btn-ghost" onClick={() => setStep('phone')}>← Indietro</button>
+            <button className="btn-ghost" onClick={() => setStep('form')}>← {t('back')}</button>
           </>
         )}
       </div>
