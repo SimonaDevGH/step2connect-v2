@@ -6,7 +6,7 @@ import { GUIDE_CATEGORIES } from '../data/guides';
 
 // Single source of truth: pull the 4 featured categories directly from
 // GUIDE_CATEGORIES so labels, colors and paths are never duplicated.
-const FEATURED_IDS = ['health', 'documents', 'school', 'work'];
+const FEATURED_IDS = ['health', 'documents', 'school', 'homeBills'];
 const SERVICES = GUIDE_CATEGORIES.filter((c) => FEATURED_IDS.includes(c.id))
   .sort((a, b) => FEATURED_IDS.indexOf(a.id) - FEATURED_IDS.indexOf(b.id));
 
