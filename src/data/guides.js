@@ -55,6 +55,7 @@ export const GUIDE_CATEGORIES = [
   },
   {
     id: 'cityLife',
+    heroImage: '/guides-cityLife.jpg',
     icon: Map,
     color: '#6A4C93',
     emoji: '🏙️',
@@ -69,6 +70,7 @@ export const GUIDE_CATEGORIES = [
   },
   {
     id: 'work',
+    heroImage: '/guides-work.jpg',
     icon: Briefcase,
     color: '#E9C46A',
     emoji: '💼',
