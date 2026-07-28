@@ -168,6 +168,12 @@ export default {
   'guideItem_mediator_title': 'আপনার ভাষায় কথা বলে একজন মধ্যস্থতাকারী',
   'guideItem_mediator_desc': 'ভালোভাবে যোগাযোগের সাহায্য',
 
+  // Analizza documento
+  analyzeTitle: 'নথি বিশ্লেষণ',
+  analyzeDesc: 'এই সেবার মাধ্যমে আপনি একটি নথি আপলোড করতে, অনুবাদ করতে এবং ইতালীয়, ইংরেজি বা বাংলায় সারসংক্ষেপ পেতে পারবেন।\n\nসেবা ব্যবহার করতে WhatsApp আইকনে ক্লিক করুন। WhatsApp অ্যাপ খুলবে এবং Step2Connect-এর সাথে কথোপকথন শুরু হবে। নির্দেশনা অনুসরণ করুন এবং আপনার নথির সমস্ত বিবরণ জানুন।',
+  analyzeWaBtn: 'WhatsApp খুলুন',
+  analyzeWaText: 'নথি বিশ্লেষণ করুন',
+
   privacyTitle: 'গোপনীয়তা নীতি',
   notificationsTitle: 'বিজ্ঞপ্তি',
   noNotifications: 'কোনো বিজ্ঞপ্তি নেই',

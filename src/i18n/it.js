@@ -178,6 +178,12 @@ export default {
   'guideItem_mediator_title': 'Un mediatore che parla la tua lingua',
   'guideItem_mediator_desc': 'Aiuto per capirsi meglio',
 
+  // Analizza documento
+  analyzeTitle: 'Analizza documento',
+  analyzeDesc: 'Il servizio permette di caricare un documento, tradurlo e ottenere un riassunto, in italiano, inglese o bengalese.\n\nPer accedere al servizio, clicca sull\'icona di WhatsApp. Si aprirà l\'app di WhatsApp e la conversazione con Step2Connect. Segui le indicazioni e scopri tutti i dettagli del tuo documento.',
+  analyzeWaBtn: 'Apri WhatsApp',
+  analyzeWaText: 'analizza il documento',
+
   // Privacy
   privacyTitle: 'Privacy Policy',
 

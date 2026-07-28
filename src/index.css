@@ -1088,10 +1088,15 @@ input, textarea { font-family: inherit; }
   margin-top: 8px;
   padding-top: 12px;
 }
+.side-menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 8px 16px;
+}
 .side-menu-partner {
   margin-top: 20px;
   padding-top: 16px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid rgba(255,255,255,0.15);
   display: flex;
   justify-content: center;
 }
@@ -1099,7 +1104,41 @@ input, textarea { font-family: inherit; }
   height: 36px;
   width: auto;
   object-fit: contain;
-  opacity: 0.85;
+}
+
+/* ── Analyze Document Page ────────────────────────────────────────────── */
+.analyze-body {
+  padding: 28px 24px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.analyze-desc {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--text);
+  white-space: pre-line;
+}
+.wa-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: #25D366;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  text-decoration: none;
+  padding: 16px 24px;
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(37,211,102,0.35);
+  transition: opacity 0.15s;
+}
+.wa-btn:active { opacity: 0.85; }
+.wa-icon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
 }
 
 /* ── Scrollbar ────────────────────────────────────────────────────────── */

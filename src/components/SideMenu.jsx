@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { X, Heart, Briefcase, GraduationCap, FileText, MapPin, Newspaper, HelpCircle, BookOpen, Bell, Languages, LogOut, ShieldCheck } from 'lucide-react';
+import { X, Home, BookOpen, HelpCircle, FileSearch, MapPin, Bell, ShieldCheck, Languages, LogOut } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -17,16 +17,12 @@ export default function SideMenu({ open, onClose }) {
   const go = (path) => { navigate(path); onClose(); };
 
   const navItems = [
-    { icon: <Heart size={20} />, label: t('health'), path: '/service/health', color: '#E63946' },
-    { icon: <Briefcase size={20} />, label: t('work'), path: '/service/work', color: '#F4A261' },
-    { icon: <GraduationCap size={20} />, label: t('school'), path: '/service/school', color: '#2A9D8F' },
-    { icon: <FileText size={20} />, label: t('documents'), path: '/service/documents', color: '#457B9D' },
-    { icon: <MapPin size={20} />, label: t('findOffices'), path: '/offices', color: '#6A4C93' },
-    { icon: <Newspaper size={20} />, label: t('news'), path: '/news', color: '#1D3557' },
-    { icon: <HelpCircle size={20} />, label: t('quiz'), path: '/quiz', color: '#E9C46A' },
-    { icon: <BookOpen size={20} />, label: t('guidesTitle'), path: '/guides', color: '#06A77D' },
-    { icon: <Bell size={20} />, label: t('notifications'), path: '/notifications', color: '#E76F51' },
-    { icon: <Languages size={20} />, label: t('translator'), path: '/translator', color: '#118AB2' },
+    { icon: <Home size={20} />,        label: t('home'),           path: '/home',          color: '#1D3557' },
+    { icon: <BookOpen size={20} />,    label: t('guidesTitle'),    path: '/guides',        color: '#06A77D' },
+    { icon: <HelpCircle size={20} />,  label: t('quiz'),           path: '/quiz',          color: '#E9C46A' },
+    { icon: <FileSearch size={20} />,  label: t('analyzeTitle'),   path: '/analyze',       color: '#457B9D' },
+    { icon: <MapPin size={20} />,      label: t('findOffices'),    path: '/offices',       color: '#6A4C93' },
+    { icon: <Bell size={20} />,        label: t('notifications'),  path: '/notifications', color: '#E76F51' },
   ];
 
   return (
@@ -49,13 +45,17 @@ export default function SideMenu({ open, onClose }) {
           ))}
         </nav>
 
-        {/* Privacy link */}
-        <button className="side-menu-item side-menu-privacy" onClick={() => go('/privacy')}>
+        {/* Divider */}
+        <div className="side-menu-divider" />
+
+        {/* Privacy */}
+        <button className="side-menu-item" onClick={() => go('/privacy')}>
           <span className="side-menu-icon" style={{ color: '#6b7280' }}><ShieldCheck size={20} /></span>
           <span>{t('privacyTitle')}</span>
         </button>
 
         <div className="side-menu-footer">
+          {/* Lingua */}
           <div className="side-menu-lang">
             <Languages size={16} />
             <span>{t('language')}:</span>
@@ -69,6 +69,8 @@ export default function SideMenu({ open, onClose }) {
               </button>
             ))}
           </div>
+
+          {/* Esci */}
           <button
             className="side-menu-item logout"
             onClick={() => { logout(); navigate('/'); onClose(); }}
@@ -77,8 +79,9 @@ export default function SideMenu({ open, onClose }) {
             <span>{t('logout')}</span>
           </button>
 
+          {/* Logo Fincantieri bianco */}
           <div className="side-menu-partner">
-            <img src="/logo-fincantieri.png" alt="Fincantieri everyDEI" className="fincantieri-logo" />
+            <img src="/logo-fincantieri-white.png" alt="Fincantieri everyDEI" className="fincantieri-logo" />
           </div>
         </div>
       </aside>

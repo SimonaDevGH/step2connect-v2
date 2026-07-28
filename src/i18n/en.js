@@ -168,6 +168,12 @@ export default {
   'guideItem_mediator_title': 'A mediator who speaks your language',
   'guideItem_mediator_desc': 'Help to communicate better',
 
+  // Analizza documento
+  analyzeTitle: 'Analyze document',
+  analyzeDesc: 'This service lets you upload a document, translate it and get a summary in Italian, English or Bengali.\n\nTo access the service, tap the WhatsApp icon. The WhatsApp app will open and start a conversation with Step2Connect. Follow the instructions to discover all the details of your document.',
+  analyzeWaBtn: 'Open WhatsApp',
+  analyzeWaText: 'analyze the document',
+
   privacyTitle: 'Privacy Policy',
   notificationsTitle: 'Notifications',
   noNotifications: 'No notifications',
