@@ -32,7 +32,7 @@ export default {
   language: 'Language',
 
   heroTitle: 'Welcome to Italy',
-  heroSubtitle: 'We are here to help you',
+  heroSubtitle: 'With you, step by step, at every moment of your life in Italy.',
   botTitle: 'Virtual assistant',
   botDesc: 'Ask me anything — I am here to help you',
   botPlaceholder: 'Type a message...',
