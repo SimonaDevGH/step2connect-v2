@@ -60,6 +60,11 @@ input, textarea { font-family: inherit; }
   font-weight: 700;
   letter-spacing: 0.5px;
 }
+.top-bar-logo {
+  height: 28px;
+  width: auto;
+  object-fit: contain;
+}
 
 .icon-btn {
   color: var(--white);
@@ -247,29 +252,12 @@ input, textarea { font-family: inherit; }
   margin-bottom: 32px;
 }
 
-.login-logo {
-  margin: 0 auto 16px;
-}
-
-.logo-circle {
-  width: 80px; height: 80px;
-  border-radius: 50%;
-  background: var(--white);
-  color: var(--navy);
-  font-size: 1.3rem;
-  font-weight: 900;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-}
-
-.login-app-name {
-  font-size: 1.8rem;
-  font-weight: 800;
-  color: var(--white);
-  margin-bottom: 6px;
+.login-logo-img {
+  height: 44px;
+  width: auto;
+  object-fit: contain;
+  margin: 0 auto 12px;
+  display: block;
 }
 
 .login-tagline {

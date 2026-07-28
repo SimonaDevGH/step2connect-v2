@@ -86,10 +86,7 @@ export default function LoginPage() {
     <div className="login-page">
       {/* Header */}
       <div className="login-header">
-        <div className="login-logo">
-          <div className="logo-circle">S2C</div>
-        </div>
-        <h1 className="login-app-name">{t('appName')}</h1>
+        <img src="/logo-white.png" alt="Step2Connect" className="login-logo-img" />
         <p className="login-tagline">{t('tagline')}</p>
 
         {/* Language selector */}

@@ -47,7 +47,7 @@ function AppShell() {
         <button className="icon-btn" onClick={() => setMenuOpen(true)} aria-label="Menu">
           <Menu size={26} />
         </button>
-        <span className="top-bar-title">{t('appName')}</span>
+        <img src="/logo-white.png" alt="Step2Connect" className="top-bar-logo" />
         <div style={{ width: 40 }} />
       </header>
 
