@@ -39,7 +39,7 @@ export default function HomePage() {
       </section>
 
       {/* LivePerson engagement container */}
-      <div id="LP_DIV_1785254130672" className="lp-engagement-container"></div>
+      <div id="LP_DIV_1785257734021" className="lp-engagement-container"></div>
 
       {/* Services grid */}
       <section className="services-section">
