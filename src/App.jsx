@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
@@ -31,7 +31,6 @@ function AppShell() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [botOpen, setBotOpen] = useState(false);
 
   if (!user) {
     return (
@@ -75,10 +74,10 @@ function AppShell() {
       </main>
 
       {/* Fixed bottom bar */}
-      <BottomBar onBotOpen={() => setBotOpen(true)} />
+      <BottomBar />
 
-      {/* LivePerson — route tracker + chat trigger (renders no DOM itself) */}
-      <LivePersonBubble open={botOpen} onClose={() => setBotOpen(false)} />
+      {/* LivePerson — mounts once to track route changes; LP renders its own chat button */}
+      <LivePersonBubble />
     </div>
   );
 }

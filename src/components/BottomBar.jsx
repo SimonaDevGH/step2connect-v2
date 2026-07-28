@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, MessageCircle, Languages } from 'lucide-react';
+import { Home, Languages } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
 const LANGS = [
@@ -9,7 +9,7 @@ const LANGS = [
   { code: 'bn', label: 'বাংলা' },
 ];
 
-export default function BottomBar({ onBotOpen }) {
+export default function BottomBar() {
   const { lang, changeLang, t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
@@ -52,15 +52,8 @@ export default function BottomBar({ onBotOpen }) {
           <Home size={28} />
         </button>
 
-        {/* Right: Bot — INTEGRATION POINT (LivePerson bubble) */}
-        <button
-          className="bottom-btn"
-          onClick={onBotOpen}
-          aria-label={t('chat')}
-        >
-          <MessageCircle size={24} />
-          <span>{t('chat')}</span>
-        </button>
+        {/* Right slot intentionally empty — LP injects its own chat button */}
+        <div style={{ width: 56 }} />
       </nav>
     </>
   );
