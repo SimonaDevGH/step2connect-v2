@@ -11,6 +11,7 @@ export const GUIDE_CATEGORIES = [
     icon: FileText,
     color: '#457B9D',
     emoji: '📄',
+    heroImage: '/guides-documents.jpg',
     items: [
       'permitRequest',
       'permitRenewal',
