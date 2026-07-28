@@ -400,34 +400,69 @@ input, textarea { font-family: inherit; }
 
 /* ── Home Page ────────────────────────────────────────────────────────── */
 .hero {
-  background: linear-gradient(160deg, var(--navy) 0%, var(--navy-light) 100%);
-  min-height: 200px;
-  display: flex;
-  align-items: flex-end;
   position: relative;
+  height: 190px;
   overflow: hidden;
+  border-radius: 0 0 var(--radius) var(--radius);
+  flex-shrink: 0;
 }
-.hero::before {
-  content: '';
+
+.hero-img {
   position: absolute;
   inset: 0;
-  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400"><path d="M0 300 Q200 200 400 280 Q600 360 800 260V400H0Z" fill="rgba(255,255,255,0.04)"/><path d="M0 350 Q300 250 600 320 Q700 350 800 310V400H0Z" fill="rgba(255,255,255,0.03)"/><circle cx="650" cy="80" r="120" fill="rgba(255,255,255,0.02)"/><circle cx="100" cy="60" r="80" fill="rgba(255,255,255,0.025)"/></svg>') center/cover no-repeat;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+  display: block;
 }
+
 .hero-overlay {
-  position: relative;
-  padding: 40px 20px 28px;
+  position: absolute;
+  inset: 0;
+  /* dark band covers only the left ~40% of the image, matching its natural dark zone */
+  background: linear-gradient(to right,
+    rgba(8, 20, 40, 0.82) 0%,
+    rgba(8, 20, 40, 0.72) 30%,
+    rgba(8, 20, 40, 0.30) 50%,
+    transparent 65%
+  );
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 20px 16px 20px 16px;
+  /* text lives inside a fixed-width column so it never spills onto the light part */
+}
+
+.hero-text-block {
+  max-width: 40%;
   color: var(--white);
 }
+
 .hero-title {
-  font-size: 1.8rem;
+  font-size: 1.15rem;
   font-weight: 900;
-  line-height: 1.1;
-  text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  line-height: 1.2;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.5);
+  word-break: break-word;
 }
+
 .hero-subtitle {
-  font-size: 1rem;
-  margin-top: 6px;
-  opacity: 0.85;
+  font-size: 0.8rem;
+  margin-top: 4px;
+  opacity: 0.90;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  word-break: break-word;
+}
+
+/* Bengali text is denser — shrink slightly so it stays in the column */
+[lang="bn"] .hero-title,
+.hero-text-block.lang-bn .hero-title {
+  font-size: 0.95rem;
+}
+[lang="bn"] .hero-subtitle,
+.hero-text-block.lang-bn .hero-subtitle {
+  font-size: 0.72rem;
 }
 
 /* ── Bot Section ──────────────────────────────────────────────────────── */

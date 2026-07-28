@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Heart, Briefcase, GraduationCap, FileText, MapPin, Newspaper, HelpCircle, BookOpen, Bell, Languages } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+
 import LivePersonBubble from '../components/LivePersonBubble';
 
 const SERVICES = [
@@ -21,7 +22,7 @@ const TOOLS = [
 ];
 
 export default function HomePage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [botOpen, setBotOpen] = useState(false);
@@ -30,12 +31,15 @@ export default function HomePage() {
     <div className="page-content home-page">
       {/* Hero */}
       <section className="hero">
+        <img src="/hero-venezia.jpg" alt="Famiglia a Venezia" className="hero-img" />
         <div className="hero-overlay">
-          <h2 className="hero-title">{t('heroTitle')}</h2>
-          {user?.name && (
-            <p className="hero-subtitle">{user.name}</p>
-          )}
-          <p className="hero-subtitle">{t('heroSubtitle')}</p>
+          <div className={`hero-text-block lang-${lang}`}>
+            <h2 className="hero-title">{t('heroTitle')}</h2>
+            {user?.name && (
+              <p className="hero-subtitle">{user.name}</p>
+            )}
+            <p className="hero-subtitle">{t('heroSubtitle')}</p>
+          </div>
         </div>
       </section>
 
