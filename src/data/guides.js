@@ -39,6 +39,7 @@ export const GUIDE_CATEGORIES = [
   },
   {
     id: 'homeBills',
+    heroImage: '/guides-homeBills.jpg',
     icon: Home,
     color: '#F4A261',
     emoji: '🏠',
