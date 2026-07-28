@@ -1,58 +1,74 @@
-// ─── INTEGRATION POINT ────────────────────────────────────────────────────────
-// This component is the LivePerson chat bubble placeholder.
-// To integrate LivePerson:
-//   1. Load the LivePerson monitoring tag in index.html (lpTag script)
-//   2. Replace the mock UI below with lpTag.newPage() / lpTag.section() calls
-//   3. The bubble div with id="lpChat" will be controlled by LivePerson SDK
+// ─── LivePerson Integration ────────────────────────────────────────────────────
+// The lpTag monitoring script is loaded in index.html (site: 91669831).
+// This component:
+//   1. Notifies LP of SPA route changes via lpTag.newPage()
+//   2. Opens/closes the LP unified chat window when triggered from the bottom bar
+//
+// LP renders its own chat UI; this component owns only the trigger logic.
+// To hide LP's native floating button (if you want the bottom-bar button to be
+// the sole entry point), set lpButtonDiv visibility via LP Admin > Engagement
+// settings, or add:  #lpButtonDiv { display: none !important; }  to index.css
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState } from 'react';
-import { X, MessageCircle, Send } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
+import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+
+// Safe wrappers — guard against LP not yet loaded or blocked by adblocker
+function lpNewPage() {
+  try {
+    window.lpTag?.newPage?.(document.title, window.location.href);
+  } catch (e) {
+    console.debug('[LP] newPage error', e);
+  }
+}
+
+function lpOpenChat() {
+  try {
+    // Preferred: trigger the unified window open event
+    window.lpTag?.events?.trigger?.('lpUnifiedWindow', 'open');
+    // Fallback: click LP's own button if the event API isn't available yet
+    if (!window.lpTag?.events) {
+      document.querySelector('#lpButtonDiv a, .LPMcontainer')?.click();
+    }
+  } catch (e) {
+    console.debug('[LP] openChat error', e);
+  }
+}
+
+function lpCloseChat() {
+  try {
+    window.lpTag?.events?.trigger?.('lpUnifiedWindow', 'close');
+  } catch (e) {
+    console.debug('[LP] closeChat error', e);
+  }
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function LivePersonBubble({ open, onClose }) {
-  const { t } = useLanguage();
-  const [messages, setMessages] = useState([
-    { from: 'bot', text: t('botDesc') }
-  ]);
-  const [input, setInput] = useState('');
+  const location = useLocation();
 
-  const send = () => {
-    if (!input.trim()) return;
-    setMessages((prev) => [
-      ...prev,
-      { from: 'user', text: input },
-      { from: 'bot', text: '🤖 ' + t('botNote') }
-    ]);
-    setInput('');
-  };
+  // Notify LP whenever the SPA navigates to a new page
+  useEffect(() => {
+    lpNewPage();
+  }, [location.pathname]);
 
-  if (!open) return null;
+  // Open / close the LP chat window when the bottom-bar button is tapped
+  useEffect(() => {
+    if (open) {
+      lpOpenChat();
+      // LP fires its own close event; mirror it back to our state
+      const handler = () => onClose?.();
+      window.lpTag?.events?.bind?.('lpUnifiedWindow', 'conversationEnd', handler);
+      window.lpTag?.events?.bind?.('lpUnifiedWindow', 'close', handler);
+      return () => {
+        // LP event API doesn't expose unbind in all versions — no-op if missing
+      };
+    } else {
+      lpCloseChat();
+    }
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return (
-    <div className="lp-bubble-panel" id="lpChat">
-      <div className="lp-header">
-        <MessageCircle size={18} />
-        <span>{t('botTitle')}</span>
-        <button className="icon-btn" onClick={onClose}><X size={18} /></button>
-      </div>
-      <div className="lp-messages">
-        {messages.map((m, i) => (
-          <div key={i} className={`lp-msg lp-msg-${m.from}`}>{m.text}</div>
-        ))}
-      </div>
-      <div className="lp-input-row">
-        <input
-          className="lp-input"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && send()}
-          placeholder={t('botPlaceholder')}
-        />
-        <button className="lp-send" onClick={send}>
-          <Send size={18} />
-        </button>
-      </div>
-    </div>
-  );
+  // This component renders nothing — LP injects its own DOM
+  return null;
 }

@@ -77,7 +77,7 @@ function AppShell() {
       {/* Fixed bottom bar */}
       <BottomBar onBotOpen={() => setBotOpen(true)} />
 
-      {/* LivePerson floating bubble */}
+      {/* LivePerson — route tracker + chat trigger (renders no DOM itself) */}
       <LivePersonBubble open={botOpen} onClose={() => setBotOpen(false)} />
     </div>
   );
