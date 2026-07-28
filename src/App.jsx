@@ -1,0 +1,90 @@
+import { useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { LanguageProvider } from './context/LanguageContext';
+
+import LoginPage from './pages/LoginPage';
+import HomePage from './pages/HomePage';
+import ServiceDetailPage from './pages/ServiceDetailPage';
+import FindOfficesPage from './pages/FindOfficesPage';
+import NewsPage from './pages/NewsPage';
+import QuizPage from './pages/QuizPage';
+import LibraryPage from './pages/LibraryPage';
+import NotificationsPage from './pages/NotificationsPage';
+import TranslatorPage from './pages/TranslatorPage';
+
+import BottomBar from './components/BottomBar';
+import SideMenu from './components/SideMenu';
+import LivePersonBubble from './components/LivePersonBubble';
+import { Menu } from 'lucide-react';
+import { useLanguage } from './context/LanguageContext';
+
+function ProtectedRoute({ children }) {
+  const { user } = useAuth();
+  return user ? children : <Navigate to="/" replace />;
+}
+
+function AppShell() {
+  const { user } = useAuth();
+  const { t } = useLanguage();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [botOpen, setBotOpen] = useState(false);
+
+  if (!user) {
+    return (
+      <Routes>
+        <Route path="/*" element={<LoginPage />} />
+      </Routes>
+    );
+  }
+
+  return (
+    <div className="app-shell">
+      {/* Top bar */}
+      <header className="top-bar">
+        <button className="icon-btn" onClick={() => setMenuOpen(true)} aria-label="Menu">
+          <Menu size={26} />
+        </button>
+        <span className="top-bar-title">{t('appName')}</span>
+        <div style={{ width: 40 }} />
+      </header>
+
+      {/* Side menu */}
+      <SideMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
+
+      {/* Page content */}
+      <main className="main-content">
+        <Routes>
+          <Route path="/" element={<Navigate to="/home" replace />} />
+          <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
+          <Route path="/service/:service" element={<ProtectedRoute><ServiceDetailPage /></ProtectedRoute>} />
+          <Route path="/offices" element={<ProtectedRoute><FindOfficesPage /></ProtectedRoute>} />
+          <Route path="/news" element={<ProtectedRoute><NewsPage /></ProtectedRoute>} />
+          <Route path="/quiz" element={<ProtectedRoute><QuizPage /></ProtectedRoute>} />
+          <Route path="/library" element={<ProtectedRoute><LibraryPage /></ProtectedRoute>} />
+          <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+          <Route path="/translator" element={<ProtectedRoute><TranslatorPage /></ProtectedRoute>} />
+          <Route path="*" element={<Navigate to="/home" replace />} />
+        </Routes>
+      </main>
+
+      {/* Fixed bottom bar */}
+      <BottomBar onBotOpen={() => setBotOpen(true)} />
+
+      {/* LivePerson floating bubble */}
+      <LivePersonBubble open={botOpen} onClose={() => setBotOpen(false)} />
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <LanguageProvider>
+        <AuthProvider>
+          <AppShell />
+        </AuthProvider>
+      </LanguageProvider>
+    </BrowserRouter>
+  );
+}
