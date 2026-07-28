@@ -487,6 +487,23 @@ input, textarea { font-family: inherit; }
 .assistant-section {
   padding: 20px 16px 4px;
 }
+.assistant-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.assistant-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #1D3557 0%, #457B9D 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(29,53,87,0.25);
+}
 .assistant-desc {
   font-size: 0.88rem;
   color: var(--text-muted);

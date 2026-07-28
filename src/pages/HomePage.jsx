@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Newspaper, HelpCircle, BookOpen, Bell, Languages } from 'lucide-react';
+import { MapPin, Newspaper, HelpCircle, BookOpen, Bell, Languages, Bot } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { GUIDE_CATEGORIES } from '../data/guides';
@@ -40,7 +40,12 @@ export default function HomePage() {
 
       {/* Virtual assistant section */}
       <section className="assistant-section">
-        <h3 className="section-title">{t('botTitle')}</h3>
+        <div className="assistant-header">
+          <div className="assistant-icon-wrap">
+            <Bot size={24} color="#ffffff" />
+          </div>
+          <h3 className="section-title" style={{ margin: 0 }}>{t('botTitle')}</h3>
+        </div>
         <p className="assistant-desc">{t('botDesc')}</p>
         <div id="LP_DIV_1785257734021" className="lp-engagement-container"></div>
       </section>
