@@ -1088,6 +1088,19 @@ input, textarea { font-family: inherit; }
   margin-top: 8px;
   padding-top: 12px;
 }
+.side-menu-partner {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: center;
+}
+.fincantieri-logo {
+  height: 36px;
+  width: auto;
+  object-fit: contain;
+  opacity: 0.85;
+}
 
 /* ── Scrollbar ────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; }

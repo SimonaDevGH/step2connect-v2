@@ -76,6 +76,10 @@ export default function SideMenu({ open, onClose }) {
             <LogOut size={20} />
             <span>{t('logout')}</span>
           </button>
+
+          <div className="side-menu-partner">
+            <img src="/logo-fincantieri.png" alt="Fincantieri everyDEI" className="fincantieri-logo" />
+          </div>
         </div>
       </aside>
     </>
