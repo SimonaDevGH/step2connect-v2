@@ -1,17 +1,17 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, Briefcase, GraduationCap, FileText, MapPin, Newspaper, HelpCircle, BookOpen, Bell, Languages } from 'lucide-react';
+import { MapPin, Newspaper, HelpCircle, BookOpen, Bell, Languages } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { GUIDE_CATEGORIES } from '../data/guides';
 
 import LivePersonBubble from '../components/LivePersonBubble';
 
-const SERVICES = [
-  { key: 'health',    icon: Heart,         color: '#E63946', path: '/guides/health' },
-  { key: 'work',      icon: Briefcase,     color: '#F4A261', path: '/guides/work' },
-  { key: 'school',    icon: GraduationCap, color: '#2A9D8F', path: '/guides/school' },
-  { key: 'documents', icon: FileText,      color: '#457B9D', path: '/guides/documents' },
-];
+// Single source of truth: pull the 4 featured categories directly from
+// GUIDE_CATEGORIES so labels, colors and paths are never duplicated.
+const FEATURED_IDS = ['health', 'documents', 'school', 'work'];
+const SERVICES = GUIDE_CATEGORIES.filter((c) => FEATURED_IDS.includes(c.id))
+  .sort((a, b) => FEATURED_IDS.indexOf(a.id) - FEATURED_IDS.indexOf(b.id));
 
 const TOOLS = [
   { key: 'news',          icon: Newspaper,  color: '#1D3557', path: '/news' },
@@ -58,17 +58,17 @@ export default function HomePage() {
       <section className="services-section">
         <h3 className="section-title">{t('servicesTitle')}</h3>
         <div className="services-grid">
-          {SERVICES.map(({ key, icon: Icon, color, path }) => (
+          {SERVICES.map(({ id, icon: Icon, color }) => (
             <button
-              key={key}
+              key={id}
               className="service-card"
-              onClick={() => navigate(path)}
+              onClick={() => navigate(`/guides/${id}`)}
               style={{ '--service-color': color }}
             >
               <div className="service-icon-wrap">
                 <Icon size={32} color={color} />
               </div>
-              <p className="service-label">{t(key)}</p>
+              <p className="service-label">{t(`guideCat_${id}`)}</p>
             </button>
           ))}
         </div>
