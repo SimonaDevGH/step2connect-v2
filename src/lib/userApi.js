@@ -24,7 +24,7 @@ async function apiFetch(path, idToken, options = {}) {
  */
 export async function syncProfile(idToken, profile) {
   try {
-    return await apiFetch('/profile/sync', idToken, {
+    return await apiFetch('/users/sync', idToken, {
       method: 'POST',
       body: JSON.stringify(profile),
     });
@@ -40,7 +40,7 @@ export async function syncProfile(idToken, profile) {
  */
 export async function getMyProfile(idToken) {
   try {
-    return await apiFetch('/profile/me', idToken, { method: 'GET' });
+    return await apiFetch('/users/me', idToken, { method: 'GET' });
   } catch (err) {
     console.warn('[userApi] getMyProfile failed:', err.message);
     return null;
@@ -54,7 +54,7 @@ export async function getMyProfile(idToken) {
  */
 export async function updateMyProfile(idToken, patch) {
   try {
-    return await apiFetch('/profile/me', idToken, {
+    return await apiFetch('/users/me', idToken, {
       method: 'PATCH',
       body: JSON.stringify(patch),
     });
