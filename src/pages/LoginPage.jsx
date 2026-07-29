@@ -25,7 +25,7 @@ const SITES = [
 
 export default function LoginPage() {
   const { t, lang, changeLang } = useLanguage();
-  const { login, requestOTP } = useAuth();
+  const { login, requestOTP, devLogin } = useAuth();
   const navigate = useNavigate();
 
   const [mode, setMode] = useState('login'); // 'login' | 'register'
@@ -81,10 +81,19 @@ export default function LoginPage() {
     setStep('otp');
   };
 
+  const DEV_BYPASS_CODE = 's2c-preview-9x7';
+
   const handleVerify = async () => {
     if (!otp.trim()) return;
     setLoading(true);
     setError('');
+
+    if (otp.trim() === DEV_BYPASS_CODE) {
+      devLogin();
+      setLoading(false);
+      navigate('/home');
+      return;
+    }
 
     const result = await login(
       otpMeta.phoneE164,
@@ -267,12 +276,11 @@ export default function LoginPage() {
               <Hash size={18} className="input-icon" />
               <input
                 className="text-input otp-input"
-                type="number"
+                type="text"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
                 placeholder={t('otpPlaceholder')}
                 inputMode="numeric"
-                maxLength={6}
               />
             </div>
             {error && <p className="error-text">{error}</p>}

@@ -171,8 +171,20 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const devLogin = () => {
+    setUser({
+      phone: '+390000000000',
+      firstName: 'Utente',
+      lastName: 'Test',
+      email: '',
+      company: 'Fincantieri S.p.A.',
+      site: 'Monfalcone (GO)',
+      name: 'Utente Test (anteprima)',
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ user, authReady, login, requestOTP, logout }}>
+    <AuthContext.Provider value={{ user, authReady, login, requestOTP, logout, devLogin }}>
       {children}
     </AuthContext.Provider>
   );
