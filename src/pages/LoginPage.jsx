@@ -10,10 +10,7 @@ const LANGS = [
   { code: 'bn', label: 'বাং', flag: '🇧🇩' },
 ];
 
-const COMPANIES = [
-  'Fincantieri S.p.A.',
-  'Altra azienda',
-];
+const COMPANIES = ['Fincantieri S.p.A.', 'Altra azienda'];
 
 const SITES = [
   'Monfalcone (GO)',
@@ -47,6 +44,9 @@ export default function LoginPage() {
   const [company, setCompany] = useState('');
   const [site, setSite] = useState('');
 
+  // Stato interno per passare dati tra step
+  const [otpMeta, setOtpMeta] = useState({ phoneE164: '', isRegister: false, userData: {} });
+
   const resetForm = (newMode) => {
     setMode(newMode);
     setStep('form');
@@ -54,15 +54,30 @@ export default function LoginPage() {
     setOtp('');
   };
 
-  const isRegisterValid =
-    firstName.trim() && lastName.trim() && phone.trim() && company && site;
+  const isRegisterValid = firstName.trim() && lastName.trim() && phone.trim() && company && site;
   const isLoginValid = phone.trim();
 
   const handleSendOTP = async () => {
     setLoading(true);
     setError('');
-    await requestOTP(phone);
+
+    const userData = mode === 'register'
+      ? { firstName, lastName, email, company, site }
+      : {};
+
+    const result = await requestOTP(phone, userData);
     setLoading(false);
+
+    if (!result.success) {
+      setError(result.error || 'Errore invio OTP');
+      return;
+    }
+
+    setOtpMeta({
+      phoneE164: result.phoneE164,
+      isRegister: result.isRegister,
+      userData,
+    });
     setStep('otp');
   };
 
@@ -70,10 +85,14 @@ export default function LoginPage() {
     if (!otp.trim()) return;
     setLoading(true);
     setError('');
-    const userData = mode === 'register'
-      ? { firstName, lastName, email, company, site }
-      : undefined;
-    const result = await login(phone, otp, userData);
+
+    const result = await login(
+      otpMeta.phoneE164,
+      otp,
+      otpMeta.userData,
+      otpMeta.isRegister,
+    );
+
     setLoading(false);
     if (result.success) {
       navigate('/home');
@@ -243,8 +262,7 @@ export default function LoginPage() {
           </>
         ) : (
           <>
-            <p className="otp-hint">{t('otpSent')}: <strong>{phone}</strong></p>
-            <p className="otp-demo-hint">{t('otpHint')}</p>
+            <p className="otp-hint">{t('otpSent')}: <strong>{otpMeta.phoneE164 || phone}</strong></p>
             <div className="input-group">
               <Hash size={18} className="input-icon" />
               <input

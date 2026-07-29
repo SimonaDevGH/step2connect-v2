@@ -25,12 +25,13 @@ import { Menu } from 'lucide-react';
 import { useLanguage } from './context/LanguageContext';
 
 function ProtectedRoute({ children }) {
-  const { user } = useAuth();
+  const { user, authReady } = useAuth();
+  if (!authReady) return null; // aspetta il ripristino sessione Amplify
   return user ? children : <Navigate to="/" replace />;
 }
 
 function AppShell() {
-  const { user } = useAuth();
+  const { user, authReady } = useAuth();
   const { t } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
 
