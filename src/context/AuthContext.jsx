@@ -50,11 +50,19 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
 
-  // Al mount: ripristina la sessione Amplify se già autenticata
+  // Al mount: controlla prima la sessione dev, poi Amplify
   useEffect(() => {
     (async () => {
       try {
-        await getCurrentUser(); // lancia se non autenticato
+        // 1. Bypass dev — persiste in localStorage
+        const devSession = localStorage.getItem('s2c_dev_session');
+        if (devSession) {
+          setUser(JSON.parse(devSession));
+          setAuthReady(true);
+          return;
+        }
+        // 2. Sessione Cognito reale
+        await getCurrentUser();
         const attrs = await fetchUserAttributes();
         setUser(buildUserFromAttributes(attrs));
       } catch {
@@ -162,6 +170,7 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
+    localStorage.removeItem('s2c_dev_session');
     try {
       await signOut();
     } catch (err) {
@@ -172,7 +181,7 @@ export function AuthProvider({ children }) {
   };
 
   const devLogin = () => {
-    setUser({
+    const devUser = {
       phone: '+390000000000',
       firstName: 'Utente',
       lastName: 'Test',
@@ -180,7 +189,9 @@ export function AuthProvider({ children }) {
       company: 'Fincantieri S.p.A.',
       site: 'Monfalcone (GO)',
       name: 'Utente Test (anteprima)',
-    });
+    };
+    localStorage.setItem('s2c_dev_session', JSON.stringify(devUser));
+    setUser(devUser);
   };
 
   return (
