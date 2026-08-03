@@ -1011,6 +1011,36 @@ input, textarea { font-family: inherit; }
 .trans-note { font-size: 0.78rem; color: var(--text-muted); max-width: 260px; line-height: 1.4; }
 
 /* ── Guide pratiche — category grid ──────────────────────────────────── */
+/* ── Guides hero ──────────────────────────────────────────────────────── */
+.guides-hero {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+.guides-hero-img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
+}
+.guides-hero-text {
+  padding: 16px 20px 12px;
+  background: #fff;
+}
+.guides-hero-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #1D3557;
+  margin: 0 0 4px;
+}
+.guides-hero-sub {
+  font-size: 0.88rem;
+  color: #1D3557;
+  margin: 0;
+  opacity: 0.75;
+}
+
 .guides-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

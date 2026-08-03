@@ -8,10 +8,12 @@ export default function GuidesPage() {
 
   return (
     <div className="page-content">
-      <div className="page-hero" style={{ background: '#06A77D' }}>
-        <div className="page-hero-icon">📖</div>
-        <h2 className="page-hero-title">{t('guidesTitle')}</h2>
-        <p className="page-hero-sub">{t('guidesDesc')}</p>
+      <div className="guides-hero">
+        <img src="/guides-hero.png" alt="" className="guides-hero-img" />
+        <div className="guides-hero-text">
+          <h2 className="guides-hero-title">{t('guidesTitle')}</h2>
+          <p className="guides-hero-sub">{t('guidesDesc')}</p>
+        </div>
       </div>
 
       <div className="guides-grid">
