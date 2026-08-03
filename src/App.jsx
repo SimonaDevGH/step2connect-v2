@@ -42,6 +42,15 @@ function AppShell() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
 
+  // Aspetta il ripristino sessione Amplify prima di decidere dove andare
+  if (!authReady) {
+    return (
+      <div className="app-loading">
+        <div className="app-loading-spinner" />
+      </div>
+    );
+  }
+
   if (!user) {
     return (
       <Routes>
