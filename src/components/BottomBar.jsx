@@ -41,16 +41,7 @@ export default function BottomBar() {
       )}
 
       <nav className="bottom-bar">
-        {/* Left: Home */}
-        <button
-          className={`bottom-btn bottom-btn-home ${location.pathname === '/home' ? 'active' : ''}`}
-          onClick={() => navigate('/home')}
-          aria-label={t('home')}
-        >
-          <Home size={28} />
-        </button>
-
-        {/* Right: User */}
+        {/* Left: User */}
         <button
           className={`bottom-btn ${userOpen ? 'active' : ''}`}
           onClick={() => setUserOpen((v) => !v)}
@@ -59,6 +50,18 @@ export default function BottomBar() {
           <UserCircle size={24} />
           <span>{user?.firstName || 'Account'}</span>
         </button>
+
+        {/* Center: Home */}
+        <button
+          className={`bottom-btn bottom-btn-home ${location.pathname === '/home' ? 'active' : ''}`}
+          onClick={() => navigate('/home')}
+          aria-label={t('home')}
+        >
+          <Home size={28} />
+        </button>
+
+        {/* Right: empty placeholder */}
+        <div style={{ width: 56 }} />
       </nav>
     </>
   );
