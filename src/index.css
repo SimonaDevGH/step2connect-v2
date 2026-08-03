@@ -150,6 +150,10 @@ input, textarea { font-family: inherit; }
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
+}
+.top-lang-dropdown--right {
+  left: auto;
+  right: 0;
   background: var(--navy);
   border-radius: var(--radius);
   overflow: hidden;

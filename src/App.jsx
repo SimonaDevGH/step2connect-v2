@@ -58,7 +58,9 @@ function AppShell() {
           <Menu size={26} />
         </button>
 
-        {/* Language selector — left of logo */}
+        <img src="/logo-white.png" alt="Step2Connect" className="top-bar-logo" />
+
+        {/* Language selector — right of logo */}
         <div className="top-lang-wrap">
           <button
             className={`top-lang-btn ${langOpen ? 'active' : ''}`}
@@ -69,7 +71,7 @@ function AppShell() {
             <span>{lang.toUpperCase()}</span>
           </button>
           {langOpen && (
-            <div className="top-lang-dropdown">
+            <div className="top-lang-dropdown top-lang-dropdown--right">
               {LANGS.map((l) => (
                 <button
                   key={l.code}
@@ -82,9 +84,6 @@ function AppShell() {
             </div>
           )}
         </div>
-
-        <img src="/logo-white.png" alt="Step2Connect" className="top-bar-logo" />
-        <div style={{ width: 40 }} />
       </header>
 
       {/* Side menu */}
