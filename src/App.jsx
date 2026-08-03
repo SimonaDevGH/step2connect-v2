@@ -21,8 +21,14 @@ import AnalyzeDocumentPage from './pages/AnalyzeDocumentPage';
 import BottomBar from './components/BottomBar';
 import SideMenu from './components/SideMenu';
 import LivePersonBubble from './components/LivePersonBubble';
-import { Menu } from 'lucide-react';
+import { Menu, Languages } from 'lucide-react';
 import { useLanguage } from './context/LanguageContext';
+
+const LANGS = [
+  { code: 'it', label: 'IT' },
+  { code: 'en', label: 'EN' },
+  { code: 'bn', label: 'বাং' },
+];
 
 function ProtectedRoute({ children }) {
   const { user, authReady } = useAuth();
@@ -32,8 +38,9 @@ function ProtectedRoute({ children }) {
 
 function AppShell() {
   const { user, authReady } = useAuth();
-  const { t } = useLanguage();
+  const { t, lang, changeLang } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [langOpen, setLangOpen] = useState(false);
 
   if (!user) {
     return (
@@ -50,6 +57,32 @@ function AppShell() {
         <button className="icon-btn" onClick={() => setMenuOpen(true)} aria-label="Menu">
           <Menu size={26} />
         </button>
+
+        {/* Language selector — left of logo */}
+        <div className="top-lang-wrap">
+          <button
+            className={`top-lang-btn ${langOpen ? 'active' : ''}`}
+            onClick={() => setLangOpen((v) => !v)}
+            aria-label="Lingua"
+          >
+            <Languages size={18} />
+            <span>{lang.toUpperCase()}</span>
+          </button>
+          {langOpen && (
+            <div className="top-lang-dropdown">
+              {LANGS.map((l) => (
+                <button
+                  key={l.code}
+                  className={`top-lang-option ${lang === l.code ? 'active' : ''}`}
+                  onClick={() => { changeLang(l.code); setLangOpen(false); }}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <img src="/logo-white.png" alt="Step2Connect" className="top-bar-logo" />
         <div style={{ width: 40 }} />
       </header>

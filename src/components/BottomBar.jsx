@@ -1,49 +1,47 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Languages } from 'lucide-react';
+import { Home, UserCircle, LogOut, X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-
-const LANGS = [
-  { code: 'it', label: 'Italiano' },
-  { code: 'en', label: 'English' },
-  { code: 'bn', label: 'বাংলা' },
-];
+import { useAuth } from '../context/AuthContext';
 
 export default function BottomBar() {
-  const { lang, changeLang, t } = useLanguage();
+  const { t } = useLanguage();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [langOpen, setLangOpen] = useState(false);
+  const [userOpen, setUserOpen] = useState(false);
+
+  const handleLogout = async () => {
+    setUserOpen(false);
+    await logout();
+  };
 
   return (
     <>
-      {/* Language dropdown */}
-      {langOpen && (
-        <div className="bottom-lang-dropdown">
-          {LANGS.map((l) => (
-            <button
-              key={l.code}
-              className={`lang-option ${lang === l.code ? 'active' : ''}`}
-              onClick={() => { changeLang(l.code); setLangOpen(false); }}
-            >
-              {l.label}
+      {/* User panel */}
+      {userOpen && (
+        <div className="bottom-user-panel">
+          <div className="user-panel-header">
+            <div className="user-panel-avatar">
+              <UserCircle size={32} />
+            </div>
+            <div className="user-panel-info">
+              <span className="user-panel-name">{user?.name || user?.phone}</span>
+              {user?.site && <span className="user-panel-site">{user.site}</span>}
+            </div>
+            <button className="user-panel-close" onClick={() => setUserOpen(false)}>
+              <X size={18} />
             </button>
-          ))}
+          </div>
+          <button className="user-panel-logout" onClick={handleLogout}>
+            <LogOut size={18} />
+            <span>{t('logout') || 'Esci'}</span>
+          </button>
         </div>
       )}
 
       <nav className="bottom-bar">
-        {/* Left: Language */}
-        <button
-          className={`bottom-btn ${langOpen ? 'active' : ''}`}
-          onClick={() => setLangOpen((v) => !v)}
-          aria-label={t('translate')}
-        >
-          <Languages size={24} />
-          <span>{lang.toUpperCase()}</span>
-        </button>
-
-        {/* Center: Home */}
+        {/* Left: Home */}
         <button
           className={`bottom-btn bottom-btn-home ${location.pathname === '/home' ? 'active' : ''}`}
           onClick={() => navigate('/home')}
@@ -52,8 +50,15 @@ export default function BottomBar() {
           <Home size={28} />
         </button>
 
-        {/* Right slot intentionally empty — LP injects its own chat button */}
-        <div style={{ width: 56 }} />
+        {/* Right: User */}
+        <button
+          className={`bottom-btn ${userOpen ? 'active' : ''}`}
+          onClick={() => setUserOpen((v) => !v)}
+          aria-label="Account"
+        >
+          <UserCircle size={24} />
+          <span>{user?.firstName || 'Account'}</span>
+        </button>
       </nav>
     </>
   );
