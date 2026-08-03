@@ -10,7 +10,8 @@ export default function GuidesPage() {
     <div className="page-content">
       <div className="guides-hero">
         <img src="/guides-hero.png" alt="" className="guides-hero-img" />
-        <div className="guides-hero-text">
+        <div className="guides-hero-overlay">
+          <span className="guides-hero-emoji">📖</span>
           <h2 className="guides-hero-title">{t('guidesTitle')}</h2>
           <p className="guides-hero-sub">{t('guidesDesc')}</p>
         </div>
