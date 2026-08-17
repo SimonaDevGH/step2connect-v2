@@ -1,12 +1,11 @@
 /**
  * Route admin — CRUD contenuti su S3.
- * Tutte protette da requireAuth + requireAdminGroup.
+ * Tutte protette da requireAdminJWT (login email+password CMS).
  */
 const express = require('express');
 const multer  = require('multer');
 const mime    = require('mime-types');
-const path    = require('path');
-const { requireAuth, requireAdminGroup, userId } = require('../middleware/auth');
+const { requireAdminJWT, adminUserId } = require('../middleware/adminAuth');
 const { getJson, putJson, putBuffer, listKeys, copyObject } = require('../lib/s3');
 const { validateContent } = require('../lib/validate');
 
@@ -23,8 +22,8 @@ const upload = multer({
   },
 });
 
-// Applica auth su tutte le route di questo router
-router.use(requireAuth, requireAdminGroup);
+// Applica auth JWT su tutte le route di questo router
+router.use(requireAdminJWT);
 
 // ── LIST ─────────────────────────────────────────────────────────────────────
 // GET /api/admin/content?type=guides&lang=it
@@ -50,24 +49,26 @@ router.get('/', async (req, res) => {
 router.get('/:type/:id', async (req, res) => {
   const { type, id } = req.params;
   try {
-    // Carica le tre versioni linguistiche del draft
     const [it, en, bn] = await Promise.all([
       getJson(`content/draft/${type}/it/${id}.json`),
       getJson(`content/draft/${type}/en/${id}.json`),
       getJson(`content/draft/${type}/bn/${id}.json`),
     ]);
     if (!it && !en && !bn) return res.status(404).json({ error: 'Not found' });
-    // Ritorna un oggetto unificato per il form
     const base = it || en || bn;
     res.json({
-      id: base.id,
-      type: base.type,
-      category: base.category || '',
-      emoji: base.emoji || '📄',
-      imageUrl: base.imageUrl || '',
-      it: it ? { title: it.title, body: it.body, audioUrl: it.audioUrl || '' } : { title: '', body: '', audioUrl: '' },
-      en: en ? { title: en.title, body: en.body, audioUrl: en.audioUrl || '' } : { title: '', body: '', audioUrl: '' },
-      bn: bn ? { title: bn.title, body: bn.body, audioUrl: bn.audioUrl || '' } : { title: '', body: '', audioUrl: '' },
+      id:        base.id,
+      type:      base.type,
+      category:  base.category || '',
+      emoji:     base.emoji || '📄',
+      imageUrl:  base.imageUrl || '',
+      url:       base.url || '',
+      it: it  ? { title: it.title,  body: it.body,  audioUrl: it.audioUrl  || '', metaDesc: it.metaDesc  || '' }
+              : { title: '',        body: '',        audioUrl: '',               metaDesc: '' },
+      en: en  ? { title: en.title,  body: en.body,  audioUrl: en.audioUrl  || '', metaDesc: en.metaDesc  || '' }
+              : { title: '',        body: '',        audioUrl: '',               metaDesc: '' },
+      bn: bn  ? { title: bn.title,  body: bn.body,  audioUrl: bn.audioUrl  || '', metaDesc: bn.metaDesc  || '' }
+              : { title: '',        body: '',        audioUrl: '',               metaDesc: '' },
       updatedBy: base.updatedBy || '',
       updatedAt: base.updatedAt || '',
     });
@@ -82,11 +83,10 @@ router.get('/:type/:id', async (req, res) => {
 router.put('/:type/:id', async (req, res) => {
   const { type, id } = req.params;
   const now    = new Date().toISOString();
-  const author = userId(req);
+  const author = adminUserId(req);
 
   try {
     const payload = validateContent({ ...req.body, id, type });
-    // Salva un file per ogni lingua
     for (const lang of ['it', 'en', 'bn']) {
       const key = `content/draft/${type}/${lang}/${id}.json`;
       await putJson(key, {
@@ -96,9 +96,11 @@ router.put('/:type/:id', async (req, res) => {
         category:  payload.category,
         emoji:     payload.emoji,
         imageUrl:  payload.imageUrl || '',
+        url:       payload.url      || '',
         title:     payload[lang].title,
         body:      payload[lang].body,
         audioUrl:  payload[lang].audioUrl || '',
+        metaDesc:  payload[lang].metaDesc || '',
         updatedBy: author,
         updatedAt: now,
       });
@@ -153,12 +155,13 @@ router.delete('/:type/:id', async (req, res) => {
 
 // ── MEDIA UPLOAD ──────────────────────────────────────────────────────────────
 // POST /api/admin/content/:type/:id/media
+// Salva in step2connect/img/{type}/{id}/{timestamp}.{ext}
 router.post('/:type/:id/media', upload.single('file'), async (req, res) => {
   const { type, id } = req.params;
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
   const ext = mime.extension(req.file.mimetype) || 'bin';
-  const key = `media/${type}/${id}/${Date.now()}.${ext}`;
+  const key = `step2connect/img/${type}/${id}/${Date.now()}.${ext}`;
   try {
     await putBuffer(key, req.file.buffer, req.file.mimetype);
     const region = process.env.AWS_REGION || 'eu-west-2';

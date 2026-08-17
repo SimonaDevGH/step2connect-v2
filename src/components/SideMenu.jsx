@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { X, Home, BookOpen, HelpCircle, FileSearch, MapPin, Bell, ShieldCheck, Languages, LogOut } from 'lucide-react';
+import { X, Home, BookOpen, HelpCircle, FileSearch, MapPin, Bell, ShieldCheck, Languages, LogOut, Settings } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -53,6 +53,19 @@ export default function SideMenu({ open, onClose }) {
           <span className="side-menu-icon" style={{ color: '#6b7280' }}><ShieldCheck size={20} /></span>
           <span>{t('privacyTitle')}</span>
         </button>
+
+        {/* Link al pannello CMS admin */}
+        <a
+          href="/admin/login"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="side-menu-item"
+          style={{ textDecoration: 'none', color: 'inherit' }}
+          onClick={onClose}
+        >
+          <span className="side-menu-icon" style={{ color: '#94a3b8' }}><Settings size={20} /></span>
+          <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Gestione contenuti</span>
+        </a>
 
         <div className="side-menu-footer">
           {/* Lingua */}

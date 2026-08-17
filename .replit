@@ -45,3 +45,8 @@ run = ["npm", "run", "start"]
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 120000
+
+[userenv]
+
+[userenv.shared]
+FROM_EMAIL = "non ho ancora un indirizzo email"

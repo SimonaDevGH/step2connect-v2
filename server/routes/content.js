@@ -31,6 +31,27 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/content/pages-by-url?url=/percorso/pagina&lang=it
+// Cerca tra le pages pubblicate quella con url corrispondente.
+// IMPORTANTE: questa route deve stare PRIMA di /:type/:id
+router.get('/pages-by-url', async (req, res) => {
+  const { url, lang = 'it' } = req.query;
+  if (!url) return res.status(400).json({ error: 'url is required' });
+
+  try {
+    const prefix = `content/published/pages/${lang}/`;
+    const keys   = await listKeys(prefix);
+    for (const key of keys.filter((k) => k.endsWith('.json'))) {
+      const data = await getJson(key);
+      if (data && data.url === url) return res.json(data);
+    }
+    res.status(404).json({ error: 'Page not found' });
+  } catch (err) {
+    console.error('[content] pages-by-url error', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/content/:type/:id?lang=it
 // Dettaglio singolo contenuto pubblicato.
 router.get('/:type/:id', async (req, res) => {

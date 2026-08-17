@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Plus, Eye, Pencil, Trash2, Send, RefreshCw } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
-import { useLanguage } from '../../context/LanguageContext';
+import { ChevronLeft, Plus, Pencil, Trash2, Send, RefreshCw, LogOut, UserCircle } from 'lucide-react';
+import { useAdminAuth } from '../../context/AdminAuthContext';
 import ContentEditForm from './ContentEditForm';
 
-const TYPES = ['guides', 'news', 'library'];
+const TYPES = ['guides', 'news', 'library', 'pages'];
 const LANGS = ['it', 'en', 'bn'];
 
-const API = import.meta.env.VITE_API_BASE_URL || '';
+// Route admin: URL sempre relativi (proxy Vite in dev, Express stesso origin in prod).
+const API = '';
 
 async function apiFetch(path, token, opts = {}) {
   const res = await fetch(`${API}${path}`, {
@@ -25,50 +25,42 @@ async function apiFetch(path, token, opts = {}) {
 }
 
 export default function AdminContentPage() {
-  const { user } = useAuth();
-  const { t } = useLanguage();
+  const { adminToken, adminUser, logout } = useAdminAuth();
   const navigate = useNavigate();
 
-  const [type, setType] = useState('guides');
-  const [lang, setLang] = useState('it');
-  const [items, setItems] = useState([]);
+  const [type,    setType]    = useState('guides');
+  const [lang,    setLang]    = useState('it');
+  const [items,   setItems]   = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [editId, setEditId] = useState(null); // null = list, 'new' = create, 'xxx' = edit
-
-  // Controlla gruppo content-admin (lato client, solo UX)
-  const isAdmin = user?.groups?.includes('content-admin') || user?.['cognito:groups']?.includes('content-admin') || true; // lascia passare — la vera protezione è server-side
-  useEffect(() => {
-    if (!user) navigate('/home');
-  }, [user, navigate]);
+  const [error,   setError]   = useState('');
+  const [editId,  setEditId]  = useState(null);
 
   const loadItems = useCallback(async () => {
+    if (!adminToken) return;
     setLoading(true);
     setError('');
     try {
-      // Usiamo l'idToken dalla sessione Amplify
-      const { fetchAuthSession } = await import('aws-amplify/auth');
-      const session = await fetchAuthSession();
-      const token = session?.tokens?.idToken?.toString();
-      const data = await apiFetch(`/api/admin/content?type=${type}&lang=${lang}`, token);
+      const data = await apiFetch(`/api/admin/content?type=${type}&lang=${lang}`, adminToken);
       setItems(data);
     } catch (err) {
-      setError(err.message);
+      if (err.message.includes('401') || err.message.toLowerCase().includes('token')) {
+        logout();
+        navigate('/admin/login', { replace: true });
+      } else {
+        setError(err.message);
+      }
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, [type, lang]);
+  }, [type, lang, adminToken, logout, navigate]);
 
   useEffect(() => { loadItems(); }, [loadItems]);
 
   const handleDelete = async (id) => {
     if (!confirm(`Archiviare il contenuto "${id}"?`)) return;
     try {
-      const { fetchAuthSession } = await import('aws-amplify/auth');
-      const session = await fetchAuthSession();
-      const token = session?.tokens?.idToken?.toString();
-      await apiFetch(`/api/admin/content/${type}/${id}`, token, { method: 'DELETE' });
+      await apiFetch(`/api/admin/content/${type}/${id}`, adminToken, { method: 'DELETE' });
       loadItems();
     } catch (err) {
       alert('Errore: ' + err.message);
@@ -78,14 +70,16 @@ export default function AdminContentPage() {
   const handlePublish = async (id) => {
     if (!confirm(`Pubblicare "${id}"? Sarà visibile a tutti gli utenti.`)) return;
     try {
-      const { fetchAuthSession } = await import('aws-amplify/auth');
-      const session = await fetchAuthSession();
-      const token = session?.tokens?.idToken?.toString();
-      await apiFetch(`/api/admin/content/${type}/${id}/publish`, token, { method: 'POST' });
+      await apiFetch(`/api/admin/content/${type}/${id}/publish`, adminToken, { method: 'POST' });
       alert('Pubblicato!');
     } catch (err) {
       alert('Errore pubblicazione: ' + err.message);
     }
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/admin/login', { replace: true });
   };
 
   if (editId !== null) {
@@ -101,12 +95,12 @@ export default function AdminContentPage() {
   return (
     <div className="page-content">
       <div className="page-hero" style={{ background: '#1D3557' }}>
-        <button className="back-btn" onClick={() => navigate('/home')}>
+        <button className="back-btn" onClick={() => navigate('/')}>
           <ChevronLeft size={24} /> Home
         </button>
         <div className="page-hero-icon">⚙️</div>
         <h2 className="page-hero-title">Gestione contenuti</h2>
-        <p className="page-hero-sub">Area admin — solo content-admin</p>
+        <p className="page-hero-sub">{adminUser?.name || adminUser?.email || 'Admin'}</p>
       </div>
 
       <div className="admin-toolbar">
@@ -140,6 +134,22 @@ export default function AdminContentPage() {
         <button className="admin-new-btn" onClick={() => setEditId('new')}>
           <Plus size={18} /> Nuovo
         </button>
+        <button
+          className="admin-refresh-btn"
+          onClick={() => navigate('/admin/account')}
+          title="Il mio account"
+          style={{ marginLeft: 'auto' }}
+        >
+          <UserCircle size={18} />
+        </button>
+        <button
+          className="admin-refresh-btn"
+          onClick={handleLogout}
+          title="Esci"
+          style={{ color: '#c0392b' }}
+        >
+          <LogOut size={18} />
+        </button>
       </div>
 
       {error && <div className="admin-error">⚠️ {error}</div>}
@@ -157,12 +167,17 @@ export default function AdminContentPage() {
               <span className="admin-item-emoji">{item.emoji || '📄'}</span>
               <div className="admin-item-info">
                 <p className="admin-item-title">{item.title || item.id}</p>
-                <p className="admin-item-meta">{item.id} · {item.updatedAt ? new Date(item.updatedAt).toLocaleDateString('it') : '—'}</p>
+                <p className="admin-item-meta">
+                  {item.id}
+                  {item.url ? ` · ${item.url}` : ''}
+                  {' · '}
+                  {item.updatedAt ? new Date(item.updatedAt).toLocaleDateString('it') : '—'}
+                </p>
               </div>
               <div className="admin-item-actions">
-                <button title="Modifica" onClick={() => setEditId(item.id)}><Pencil size={16} /></button>
-                <button title="Pubblica" onClick={() => handlePublish(item.id)}><Send size={16} /></button>
-                <button title="Archivia" className="admin-action-danger" onClick={() => handleDelete(item.id)}><Trash2 size={16} /></button>
+                <button title="Modifica"  onClick={() => setEditId(item.id)}><Pencil size={16} /></button>
+                <button title="Pubblica"  onClick={() => handlePublish(item.id)}><Send size={16} /></button>
+                <button title="Archivia"  className="admin-action-danger" onClick={() => handleDelete(item.id)}><Trash2 size={16} /></button>
               </div>
             </div>
           ))}

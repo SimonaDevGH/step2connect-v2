@@ -1,19 +1,25 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Save, Send, Upload, Music } from 'lucide-react';
+import { useAdminAuth } from '../../context/AdminAuthContext';
 
-const API = import.meta.env.VITE_API_BASE_URL || '';
+// Route admin: URL sempre relativi (proxy Vite in dev, Express stesso origin in prod).
+const API = '';
 const LANGS = [
   { code: 'it', label: 'Italiano 🇮🇹' },
   { code: 'en', label: 'English 🇬🇧' },
   { code: 'bn', label: 'বাংলা 🇧🇩' },
 ];
-const TYPES = ['guides', 'news', 'library'];
+const TYPES = ['guides', 'news', 'library', 'pages'];
 
-async function getToken() {
-  const { fetchAuthSession } = await import('aws-amplify/auth');
-  const session = await fetchAuthSession();
-  return session?.tokens?.idToken?.toString();
-}
+const GUIDE_CATEGORIES = [
+  { value: 'documents', label: '📄 Documenti e permessi' },
+  { value: 'health',    label: '❤️ Salute' },
+  { value: 'homeBills', label: '🏠 Casa e bollette' },
+  { value: 'school',    label: '🎓 Scuola e famiglia' },
+  { value: 'cityLife',  label: '🏙️ Vita in città' },
+  { value: 'work',      label: '💼 Lavoro' },
+];
 
 async function apiFetch(path, token, opts = {}) {
   const headers = { Authorization: `Bearer ${token}`, ...(opts.headers || {}) };
@@ -24,44 +30,48 @@ async function apiFetch(path, token, opts = {}) {
   return data;
 }
 
-const emptyLang = () => ({ title: '', body: '', audioUrl: '' });
+const emptyLang = () => ({ title: '', body: '', audioUrl: '', metaDesc: '' });
 const defaultForm = () => ({
-  id: '',
-  type: 'guides',
-  category: '',
-  emoji: '📄',
-  imageUrl: '',
-  it: emptyLang(),
-  en: emptyLang(),
-  bn: emptyLang(),
+  id: '', type: 'guides', category: '', emoji: '📄', imageUrl: '', url: '',
+  it: emptyLang(), en: emptyLang(), bn: emptyLang(),
 });
 
 export default function ContentEditForm({ contentType, contentId, onClose }) {
   const isNew = !contentId;
-  const [form, setForm] = useState(() => ({ ...defaultForm(), type: contentType || 'guides' }));
-  const [activeLang, setActiveLang] = useState('it');
-  const [loading, setLoading] = useState(!isNew);
-  const [saving, setSaving] = useState(false);
-  const [publishing, setPublishing] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const { adminToken, logout } = useAdminAuth();
+  const navigate = useNavigate();
+
+  const [form,         setForm]         = useState(() => ({ ...defaultForm(), type: contentType || 'guides' }));
+  const [activeLang,   setActiveLang]   = useState('it');
+  const [loading,      setLoading]      = useState(!isNew);
+  const [saving,       setSaving]       = useState(false);
+  const [publishing,   setPublishing]   = useState(false);
+  const [error,        setError]        = useState('');
+  const [success,      setSuccess]      = useState('');
   const [uploadingImg, setUploadingImg] = useState(false);
+
+  const handleAuthError = (err) => {
+    if (err.message.includes('401') || err.message.toLowerCase().includes('token')) {
+      logout();
+      navigate('/admin/login', { replace: true });
+    }
+  };
 
   // Carica contenuto esistente
   useEffect(() => {
     if (isNew) return;
     (async () => {
       try {
-        const token = await getToken();
-        const data = await apiFetch(`/api/admin/content/${contentType}/${contentId}`, token);
+        const data = await apiFetch(`/api/admin/content/${contentType}/${contentId}`, adminToken);
         setForm((prev) => ({ ...prev, ...data }));
       } catch (err) {
+        handleAuthError(err);
         setError('Errore caricamento: ' + err.message);
       } finally {
         setLoading(false);
       }
     })();
-  }, [contentId, contentType, isNew]);
+  }, [contentId, contentType, isNew, adminToken]);
 
   const setLangField = (lang, field, value) => {
     setForm((prev) => ({ ...prev, [lang]: { ...prev[lang], [field]: value } }));
@@ -72,13 +82,13 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
     setError('');
     setSuccess('');
     try {
-      const token = await getToken();
-      await apiFetch(`/api/admin/content/${form.type}/${form.id}`, token, {
+      await apiFetch(`/api/admin/content/${form.type}/${form.id}`, adminToken, {
         method: 'PUT',
         body: JSON.stringify(form),
       });
       setSuccess('Bozza salvata ✓');
     } catch (err) {
+      handleAuthError(err);
       setError(err.message);
     } finally {
       setSaving(false);
@@ -91,15 +101,14 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
     setError('');
     setSuccess('');
     try {
-      const token = await getToken();
-      // Prima salva la bozza aggiornata, poi pubblica
-      await apiFetch(`/api/admin/content/${form.type}/${form.id}`, token, {
+      await apiFetch(`/api/admin/content/${form.type}/${form.id}`, adminToken, {
         method: 'PUT',
         body: JSON.stringify(form),
       });
-      await apiFetch(`/api/admin/content/${form.type}/${form.id}/publish`, token, { method: 'POST' });
+      await apiFetch(`/api/admin/content/${form.type}/${form.id}/publish`, adminToken, { method: 'POST' });
       setSuccess('Pubblicato! ✓');
     } catch (err) {
+      handleAuthError(err);
       setError(err.message);
     } finally {
       setPublishing(false);
@@ -112,17 +121,17 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
     setUploadingImg(true);
     setError('');
     try {
-      const token = await getToken();
       const fd = new FormData();
       fd.append('file', file);
       const data = await apiFetch(
         `/api/admin/content/${form.type}/${form.id || 'new'}/media`,
-        token,
+        adminToken,
         { method: 'POST', body: fd }
       );
       setForm((prev) => ({ ...prev, imageUrl: data.url }));
       setSuccess('Immagine caricata ✓');
     } catch (err) {
+      handleAuthError(err);
       setError('Upload fallito: ' + err.message);
     } finally {
       setUploadingImg(false);
@@ -131,7 +140,9 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
 
   if (loading) return <div className="admin-loading">Caricamento…</div>;
 
-  const curLang = form[activeLang];
+  const curLang    = form[activeLang];
+  const isPages    = form.type === 'pages';
+  const isGuides   = form.type === 'guides';
 
   return (
     <div className="page-content">
@@ -159,27 +170,89 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
           />
 
           <label className="admin-label">Tipo *</label>
-          <select className="admin-input" value={form.type} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value }))}>
+          <select
+            className="admin-input"
+            value={form.type}
+            onChange={(e) => setForm((p) => ({ ...p, type: e.target.value }))}
+          >
             {TYPES.map((tp) => <option key={tp} value={tp}>{tp}</option>)}
           </select>
 
+          {/* Categoria: dropdown per guides, testo libero per gli altri */}
           <label className="admin-label">Categoria</label>
-          <input className="admin-input" value={form.category} onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))} placeholder="es. documents" />
+          {isGuides ? (
+            <select
+              className="admin-input"
+              value={form.category}
+              onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
+            >
+              <option value="">— seleziona categoria —</option>
+              {GUIDE_CATEGORIES.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+          ) : (
+            <input
+              className="admin-input"
+              value={form.category}
+              onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
+              placeholder="es. documents"
+            />
+          )}
 
           <label className="admin-label">Emoji</label>
-          <input className="admin-input" value={form.emoji} onChange={(e) => setForm((p) => ({ ...p, emoji: e.target.value }))} placeholder="📄" maxLength={4} style={{ width: 80 }} />
+          <input
+            className="admin-input"
+            value={form.emoji}
+            onChange={(e) => setForm((p) => ({ ...p, emoji: e.target.value }))}
+            placeholder="📄"
+            maxLength={4}
+            style={{ width: 80 }}
+          />
+
+          {/* URL pagina — visibile e obbligatorio solo per pages */}
+          {isPages && (
+            <>
+              <label className="admin-label" style={{ color: '#c0392b' }}>
+                URL pagina * <span style={{ fontWeight: 400, color: '#666', fontSize: 12 }}>
+                  (es. /guide-pratiche/documenti/permesso-di-soggiorno)
+                </span>
+              </label>
+              <input
+                className="admin-input"
+                value={form.url}
+                onChange={(e) => setForm((p) => ({ ...p, url: e.target.value }))}
+                placeholder="/percorso/pubblico/della-pagina"
+              />
+            </>
+          )}
         </div>
 
         {/* Immagine */}
         <div className="admin-section">
           <label className="admin-label">Immagine copertina</label>
-          {form.imageUrl && <img src={form.imageUrl} alt="" className="admin-img-preview" />}
+          {form.imageUrl && (
+            <img src={form.imageUrl} alt="" className="admin-img-preview" />
+          )}
           <label className="admin-upload-btn">
             {uploadingImg ? 'Caricamento…' : <><Upload size={16} /> Carica immagine</>}
-            <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} disabled={uploadingImg || !form.id} />
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              style={{ display: 'none' }}
+              disabled={uploadingImg || !form.id}
+            />
           </label>
-          {!form.id && <p className="admin-hint">Inserisci prima un ID per caricare l'immagine</p>}
-          <input className="admin-input" value={form.imageUrl} onChange={(e) => setForm((p) => ({ ...p, imageUrl: e.target.value }))} placeholder="URL immagine (opzionale)" />
+          {!form.id && (
+            <p className="admin-hint">Inserisci prima un ID per caricare l'immagine</p>
+          )}
+          <input
+            className="admin-input"
+            value={form.imageUrl}
+            onChange={(e) => setForm((p) => ({ ...p, imageUrl: e.target.value }))}
+            placeholder="URL immagine (oppure incolla link manuale)"
+          />
         </div>
 
         {/* Tab lingua */}
@@ -205,16 +278,62 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
             placeholder="Titolo"
           />
 
-          <label className="admin-label">Testo / Corpo ({activeLang.toUpperCase()})</label>
+          {/* Meta description — prominente per pages, disponibile anche per altri */}
+          {isPages ? (
+            <>
+              <label className="admin-label" style={{ color: '#c0392b' }}>
+                Meta description ({activeLang.toUpperCase()}) — SEO
+                <span style={{ fontWeight: 400, color: '#666', fontSize: 12, marginLeft: 6 }}>
+                  max 300 caratteri
+                </span>
+              </label>
+              <textarea
+                className="admin-textarea"
+                value={curLang.metaDesc}
+                onChange={(e) => setLangField(activeLang, 'metaDesc', e.target.value)}
+                placeholder="Breve descrizione per i motori di ricerca e le anteprime social"
+                rows={2}
+                maxLength={300}
+              />
+            </>
+          ) : (
+            <>
+              <label className="admin-label">
+                Meta description ({activeLang.toUpperCase()})
+                <span style={{ fontWeight: 400, color: '#666', fontSize: 12, marginLeft: 6 }}>
+                  opzionale, max 300 car.
+                </span>
+              </label>
+              <input
+                className="admin-input"
+                value={curLang.metaDesc}
+                onChange={(e) => setLangField(activeLang, 'metaDesc', e.target.value)}
+                placeholder="Descrizione breve (opzionale)"
+                maxLength={300}
+              />
+            </>
+          )}
+
+          <label className="admin-label">
+            Testo / Corpo ({activeLang.toUpperCase()})
+            {isPages && (
+              <span style={{ fontWeight: 400, color: '#666', fontSize: 12, marginLeft: 6 }}>
+                HTML: b, i, ul, ol, li, p, br, a, h2, h3, img
+              </span>
+            )}
+          </label>
           <textarea
             className="admin-textarea"
             value={curLang.body}
             onChange={(e) => setLangField(activeLang, 'body', e.target.value)}
-            placeholder="Testo del contenuto (HTML consentito: b, i, ul, ol, li, p, br, a)"
-            rows={10}
+            placeholder={
+              isPages
+                ? 'Corpo della pagina — HTML consentito incluso <img src="..." alt="...">'
+                : 'Testo del contenuto (HTML: b, i, ul, ol, li, p, br, a, h2, h3)'
+            }
+            rows={12}
           />
 
-          {/* Campo audio (predisposto, non attivo) */}
           <label className="admin-label">
             <Music size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} />
             Audio MP3 ({activeLang.toUpperCase()}) — opzionale
@@ -223,17 +342,25 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
             className="admin-input"
             value={curLang.audioUrl}
             onChange={(e) => setLangField(activeLang, 'audioUrl', e.target.value)}
-            placeholder="URL audio MP3 (carica manualmente per ora)"
+            placeholder="URL audio MP3"
           />
           <p className="admin-hint">In futuro questo campo sarà popolato automaticamente da text-to-speech.</p>
         </div>
 
         {/* Azioni */}
         <div className="admin-actions">
-          <button className="admin-btn-draft" onClick={handleSaveDraft} disabled={saving || !form.id}>
+          <button
+            className="admin-btn-draft"
+            onClick={handleSaveDraft}
+            disabled={saving || !form.id}
+          >
             {saving ? 'Salvataggio…' : <><Save size={16} /> Salva bozza</>}
           </button>
-          <button className="admin-btn-publish" onClick={handlePublish} disabled={publishing || !form.id}>
+          <button
+            className="admin-btn-publish"
+            onClick={handlePublish}
+            disabled={publishing || !form.id}
+          >
             {publishing ? 'Pubblicazione…' : <><Send size={16} /> Pubblica</>}
           </button>
         </div>

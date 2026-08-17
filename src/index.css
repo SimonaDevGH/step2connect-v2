@@ -1399,6 +1399,16 @@ input, textarea { font-family: inherit; }
 /* ── Guide pratiche — detail page ─────────────────────────────────────── */
 .guide-detail-body { padding: 20px 16px 32px; display: flex; flex-direction: column; gap: 20px; }
 
+/* Corpo HTML proveniente dal CMS */
+.guide-cms-body { font-size: 0.95rem; line-height: 1.7; color: #1a1a2e; }
+.guide-cms-body h2 { font-size: 1.1rem; font-weight: 700; margin: 20px 0 8px; color: #1D3557; }
+.guide-cms-body h3 { font-size: 1rem; font-weight: 600; margin: 16px 0 6px; color: #1D3557; }
+.guide-cms-body p  { margin: 0 0 12px; }
+.guide-cms-body ul, .guide-cms-body ol { padding-left: 20px; margin: 0 0 12px; }
+.guide-cms-body li { margin-bottom: 4px; }
+.guide-cms-body a  { color: #457B9D; text-decoration: underline; }
+.guide-cms-body img { max-width: 100%; border-radius: 8px; margin: 8px 0; }
+
 .guide-placeholder-block {
   display: flex;
   flex-direction: column;
