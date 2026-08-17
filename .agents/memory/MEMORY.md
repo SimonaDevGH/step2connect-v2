@@ -1,0 +1,3 @@
+- [Admin backend architecture](admin-backend-arch.md) — Express API su porta 3001 (dev) / 5000 (prod), CommonJS in server/, JWKS Cognito auth
+- [Dev workflow](dev-workflow.md) — concurrently lancia Vite (5000) + Express (3001); proxy Vite per /api in dev
+- [Content S3 schema](content-s3-schema.md) — chiavi S3: content/{draft|published|archive}/{type}/{lang}/{id}.json; un file per lingua

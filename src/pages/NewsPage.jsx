@@ -1,11 +1,10 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
-// ─── MOCK DATA ────────────────────────────────────────────────────────────────
-// Replace with real CMS or API feed
-// ─────────────────────────────────────────────────────────────────────────────
-const NEWS = [
+// ─── FALLBACK (static data shown if API is unavailable) ──────────────────────
+const NEWS_FALLBACK = [
   {
     id: 1,
     date: '2026-07-20',
@@ -36,9 +35,26 @@ const NEWS = [
   },
 ];
 
+const API = import.meta.env.VITE_API_BASE_URL || '';
+
 export default function NewsPage() {
   const { t, lang } = useLanguage();
   const navigate = useNavigate();
+  const [news, setNews] = useState(NEWS_FALLBACK);
+
+  useEffect(() => {
+    fetch(`${API}/api/content?type=news&lang=${lang}`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((data) => {
+        if (Array.isArray(data)) setNews(data);
+      })
+      .catch(() => {
+        // API unavailable — keep fallback data
+      });
+  }, [lang]);
 
   return (
     <div className="page-content">
@@ -51,13 +67,17 @@ export default function NewsPage() {
       </div>
 
       <div className="news-list">
-        {NEWS.map((item) => (
+        {news.map((item) => (
           <div key={item.id} className="news-card">
             <span className="news-emoji">{item.emoji}</span>
             <div className="news-content">
-              <p className="news-date">{item.date}</p>
-              <p className="news-title">{item.title[lang] || item.title.it}</p>
-              <p className="news-body">{item.body[lang] || item.body.it}</p>
+              <p className="news-date">{item.date || item.updatedAt?.split('T')[0] || ''}</p>
+              <p className="news-title">
+                {typeof item.title === 'string' ? item.title : (item.title?.[lang] ?? item.title?.it)}
+              </p>
+              <p className="news-body">
+                {typeof item.body === 'string' ? item.body : (item.body?.[lang] ?? item.body?.it)}
+              </p>
               <button className="news-read">{t('readMore')} →</button>
             </div>
           </div>

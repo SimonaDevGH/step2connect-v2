@@ -17,6 +17,7 @@ import NotificationsPage from './pages/NotificationsPage';
 import TranslatorPage from './pages/TranslatorPage';
 import PrivacyPage from './pages/PrivacyPage';
 import AnalyzeDocumentPage from './pages/AnalyzeDocumentPage';
+import AdminContentPage from './pages/admin/AdminContentPage';
 
 import BottomBar from './components/BottomBar';
 import SideMenu from './components/SideMenu';
@@ -107,7 +108,7 @@ function AppShell() {
           <Route path="/offices" element={<ProtectedRoute><FindOfficesPage /></ProtectedRoute>} />
           <Route path="/news" element={<ProtectedRoute><NewsPage /></ProtectedRoute>} />
           <Route path="/quiz" element={<ProtectedRoute><QuizPage /></ProtectedRoute>} />
-          <Route path="/library" element={<ProtectedRoute><GuidesPage /></ProtectedRoute>} />
+          <Route path="/library" element={<ProtectedRoute><LibraryPage /></ProtectedRoute>} />
           <Route path="/guides" element={<ProtectedRoute><GuidesPage /></ProtectedRoute>} />
           <Route path="/guides/:category" element={<ProtectedRoute><GuideCategoryPage /></ProtectedRoute>} />
           <Route path="/guides/:category/:item" element={<ProtectedRoute><GuideDetailPage /></ProtectedRoute>} />
@@ -115,6 +116,7 @@ function AppShell() {
           <Route path="/translator" element={<ProtectedRoute><TranslatorPage /></ProtectedRoute>} />
           <Route path="/privacy" element={<ProtectedRoute><PrivacyPage /></ProtectedRoute>} />
           <Route path="/analyze-document" element={<ProtectedRoute><AnalyzeDocumentPage /></ProtectedRoute>} />
+          <Route path="/admin/content" element={<ProtectedRoute><AdminContentPage /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
       </main>

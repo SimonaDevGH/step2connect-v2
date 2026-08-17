@@ -1,11 +1,10 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Download } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
-// ─── MOCK DATA ────────────────────────────────────────────────────────────────
-// Replace with real document storage (S3, CMS, etc.)
-// ─────────────────────────────────────────────────────────────────────────────
-const DOCUMENTS = [
+// ─── FALLBACK (static data shown if API is unavailable) ──────────────────────
+const DOCUMENTS_FALLBACK = [
   { emoji: '📄', title: { it: 'Guida al permesso di soggiorno', en: 'Residence permit guide', bn: 'বাসস্থান পারমিট গাইড' }, category: 'documents', size: '1.2 MB', url: '#' },
   { emoji: '💰', title: { it: 'Come leggere la busta paga', en: 'How to read your payslip', bn: 'বেতন স্লিপ কিভাবে পড়বেন' }, category: 'work', size: '800 KB', url: '#' },
   { emoji: '🏥', title: { it: 'Guida al sistema sanitario', en: 'Healthcare system guide', bn: 'স্বাস্থ্যসেবা সিস্টেম গাইড' }, category: 'health', size: '1.5 MB', url: '#' },
@@ -16,9 +15,26 @@ const DOCUMENTS = [
 
 const CAT_COLORS = { documents: '#457B9D', work: '#F4A261', health: '#E63946', school: '#2A9D8F', language: '#118AB2' };
 
+const API = import.meta.env.VITE_API_BASE_URL || '';
+
 export default function LibraryPage() {
   const { t, lang } = useLanguage();
   const navigate = useNavigate();
+  const [documents, setDocuments] = useState(DOCUMENTS_FALLBACK);
+
+  useEffect(() => {
+    fetch(`${API}/api/content?type=library&lang=${lang}`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((data) => {
+        if (Array.isArray(data)) setDocuments(data);
+      })
+      .catch(() => {
+        // API unavailable — keep fallback data
+      });
+  }, [lang]);
 
   return (
     <div className="page-content">
@@ -31,17 +47,26 @@ export default function LibraryPage() {
       </div>
 
       <div className="library-list">
-        {DOCUMENTS.map((doc, i) => (
-          <div key={i} className="library-card" style={{ '--cat-color': CAT_COLORS[doc.category] }}>
+        {documents.map((doc, i) => (
+          <div key={i} className="library-card" style={{ '--cat-color': CAT_COLORS[doc.category] ?? '#888' }}>
             <span className="lib-emoji">{doc.emoji}</span>
             <div className="lib-info">
-              <p className="lib-title">{doc.title[lang] || doc.title.it}</p>
-              <p className="lib-size">{doc.size}</p>
+              <p className="lib-title">
+                {typeof doc.title === 'string' ? doc.title : (doc.title?.[lang] ?? doc.title?.it)}
+              </p>
+              {doc.size && <p className="lib-size">{doc.size}</p>}
             </div>
-            <a className="lib-download" href={doc.url} download>
-              <Download size={20} />
-              <span>{t('download')}</span>
-            </a>
+            {doc.url && doc.url !== '#' ? (
+              <a className="lib-download" href={doc.url} download>
+                <Download size={20} />
+                <span>{t('download')}</span>
+              </a>
+            ) : (
+              <span className="lib-download lib-download--disabled">
+                <Download size={20} />
+                <span>{t('download')}</span>
+              </span>
+            )}
           </div>
         ))}
       </div>
