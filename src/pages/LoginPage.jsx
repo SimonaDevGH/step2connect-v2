@@ -268,6 +268,8 @@ export default function LoginPage() {
                 </button>
               </>
             )}
+            {/* Errore invio OTP — visibile nello step form, non solo nell'OTP step */}
+            {error && <p className="error-text">{error}</p>}
           </>
         ) : (
           <>

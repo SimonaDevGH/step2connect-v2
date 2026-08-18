@@ -85,7 +85,11 @@ export function AuthProvider({ children }) {
         // ── REGISTER FLOW ──
         const { nextStep } = await signUp({
           username: phoneE164,
-          password: crypto.randomUUID(), // Cognito lo richiede anche in passwordless
+          // Cognito richiede una password anche nel flusso passwordless.
+          // randomUUID() produce solo hex minuscolo + trattini → non soddisfa la policy
+          // "almeno 1 maiuscola, 1 simbolo". Aggiungiamo un suffisso fisso che copre
+          // tutte le classi richieste; la password è throwaway e non viene mai usata.
+          password: `${crypto.randomUUID()}Xz9!`,
           options: {
             userAttributes: {
               phone_number: phoneE164,
