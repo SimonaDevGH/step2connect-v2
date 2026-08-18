@@ -92,13 +92,10 @@ export function AuthProvider({ children }) {
           password: `${crypto.randomUUID()}Xz9!`,
           options: {
             userAttributes: {
+              // Il pool Cognito accetta solo phone_number al signUp.
+              // Tutti gli altri dati (email, nome, azienda, sito) vengono
+              // persistiti nel nostro backend tramite syncProfile dopo il login.
               phone_number: phoneE164,
-              ...(userData.email ? { email: userData.email } : {}),
-              ...(userData.firstName ? { given_name: userData.firstName } : {}),
-              ...(userData.lastName ? { family_name: userData.lastName } : {}),
-              ...(userData.company ? { 'custom:company': userData.company } : {}),
-              // 'custom:site' rimosso: non è nello schema Cognito e causa schema error al signUp.
-              // Il valore viene già salvato nel nostro backend tramite syncProfile dopo il login.
             },
             autoSignIn: { authFlowType: 'USER_AUTH' },
           },
