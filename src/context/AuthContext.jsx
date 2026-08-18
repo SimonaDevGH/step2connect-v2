@@ -97,7 +97,8 @@ export function AuthProvider({ children }) {
               ...(userData.firstName ? { given_name: userData.firstName } : {}),
               ...(userData.lastName ? { family_name: userData.lastName } : {}),
               ...(userData.company ? { 'custom:company': userData.company } : {}),
-              ...(userData.site ? { 'custom:site': userData.site } : {}),
+              // 'custom:site' rimosso: non è nello schema Cognito e causa schema error al signUp.
+              // Il valore viene già salvato nel nostro backend tramite syncProfile dopo il login.
             },
             autoSignIn: { authFlowType: 'USER_AUTH' },
           },
