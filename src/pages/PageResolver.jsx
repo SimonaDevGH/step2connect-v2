@@ -86,6 +86,15 @@ export default function PageResolver() {
         </div>
       )}
 
+      {page.videoUrl && (
+        <div className="content-video-wrap">
+          <video className="content-video" controls playsInline preload="metadata">
+            <source src={page.videoUrl} />
+            Il tuo browser non supporta la riproduzione video.
+          </video>
+        </div>
+      )}
+
       {/* Corpo */}
       <div
         className="guide-detail-body guide-cms-body"

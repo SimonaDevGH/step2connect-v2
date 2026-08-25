@@ -49,4 +49,4 @@ timeoutMs = 120000
 [userenv]
 
 [userenv.shared]
-FROM_EMAIL = "non ho ancora un indirizzo email"
+FROM_EMAIL = "liveperson-team@b4service.it"

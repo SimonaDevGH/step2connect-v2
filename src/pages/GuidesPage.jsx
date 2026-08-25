@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { GUIDE_CATEGORIES } from '../data/guides';
 
-const API = import.meta.env.VITE_API_BASE_URL || '';
+const API = '';
 
 export default function GuidesPage() {
   const { t, lang } = useLanguage();

@@ -4,7 +4,9 @@ import { ChevronLeft } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { getCategoryById, GUIDE_ITEMS } from '../data/guides';
 
-const API = import.meta.env.VITE_API_BASE_URL || '';
+// L'API pubblica è sullo stesso origin dell'app: in sviluppo Vite inoltra
+// /api a Express e in produzione Express serve entrambe le parti.
+const API = '';
 
 export default function GuideDetailPage() {
   const { category, item } = useParams();
@@ -18,9 +20,11 @@ export default function GuideDetailPage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`${API}/api/content/guides/${item}?lang=${lang}`)
+    setCmsContent(undefined);
+    fetch(`${API}/api/content/guides/${encodeURIComponent(item)}?lang=${lang}`)
       .then((r) => {
-        if (!r.ok) return null;
+        if (r.status === 404) return null;
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
       .then((data) => {
@@ -30,35 +34,54 @@ export default function GuideDetailPage() {
     return () => { cancelled = true; };
   }, [item, lang]);
 
-  if (!cat || !meta) {
+  if (!cat) {
     return <div className="page-content"><p className="empty-state">Guida non trovata</p></div>;
   }
 
-  // Usa i dati CMS se disponibili, altrimenti fallback ai dati statici
-  const displayTitle = cmsContent?.title || t(`guideItem_${item}_title`);
-  const displayDesc  = t(`guideItem_${item}_desc`);
+  // Il CMS può contenere nuove guide non presenti nel catalogo statico.
+  const displayTitle = cmsContent?.title || (meta ? t(`guideItem_${item}_title`) : t('guidesTitle'));
+  const displayDesc  = cmsContent?.metaDesc || (meta ? t(`guideItem_${item}_desc`) : '');
   const hasBody      = cmsContent?.body && cmsContent.body.trim().length > 0;
+  const hasPublishedContent = cmsContent !== undefined && cmsContent !== null;
+  const hasCoverImage = Boolean(cmsContent?.imageUrl);
+  const isResidencePermitGuide =
+    item === 'permitRequest' ||
+    /permesso di soggiorno|residence permit|বাসস্থান পারমিট/i.test(displayTitle);
+  const videoLabel = isResidencePermitGuide
+    ? t('guidePermitVideoPrompt')
+    : t('guideVideoPrompt');
+  const audioLabel = isResidencePermitGuide
+    ? t('guidePermitAudioPrompt')
+    : t('guideAudioPrompt');
+  const textHeading = isResidencePermitGuide
+    ? t('guidePermitTextHeading')
+    : `📄 ${displayTitle}`;
 
   return (
     <div className="page-content">
       {/* Header */}
-      <div className="page-hero" style={{ background: cat.color }}>
-        <button className="back-btn" onClick={() => navigate(`/guides/${category}`)}>
-          <ChevronLeft size={24} /> {t(`guideCat_${category}`)}
-        </button>
-        <div className="page-hero-icon">{cmsContent?.emoji || meta.emoji}</div>
-        <h2 className="page-hero-title">{displayTitle}</h2>
-        <p className="page-hero-sub">{displayDesc}</p>
+      <div
+        className={`page-hero${hasCoverImage ? ' page-hero--image' : ''}`}
+        style={hasCoverImage ? undefined : { background: cat.color }}
+      >
+        {hasCoverImage && (
+          <img
+            src={cmsContent.imageUrl}
+            alt=""
+            className="page-hero-img guide-detail-hero-img"
+          />
+        )}
+        <div
+          className={hasCoverImage ? 'page-hero-overlay guide-detail-hero-overlay' : undefined}
+        >
+          <button className="back-btn" onClick={() => navigate(`/guides/${category}`)}>
+            <ChevronLeft size={24} /> {t(`guideCat_${category}`)}
+          </button>
+          <div className="page-hero-icon">{cmsContent?.emoji || meta?.emoji || '📌'}</div>
+          <h2 className="page-hero-title">{displayTitle}</h2>
+          {displayDesc && <p className="page-hero-sub">{displayDesc}</p>}
+        </div>
       </div>
-
-      {/* Immagine copertina CMS */}
-      {cmsContent?.imageUrl && (
-        <img
-          src={cmsContent.imageUrl}
-          alt={displayTitle}
-          style={{ width: '100%', maxHeight: 260, objectFit: 'cover', display: 'block' }}
-        />
-      )}
 
       {/* Corpo */}
       <div className="guide-detail-body">
@@ -69,14 +92,8 @@ export default function GuideDetailPage() {
             <div className="skeleton-line" />
             <div className="skeleton-line short" />
           </div>
-        ) : hasBody ? (
-          /* Contenuto CMS */
-          <div
-            className="guide-cms-body"
-            dangerouslySetInnerHTML={{ __html: cmsContent.body }}
-          />
-        ) : (
-          /* Placeholder — nessun contenuto pubblicato */
+        ) : !hasPublishedContent ? (
+          /* Fallback solo se non esiste un record pubblicato. */
           <>
             <div className="guide-placeholder-block">
               <span className="guide-placeholder-icon">📝</span>
@@ -94,6 +111,39 @@ export default function GuideDetailPage() {
               <div className="skeleton-line" />
               <div className="skeleton-line short" />
             </div>
+          </>
+        ) : (
+          <>
+            {cmsContent.videoUrl && (
+              <section className="guide-detail-section">
+                <p className="guide-media-label">{videoLabel}</p>
+                <div className="content-video-wrap guide-detail-video-wrap">
+                  <video className="content-video" controls playsInline preload="metadata">
+                    <source src={cmsContent.videoUrl} />
+                    Il tuo browser non supporta la riproduzione video.
+                  </video>
+                </div>
+              </section>
+            )}
+
+            {cmsContent.audioUrl && (
+              <section className="guide-detail-section">
+                <p className="guide-media-label">{audioLabel}</p>
+                <audio className="content-audio" controls preload="metadata">
+                  <source src={cmsContent.audioUrl} />
+                </audio>
+              </section>
+            )}
+
+            {hasBody && (
+              <section className="guide-detail-section">
+                <h3 className="guide-content-heading">{textHeading}</h3>
+                <div
+                  className="guide-cms-body"
+                  dangerouslySetInnerHTML={{ __html: cmsContent.body }}
+                />
+              </section>
+            )}
           </>
         )}
       </div>

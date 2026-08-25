@@ -11,7 +11,7 @@ import {
   fetchUserAttributes,
 } from 'aws-amplify/auth';
 import '../lib/cognito.js'; // initialise Amplify once
-import { syncProfile } from '../lib/userApi.js';
+import { getMyProfile, syncProfile } from '../lib/userApi.js';
 
 const AuthContext = createContext(null);
 
@@ -46,6 +46,19 @@ function buildUserFromAttributes(attrs) {
   };
 }
 
+function mergeProfileIntoUser(setUser, profile, expectedPhone) {
+  if (!profile || typeof profile.firstName !== 'string' || !profile.firstName.trim()) return;
+  setUser((current) => {
+    if (!current || current.phone !== expectedPhone) return current;
+    const firstName = profile.firstName.trim();
+    return {
+      ...current,
+      firstName,
+      name: `${firstName} ${current.lastName ?? ''}`.trim() || current.phone,
+    };
+  });
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
@@ -63,8 +76,18 @@ export function AuthProvider({ children }) {
         }
         // 2. Sessione Cognito reale
         await getCurrentUser();
-        const attrs = await fetchUserAttributes();
-        setUser(buildUserFromAttributes(attrs));
+        const [attrs, idToken] = await Promise.all([
+          fetchUserAttributes(),
+          getIdToken(),
+        ]);
+        const userObj = buildUserFromAttributes(attrs);
+        setUser(userObj);
+        // Il primo render non aspetta DynamoDB: il nome si aggiorna appena
+        // la lettura del profilo è disponibile.
+        if (idToken) {
+          getMyProfile(idToken)
+            .then((profile) => mergeProfileIntoUser(setUser, profile, userObj.phone));
+        }
       } catch {
         setUser(null);
       } finally {
@@ -146,18 +169,25 @@ export function AuthProvider({ children }) {
         getIdToken(),
       ]);
       const userObj = buildUserFromAttributes(attrs);
-      setUser(userObj);
+      const profileHint = {
+        phone: userObj.phone,
+        firstName: userData.firstName ?? userObj.firstName,
+        lastName: userData.lastName ?? userObj.lastName,
+        email: userData.email ?? userObj.email,
+        company: userData.company ?? userObj.company,
+        site: userData.site ?? userObj.site,
+      };
+      setUser({
+        ...userObj,
+        ...profileHint,
+        name: `${profileHint.firstName ?? ''} ${profileHint.lastName ?? ''}`.trim() || userObj.phone,
+      });
 
       // Sincronizza il profilo con il backend (non-blocking)
       if (idToken) {
-        syncProfile(idToken, {
-          phone: userObj.phone,
-          firstName: userData.firstName ?? userObj.firstName,
-          lastName: userData.lastName ?? userObj.lastName,
-          email: userData.email ?? userObj.email,
-          company: userData.company ?? userObj.company,
-          site: userData.site ?? userObj.site,
-        });
+        const profileSync = syncProfile(idToken, profileHint);
+        profileSync.then(() => getMyProfile(idToken))
+          .then((profile) => mergeProfileIntoUser(setUser, profile, profileHint.phone));
       }
 
       return { success: true };

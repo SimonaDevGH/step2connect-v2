@@ -4,7 +4,7 @@ import { ChevronLeft } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { getCategoryById, GUIDE_ITEMS } from '../data/guides';
 
-const API = import.meta.env.VITE_API_BASE_URL || '';
+const API = '';
 
 export default function GuideCategoryPage() {
   const { category } = useParams();
@@ -17,7 +17,10 @@ export default function GuideCategoryPage() {
   useEffect(() => {
     let cancelled = false;
     fetch(`${API}/api/content?type=guides&lang=${lang}`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((data) => {
         if (!cancelled && Array.isArray(data)) {
           // Filtra per categoria corrente
@@ -35,26 +38,29 @@ export default function GuideCategoryPage() {
 
   const Icon = cat.icon;
 
-  // Unisci: items statici arricchiti con CMS + nuovi items CMS non presenti negli statici
+  // L'elenco pubblicato su S3 decide quali guide sono visibili. Il catalogo
+  // statico serve solo a conservare l'ordine e le icone delle guide esistenti.
   const staticIds = cat.items || [];
   const cmsMap    = {};
   (cmsItems || []).forEach((item) => { cmsMap[item.id] = item; });
 
-  // Items statici (nell'ordine originale, arricchiti con dati CMS se disponibili)
-  const mergedItems = staticIds.map((id) => ({
+  // Mostra un item statico soltanto se il relativo JSON è ancora pubblicato.
+  const mergedItems = staticIds
+    .filter((id) => cmsMap[id])
+    .map((id) => ({
     id,
-    fromCms: !!cmsMap[id],
-    title:   cmsMap[id]?.title || null, // null → usa i18n
+    title:   cmsMap[id].title || null, // null → usa i18n
+    desc:    cmsMap[id].metaDesc || null,
     emoji:   cmsMap[id]?.emoji || GUIDE_ITEMS[id]?.emoji || '📌',
-  }));
+    }));
 
-  // Nuovi items CMS non presenti nella lista statica
+  // Nuovi item CMS non presenti nel catalogo statico.
   const newCmsIds = Object.keys(cmsMap).filter((id) => !staticIds.includes(id));
   newCmsIds.forEach((id) => {
     mergedItems.push({
       id,
-      fromCms: true,
       title:   cmsMap[id].title,
+      desc:    cmsMap[id].metaDesc || null,
       emoji:   cmsMap[id].emoji || '📌',
     });
   });
@@ -84,9 +90,26 @@ export default function GuideCategoryPage() {
           <p className="coming-soon-title">{t('comingSoon')}</p>
           <p className="coming-soon-desc">{t('comingSoonDesc')}</p>
         </div>
+      ) : cmsItems === null ? (
+        <div className="guide-items-list" aria-busy="true" aria-label="Caricamento guide">
+          <div className="guide-section-skeleton">
+            <div className="skeleton-title" />
+            <div className="skeleton-line" />
+          </div>
+          <div className="guide-section-skeleton">
+            <div className="skeleton-title" />
+            <div className="skeleton-line short" />
+          </div>
+        </div>
+      ) : mergedItems.length === 0 ? (
+        <div className="coming-soon-wrap">
+          <span className="coming-soon-emoji">🛠️</span>
+          <p className="coming-soon-title">{t('comingSoon')}</p>
+          <p className="coming-soon-desc">{t('comingSoonDesc')}</p>
+        </div>
       ) : (
         <div className="guide-items-list">
-          {mergedItems.map(({ id, title, emoji }) => (
+          {mergedItems.map(({ id, title, desc, emoji }) => (
             <button
               key={id}
               className="guide-item-card"
@@ -99,7 +122,7 @@ export default function GuideCategoryPage() {
                   {title || t(`guideItem_${id}_title`)}
                 </p>
                 <p className="guide-item-desc">
-                  {t(`guideItem_${id}_desc`) || ''}
+                  {desc || t(`guideItem_${id}_desc`) || ''}
                 </p>
               </div>
               <span className="guide-item-arrow">›</span>

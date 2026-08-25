@@ -1,5 +1,21 @@
 const BASE = import.meta.env.VITE_API_BASE_URL;
 
+async function sameOriginApiFetch(path, idToken, options = {}) {
+  const res = await fetch(path, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${idToken}`,
+      ...(options.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.status);
+    throw new Error(`API ${path} → ${res.status}: ${text}`);
+  }
+  return res.json();
+}
+
 async function apiFetch(path, idToken, options = {}) {
   if (!BASE) return null;
   const res = await fetch(`${BASE}${path}`, {
@@ -40,7 +56,7 @@ export async function syncProfile(idToken, profile) {
  */
 export async function getMyProfile(idToken) {
   try {
-    return await apiFetch('/users/me', idToken, { method: 'GET' });
+    return await sameOriginApiFetch('/api/users/me', idToken, { method: 'GET' });
   } catch (err) {
     console.warn('[userApi] getMyProfile failed:', err.message);
     return null;

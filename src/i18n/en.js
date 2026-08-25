@@ -91,6 +91,12 @@ export default {
   comingSoon: 'Content coming soon',
   comingSoonDesc: 'We are preparing guides for this section',
   guideDetailPlaceholder: 'Content coming soon. This guide will be updated with official information migrated from the current site.',
+  contentDetailPlaceholder: 'Content coming soon. This page will be updated with official information.',
+  guideVideoPrompt: '📽️ Watch the video to learn more',
+  guideAudioPrompt: '🔊 Listen to the content for all the information',
+  guidePermitVideoPrompt: '📽️ Watch the video to learn how to apply for a residence permit',
+  guidePermitAudioPrompt: '🔊 Listen to the content for all the information about the residence permit',
+  guidePermitTextHeading: '📄Residence permit: all the information',
 
   // Categories
   guideCat_documents: 'Documents & Permits',

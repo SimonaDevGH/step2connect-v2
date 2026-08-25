@@ -101,6 +101,12 @@ export default {
   comingSoon: 'Contenuti in arrivo',
   comingSoonDesc: 'Stiamo preparando le guide per questa sezione',
   guideDetailPlaceholder: 'Contenuto in arrivo. Questa guida verrà aggiornata con informazioni ufficiali migrate dal sito attuale.',
+  contentDetailPlaceholder: 'Contenuto in arrivo. Questa pagina verrà aggiornata con informazioni ufficiali.',
+  guideVideoPrompt: '📽️ Guarda il video per saperne di più',
+  guideAudioPrompt: '🔊 Ascolta il contenuto per avere tutte le informazioni',
+  guidePermitVideoPrompt: '📽️ Guarda il video per sapere come richiedere il permesso di soggiorno',
+  guidePermitAudioPrompt: '🔊 Ascolta il contenuto per avere tutte le informazioni sul permesso di soggiorno',
+  guidePermitTextHeading: '📄Permesso di soggiorno: tutte le informazioni',
 
   // Categorie
   guideCat_documents: 'Documenti e permessi',

@@ -6,6 +6,7 @@ const path    = require('path');
 const contentRoutes   = require('./routes/content');
 const adminRoutes     = require('./routes/admin');
 const adminAuthRoutes = require('./routes/adminAuth');
+const userRoutes      = require('./routes/users');
 
 const app  = express();
 // In production Express serves both the API and the Vite-built SPA on port 5000.
@@ -39,6 +40,7 @@ app.use(express.json({ limit: '1mb' }));
 
 // ── ROUTES ────────────────────────────────────────────────────────────────────
 app.use('/api/content',       contentRoutes);
+app.use('/api/users',         userRoutes);
 app.use('/api/admin/auth',    adminAuthRoutes);
 app.use('/api/admin/content', adminRoutes);
 

@@ -35,7 +35,7 @@ const NEWS_FALLBACK = [
   },
 ];
 
-const API = import.meta.env.VITE_API_BASE_URL || '';
+const API = '';
 
 export default function NewsPage() {
   const { t, lang } = useLanguage();
@@ -68,7 +68,12 @@ export default function NewsPage() {
 
       <div className="news-list">
         {news.map((item) => (
-          <div key={item.id} className="news-card">
+          <button
+            key={item.id}
+            type="button"
+            className="news-card news-card--interactive"
+            onClick={() => typeof item.id === 'string' && navigate(`/news/${item.id}`)}
+          >
             <span className="news-emoji">{item.emoji}</span>
             <div className="news-content">
               <p className="news-date">{item.date || item.updatedAt?.split('T')[0] || ''}</p>
@@ -78,9 +83,9 @@ export default function NewsPage() {
               <p className="news-body">
                 {typeof item.body === 'string' ? item.body : (item.body?.[lang] ?? item.body?.it)}
               </p>
-              <button className="news-read">{t('readMore')} →</button>
+              <span className="news-read">{t('readMore')} →</span>
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </div>

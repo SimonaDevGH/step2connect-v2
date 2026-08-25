@@ -4,7 +4,12 @@ import { ChevronLeft, Plus, Pencil, Trash2, Send, RefreshCw, LogOut, UserCircle 
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import ContentEditForm from './ContentEditForm';
 
-const TYPES = ['guides', 'news', 'library', 'pages'];
+const TYPES = [
+  { value: 'guides', label: 'guides' },
+  { value: 'news', label: 'news' },
+  { value: 'library', label: 'library' },
+  { value: 'all', label: 'pages' },
+];
 const LANGS = ['it', 'en', 'bn'];
 
 // Route admin: URL sempre relativi (proxy Vite in dev, Express stesso origin in prod).
@@ -24,16 +29,30 @@ async function apiFetch(path, token, opts = {}) {
   return data;
 }
 
+function formatLastEdited(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('it-IT', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date);
+}
+
 export default function AdminContentPage() {
   const { adminToken, adminUser, logout } = useAdminAuth();
   const navigate = useNavigate();
 
-  const [type,    setType]    = useState('guides');
-  const [lang,    setLang]    = useState('it');
-  const [items,   setItems]   = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState('');
-  const [editId,  setEditId]  = useState(null);
+  const [type,     setType]     = useState('guides');
+  const [lang,     setLang]     = useState('it');
+  const [items,    setItems]    = useState([]);
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState('');
+  const [editItem, setEditItem] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const loadItems = useCallback(async () => {
     if (!adminToken) return;
@@ -57,21 +76,36 @@ export default function AdminContentPage() {
 
   useEffect(() => { loadItems(); }, [loadItems]);
 
-  const handleDelete = async (id) => {
-    if (!confirm(`Archiviare il contenuto "${id}"?`)) return;
+  const handleDelete = (item) => {
+    setDeleteTarget(item);
+    setDeleteError('');
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setDeleteError('');
     try {
-      await apiFetch(`/api/admin/content/${type}/${id}`, adminToken, { method: 'DELETE' });
-      loadItems();
+      await apiFetch(
+        `/api/admin/content/${deleteTarget.type}/${deleteTarget.id}`,
+        adminToken,
+        { method: 'DELETE' }
+      );
+      setDeleteTarget(null);
+      await loadItems();
     } catch (err) {
-      alert('Errore: ' + err.message);
+      setDeleteError(err.message);
+    } finally {
+      setDeleting(false);
     }
   };
 
-  const handlePublish = async (id) => {
-    if (!confirm(`Pubblicare "${id}"? Sarà visibile a tutti gli utenti.`)) return;
+  const handlePublish = async (item) => {
+    if (!confirm(`Pubblicare "${item.id}"? Sarà visibile a tutti gli utenti.`)) return;
     try {
-      await apiFetch(`/api/admin/content/${type}/${id}/publish`, adminToken, { method: 'POST' });
+      await apiFetch(`/api/admin/content/${item.type}/${item.id}/publish`, adminToken, { method: 'POST' });
       alert('Pubblicato!');
+      loadItems();
     } catch (err) {
       alert('Errore pubblicazione: ' + err.message);
     }
@@ -82,18 +116,19 @@ export default function AdminContentPage() {
     navigate('/admin/login', { replace: true });
   };
 
-  if (editId !== null) {
+  if (editItem !== null) {
     return (
       <ContentEditForm
-        contentType={type}
-        contentId={editId === 'new' ? null : editId}
-        onClose={() => { setEditId(null); loadItems(); }}
+        contentType={editItem.type}
+        contentId={editItem.id === 'new' ? null : editItem.id}
+        onClose={() => { setEditItem(null); loadItems(); }}
       />
     );
   }
 
   return (
-    <div className="page-content">
+    <>
+      <div className="page-content">
       <div className="page-hero" style={{ background: '#1D3557' }}>
         <button className="back-btn" onClick={() => navigate('/')}>
           <ChevronLeft size={24} /> Home
@@ -108,11 +143,11 @@ export default function AdminContentPage() {
         <div className="admin-filter-group">
           {TYPES.map((tp) => (
             <button
-              key={tp}
-              className={`admin-filter-btn ${type === tp ? 'active' : ''}`}
-              onClick={() => setType(tp)}
+              key={tp.value}
+              className={`admin-filter-btn ${type === tp.value ? 'active' : ''}`}
+              onClick={() => setType(tp.value)}
             >
-              {tp}
+              {tp.label}
             </button>
           ))}
         </div>
@@ -131,9 +166,11 @@ export default function AdminContentPage() {
         <button className="admin-refresh-btn" onClick={loadItems} title="Ricarica">
           <RefreshCw size={18} />
         </button>
-        <button className="admin-new-btn" onClick={() => setEditId('new')}>
-          <Plus size={18} /> Nuovo
-        </button>
+        {type !== 'all' && (
+          <button className="admin-new-btn" onClick={() => setEditItem({ id: 'new', type })}>
+            <Plus size={18} /> Nuovo
+          </button>
+        )}
         <button
           className="admin-refresh-btn"
           onClick={() => navigate('/admin/account')}
@@ -158,31 +195,89 @@ export default function AdminContentPage() {
         <div className="admin-loading">Caricamento…</div>
       ) : items.length === 0 ? (
         <div className="admin-empty">
-          Nessun contenuto trovato per <strong>{type}</strong> / <strong>{lang.toUpperCase()}</strong>
+          Nessun contenuto trovato per <strong>{type === 'all' ? 'pages' : type}</strong> / <strong>{lang.toUpperCase()}</strong>
         </div>
       ) : (
-        <div className="admin-list">
+        <div className="admin-list" role="table" aria-label="Elenco contenuti">
+          <div className="admin-list-header" role="row">
+            <span aria-hidden="true" />
+            <span>Contenuto</span>
+            <span>Tipo</span>
+            <span>Stato</span>
+            <span>Ultima modifica</span>
+            <span>Percorso</span>
+            <span>Azioni</span>
+          </div>
           {items.map((item) => (
-            <div key={item.id} className="admin-item">
+            <div key={`${item.type}-${item.id}`} className="admin-item" role="row">
               <span className="admin-item-emoji">{item.emoji || '📄'}</span>
               <div className="admin-item-info">
                 <p className="admin-item-title">{item.title || item.id}</p>
-                <p className="admin-item-meta">
-                  {item.id}
-                  {item.url ? ` · ${item.url}` : ''}
-                  {' · '}
-                  {item.updatedAt ? new Date(item.updatedAt).toLocaleDateString('it') : '—'}
-                </p>
+                <p className="admin-item-meta">{item.id}</p>
               </div>
+              <span className="admin-item-cell admin-item-type" data-label="Tipo">{item.type}</span>
+              <span className="admin-item-cell admin-item-status" data-label="Stato">
+                <span className={`admin-status admin-status--${item.status}`}>
+                  {item.status === 'published' ? 'Pubblicato' : 'Bozza'}
+                </span>
+              </span>
+              <span className="admin-item-cell admin-item-updated" data-label="Ultima modifica">
+                {formatLastEdited(item.updatedAt)}
+              </span>
+              <span className="admin-item-cell admin-item-url" data-label="Percorso" title={item.url || ''}>
+                {item.url || '—'}
+              </span>
               <div className="admin-item-actions">
-                <button title="Modifica"  onClick={() => setEditId(item.id)}><Pencil size={16} /></button>
-                <button title="Pubblica"  onClick={() => handlePublish(item.id)}><Send size={16} /></button>
-                <button title="Archivia"  className="admin-action-danger" onClick={() => handleDelete(item.id)}><Trash2 size={16} /></button>
+                <button title="Modifica"  onClick={() => setEditItem({ id: item.id, type: item.type })}><Pencil size={16} /></button>
+                <button title="Pubblica"  onClick={() => handlePublish(item)}><Send size={16} /></button>
+                <button title="Elimina" className="admin-action-danger" onClick={() => handleDelete(item)}><Trash2 size={16} /></button>
               </div>
             </div>
           ))}
         </div>
       )}
-    </div>
+      </div>
+
+      {deleteTarget && (
+        <div className="admin-modal-backdrop" role="presentation">
+          <div
+            className="admin-confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-content-title"
+          >
+            <h3 id="delete-content-title">Eliminare questa pagina?</h3>
+            <p>
+              Stai per eliminare <strong>{deleteTarget.title || deleteTarget.id}</strong>.
+            </p>
+            {deleteTarget.url && (
+              <p className="admin-modal-url">
+                Anche l’URL <code>{deleteTarget.url}</code> non sarà più disponibile.
+              </p>
+            )}
+            <p className="admin-modal-hint">
+              Bozza e contenuto pubblicato verranno rimossi in tutte le lingue.
+            </p>
+            {deleteError && <p className="admin-modal-error">⚠️ {deleteError}</p>}
+            <div className="admin-modal-actions">
+              <button
+                className="admin-modal-cancel"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+              >
+                Annulla
+              </button>
+              <button
+                className="admin-modal-delete"
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+              >
+                {deleting ? 'Eliminazione…' : 'OK, cancella'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

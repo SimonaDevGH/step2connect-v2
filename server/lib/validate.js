@@ -23,7 +23,10 @@ const translationSchema = z.object({
   title:    z.string().min(1).max(500),
   body:     z.string().max(50000).default(''),
   audioUrl: z.string().url().optional().or(z.literal('')),
+  videoUrl: z.string().url().optional().or(z.literal('')),
   metaDesc: z.string().max(300).default(''),
+  emoji:    z.string().max(10).optional(),
+  imageUrl: z.string().url().optional().or(z.literal('')),
 });
 
 const contentSchema = z.object({
@@ -32,6 +35,7 @@ const contentSchema = z.object({
   category: z.string().max(100).default(''),
   emoji:    z.string().max(10).default('📄'),
   imageUrl: z.string().url().optional().or(z.literal('')),
+  videoUrl: z.string().url().optional().or(z.literal('')),
   url:      z.string().max(500).optional().or(z.literal('')), // percorso pubblico, obbligatorio per pages lato UI
   it: translationSchema,
   en: translationSchema,

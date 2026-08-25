@@ -14,6 +14,7 @@ import LibraryPage        from './pages/LibraryPage';
 import GuidesPage         from './pages/GuidesPage';
 import GuideCategoryPage  from './pages/GuideCategoryPage';
 import GuideDetailPage    from './pages/GuideDetailPage';
+import ContentDetailPage  from './pages/ContentDetailPage';
 import NotificationsPage  from './pages/NotificationsPage';
 import TranslatorPage     from './pages/TranslatorPage';
 import PrivacyPage        from './pages/PrivacyPage';
@@ -132,8 +133,10 @@ function AppShell() {
           <Route path="/service/:service"    element={<ProtectedRoute><ServiceDetailPage /></ProtectedRoute>} />
           <Route path="/offices"             element={<ProtectedRoute><FindOfficesPage /></ProtectedRoute>} />
           <Route path="/news"                element={<ProtectedRoute><NewsPage /></ProtectedRoute>} />
+          <Route path="/news/:id"            element={<ProtectedRoute><ContentDetailPage contentType="news" /></ProtectedRoute>} />
           <Route path="/quiz"                element={<ProtectedRoute><QuizPage /></ProtectedRoute>} />
           <Route path="/library"             element={<ProtectedRoute><LibraryPage /></ProtectedRoute>} />
+          <Route path="/library/:id"         element={<ProtectedRoute><ContentDetailPage contentType="library" /></ProtectedRoute>} />
           <Route path="/guides"              element={<ProtectedRoute><GuidesPage /></ProtectedRoute>} />
           <Route path="/guides/:category"    element={<ProtectedRoute><GuideCategoryPage /></ProtectedRoute>} />
           <Route path="/guides/:category/:item" element={<ProtectedRoute><GuideDetailPage /></ProtectedRoute>} />

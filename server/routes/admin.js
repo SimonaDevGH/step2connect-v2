@@ -6,10 +6,18 @@ const express = require('express');
 const multer  = require('multer');
 const mime    = require('mime-types');
 const { requireAdminJWT, adminUserId } = require('../middleware/adminAuth');
-const { getJson, putJson, putBuffer, listKeys, copyObject } = require('../lib/s3');
+const { getJson, putJson, putBuffer, listKeys, copyObject, deleteObject } = require('../lib/s3');
 const { validateContent } = require('../lib/validate');
 
 const router = express.Router();
+const CONTENT_TYPES = ['guides', 'news', 'library', 'pages'];
+const LIST_LANGUAGES = ['it', 'en', 'bn'];
+const hasOwn = (value, key) => Boolean(
+  value && Object.prototype.hasOwnProperty.call(value, key)
+);
+const localizedOrLegacy = (translation, field, legacyValue) => (
+  hasOwn(translation, field) ? translation[field] : legacyValue
+);
 
 // Multer in memoria (max 5 MB)
 const upload = multer({
@@ -26,18 +34,50 @@ const upload = multer({
 router.use(requireAdminJWT);
 
 // ── LIST ─────────────────────────────────────────────────────────────────────
-// GET /api/admin/content?type=guides&lang=it
+// GET /api/admin/content?type=guides|news|library|pages|all&lang=it
+// `all` è la vista riepilogativa dell'admin (guide, news e library).
 router.get('/', async (req, res) => {
   const { type, lang = 'it' } = req.query;
-  if (!type) return res.status(400).json({ error: 'type is required' });
+  if (!CONTENT_TYPES.includes(type) && type !== 'all') {
+    return res.status(400).json({ error: 'Invalid content type' });
+  }
+  if (!LIST_LANGUAGES.includes(lang)) {
+    return res.status(400).json({ error: 'Invalid language' });
+  }
 
   try {
-    const prefix = `content/draft/${type}/${lang}/`;
-    const keys   = await listKeys(prefix);
-    const items  = await Promise.all(
-      keys.filter((k) => k.endsWith('.json')).map((k) => getJson(k))
+    const typesToList = type === 'all' ? ['guides', 'news', 'library'] : [type];
+    const [draftKeyGroups, publishedKeyGroups] = await Promise.all([
+      Promise.all(typesToList.map((contentType) =>
+        listKeys(`content/draft/${contentType}/${lang}/`)
+      )),
+      Promise.all(typesToList.map((contentType) =>
+        listKeys(`content/published/${contentType}/${lang}/`)
+      )),
+    ]);
+    const publishedKeys = new Set(publishedKeyGroups.flat());
+    const draftRecords = draftKeyGroups.flatMap((keys, index) =>
+      keys
+        .filter((key) => key.endsWith('.json'))
+        .map((key) => ({ key, type: typesToList[index] }))
     );
-    res.json(items.filter(Boolean));
+    const items = await Promise.all(draftRecords.map(async ({ key, type: contentType }) => {
+      const item = await getJson(key);
+      if (!item) return null;
+
+      return {
+        ...item,
+        type: item.type || contentType,
+        status: publishedKeys.has(key.replace('content/draft/', 'content/published/'))
+          ? 'published'
+          : 'draft',
+      };
+    }));
+
+    res.json(items
+      .filter(Boolean)
+      .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))
+    );
   } catch (err) {
     console.error('[admin] list error', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -56,19 +96,31 @@ router.get('/:type/:id', async (req, res) => {
     ]);
     if (!it && !en && !bn) return res.status(404).json({ error: 'Not found' });
     const base = it || en || bn;
+    const legacyVideoUrl = base.videoUrl || '';
+    const translation = (record) => ({
+      title: record?.title || '',
+      body: record?.body || '',
+      // L'audio è localizzato fin dal formato precedente: non usare mai
+      // l'audio di un'altra lingua come fallback.
+      audioUrl: localizedOrLegacy(record, 'audioUrl', ''),
+      // Compatibilità con il precedente formato, in cui il video era globale.
+      videoUrl: localizedOrLegacy(record, 'videoUrl', legacyVideoUrl),
+      metaDesc: record?.metaDesc || '',
+      // Immagine e icona erano in precedenza mostrate una sola volta nel form.
+      emoji: localizedOrLegacy(record, 'emoji', base.emoji || '📄'),
+      imageUrl: localizedOrLegacy(record, 'imageUrl', base.imageUrl || ''),
+    });
     res.json({
       id:        base.id,
       type:      base.type,
       category:  base.category || '',
       emoji:     base.emoji || '📄',
       imageUrl:  base.imageUrl || '',
+      videoUrl:  base.videoUrl || '',
       url:       base.url || '',
-      it: it  ? { title: it.title,  body: it.body,  audioUrl: it.audioUrl  || '', metaDesc: it.metaDesc  || '' }
-              : { title: '',        body: '',        audioUrl: '',               metaDesc: '' },
-      en: en  ? { title: en.title,  body: en.body,  audioUrl: en.audioUrl  || '', metaDesc: en.metaDesc  || '' }
-              : { title: '',        body: '',        audioUrl: '',               metaDesc: '' },
-      bn: bn  ? { title: bn.title,  body: bn.body,  audioUrl: bn.audioUrl  || '', metaDesc: bn.metaDesc  || '' }
-              : { title: '',        body: '',        audioUrl: '',               metaDesc: '' },
+      it: translation(it),
+      en: translation(en),
+      bn: translation(bn),
       updatedBy: base.updatedBy || '',
       updatedAt: base.updatedAt || '',
     });
@@ -81,12 +133,33 @@ router.get('/:type/:id', async (req, res) => {
 // ── PUT (crea / aggiorna draft) ───────────────────────────────────────────────
 // PUT /api/admin/content/:type/:id
 router.put('/:type/:id', async (req, res) => {
-  const { type, id } = req.params;
+  const { type, id: previousId } = req.params;
   const now    = new Date().toISOString();
   const author = adminUserId(req);
 
   try {
-    const payload = validateContent({ ...req.body, id, type });
+    const payload = validateContent({ ...req.body, type });
+    const id = payload.id;
+    const isRename = previousId !== id;
+
+    // Una rinomina non deve sovrascrivere per errore un contenuto esistente.
+    if (isRename) {
+      const targetKeys = ['it', 'en', 'bn'].flatMap((lang) => [
+        `content/draft/${type}/${lang}/${id}.json`,
+        `content/published/${type}/${lang}/${id}.json`,
+      ]);
+      const existing = await Promise.all(targetKeys.map((key) => getJson(key)));
+      if (existing.some(Boolean)) {
+        return res.status(409).json({ error: `L'ID "${id}" è già in uso` });
+      }
+    }
+
+    // Per le guide il percorso pubblico è sempre derivato da categoria + ID.
+    // Questo evita che JSON, card e route possano finire su URL diversi.
+    const publicUrl = type === 'guides'
+      ? `/guides/${payload.category}/${id}`
+      : (payload.url || '');
+
     for (const lang of ['it', 'en', 'bn']) {
       const key = `content/draft/${type}/${lang}/${id}.json`;
       await putJson(key, {
@@ -94,18 +167,29 @@ router.put('/:type/:id', async (req, res) => {
         type,
         lang,
         category:  payload.category,
-        emoji:     payload.emoji,
-        imageUrl:  payload.imageUrl || '',
-        url:       payload.url      || '',
+        emoji:     localizedOrLegacy(payload[lang], 'emoji', payload.emoji),
+        audioUrl:  localizedOrLegacy(payload[lang], 'audioUrl', ''),
+        imageUrl:  localizedOrLegacy(payload[lang], 'imageUrl', payload.imageUrl || ''),
+        videoUrl:  localizedOrLegacy(payload[lang], 'videoUrl', payload.videoUrl || ''),
+        url:       publicUrl,
         title:     payload[lang].title,
         body:      payload[lang].body,
-        audioUrl:  payload[lang].audioUrl || '',
         metaDesc:  payload[lang].metaDesc || '',
+        renamedFrom: isRename ? previousId : '',
         updatedBy: author,
         updatedAt: now,
       });
     }
-    res.json({ ok: true, updatedAt: now });
+
+    // Il vecchio draft non deve più apparire nell'elenco admin dopo la rinomina.
+    // Il vecchio contenuto pubblicato resta online fino al successivo "Pubblica".
+    if (isRename) {
+      await Promise.all(['it', 'en', 'bn'].map((lang) =>
+        deleteObject(`content/draft/${type}/${lang}/${previousId}.json`)
+      ));
+    }
+
+    res.json({ ok: true, id, url: publicUrl, renamed: isRename, updatedAt: now });
   } catch (err) {
     if (err.name === 'ZodError') {
       return res.status(400).json({ error: 'Validation error', details: err.errors });
@@ -120,13 +204,23 @@ router.put('/:type/:id', async (req, res) => {
 router.post('/:type/:id/publish', async (req, res) => {
   const { type, id } = req.params;
   try {
+    let renamedFrom = '';
     for (const lang of ['it', 'en', 'bn']) {
       const draft     = `content/draft/${type}/${lang}/${id}.json`;
       const published = `content/published/${type}/${lang}/${id}.json`;
       const data = await getJson(draft);
       if (!data) continue;
+      renamedFrom = renamedFrom || data.renamedFrom || '';
       await copyObject(draft, published);
     }
+
+    // Dopo avere pubblicato tutte le nuove lingue, disattiva il vecchio URL.
+    if (renamedFrom && renamedFrom !== id) {
+      await Promise.all(['it', 'en', 'bn'].map((lang) =>
+        deleteObject(`content/published/${type}/${lang}/${renamedFrom}.json`)
+      ));
+    }
+
     res.json({ ok: true, publishedAt: new Date().toISOString() });
   } catch (err) {
     console.error('[admin] publish error', err);
@@ -134,19 +228,24 @@ router.post('/:type/:id/publish', async (req, res) => {
   }
 });
 
-// ── DELETE (archivia, non elimina) ────────────────────────────────────────────
+// ── DELETE (rimuove bozza e versione pubblicata) ───────────────────────────────
 // DELETE /api/admin/content/:type/:id
 router.delete('/:type/:id', async (req, res) => {
   const { type, id } = req.params;
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
   try {
     for (const lang of ['it', 'en', 'bn']) {
-      const src = `content/draft/${type}/${lang}/${id}.json`;
-      const dst = `content/archive/${type}/${lang}/${id}_${ts}.json`;
-      const data = await getJson(src);
-      if (data) await copyObject(src, dst);
+      const draft = `content/draft/${type}/${lang}/${id}.json`;
+      const published = `content/published/${type}/${lang}/${id}.json`;
+      const archive = `content/archive/${type}/${lang}/${id}_${ts}.json`;
+      const data = await getJson(draft);
+
+      // Conserva una copia della bozza per recuperi amministrativi, ma elimina
+      // tutte le chiavi attive: il contenuto e il suo URL non saranno più esposti.
+      if (data) await copyObject(draft, archive);
+      await Promise.all([deleteObject(draft), deleteObject(published)]);
     }
-    res.json({ ok: true, archivedAt: ts });
+    res.json({ ok: true, deletedAt: ts });
   } catch (err) {
     console.error('[admin] delete error', err);
     res.status(500).json({ error: 'Internal server error' });

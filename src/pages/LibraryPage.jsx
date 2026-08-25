@@ -15,7 +15,7 @@ const DOCUMENTS_FALLBACK = [
 
 const CAT_COLORS = { documents: '#457B9D', work: '#F4A261', health: '#E63946', school: '#2A9D8F', language: '#118AB2' };
 
-const API = import.meta.env.VITE_API_BASE_URL || '';
+const API = '';
 
 export default function LibraryPage() {
   const { t, lang } = useLanguage();
@@ -48,14 +48,21 @@ export default function LibraryPage() {
 
       <div className="library-list">
         {documents.map((doc, i) => (
-          <div key={i} className="library-card" style={{ '--cat-color': CAT_COLORS[doc.category] ?? '#888' }}>
-            <span className="lib-emoji">{doc.emoji}</span>
-            <div className="lib-info">
-              <p className="lib-title">
-                {typeof doc.title === 'string' ? doc.title : (doc.title?.[lang] ?? doc.title?.it)}
-              </p>
-              {doc.size && <p className="lib-size">{doc.size}</p>}
-            </div>
+          <div key={doc.id || i} className="library-card" style={{ '--cat-color': CAT_COLORS[doc.category] ?? '#888' }}>
+            <button
+              type="button"
+              className="library-card-main"
+              disabled={!doc.id}
+              onClick={() => doc.id && navigate(`/library/${doc.id}`)}
+            >
+              <span className="lib-emoji">{doc.emoji}</span>
+              <div className="lib-info">
+                <p className="lib-title">
+                  {typeof doc.title === 'string' ? doc.title : (doc.title?.[lang] ?? doc.title?.it)}
+                </p>
+                {doc.size && <p className="lib-size">{doc.size}</p>}
+              </div>
+            </button>
             {doc.url && doc.url !== '#' ? (
               <a className="lib-download" href={doc.url} download>
                 <Download size={20} />

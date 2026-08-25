@@ -1,4 +1,11 @@
-const { S3Client, GetObjectCommand, PutObjectCommand, ListObjectsV2Command, CopyObjectCommand } = require('@aws-sdk/client-s3');
+const {
+  S3Client,
+  GetObjectCommand,
+  PutObjectCommand,
+  ListObjectsV2Command,
+  CopyObjectCommand,
+  DeleteObjectCommand,
+} = require('@aws-sdk/client-s3');
 
 const s3 = new S3Client({
   region: process.env.AWS_REGION || 'eu-west-2',
@@ -67,6 +74,14 @@ async function copyObject(srcKey, dstKey) {
   }));
 }
 
+/** Elimina un oggetto. Usato per completare una rinomina dopo aver copiato i dati. */
+async function deleteObject(key) {
+  await s3.send(new DeleteObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+  }));
+}
+
 function streamToString(stream) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -76,4 +91,4 @@ function streamToString(stream) {
   });
 }
 
-module.exports = { getJson, putJson, putBuffer, listKeys, copyObject, BUCKET };
+module.exports = { getJson, putJson, putBuffer, listKeys, copyObject, deleteObject, BUCKET };

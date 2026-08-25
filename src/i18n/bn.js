@@ -91,6 +91,12 @@ export default {
   comingSoon: 'সামগ্রী শীঘ্রই আসছে',
   comingSoonDesc: 'আমরা এই বিভাগের জন্য গাইড প্রস্তুত করছি',
   guideDetailPlaceholder: 'সামগ্রী শীঘ্রই আসছে। এই গাইডটি বর্তমান সাইট থেকে মাইগ্রেট করা সরকারি তথ্য দিয়ে আপডেট করা হবে।',
+  contentDetailPlaceholder: 'সামগ্রী শীঘ্রই আসছে। এই পৃষ্ঠাটি আনুষ্ঠানিক তথ্য দিয়ে আপডেট করা হবে।',
+  guideVideoPrompt: '📽️ আরও জানতে ভিডিওটি দেখুন',
+  guideAudioPrompt: '🔊 সমস্ত তথ্য জানতে বিষয়বস্তুটি শুনুন',
+  guidePermitVideoPrompt: '📽️ বসবাসের পারমিটের জন্য কীভাবে আবেদন করবেন তা জানতে ভিডিওটি দেখুন',
+  guidePermitAudioPrompt: '🔊 বসবাসের পারমিট সম্পর্কে সমস্ত তথ্য জানতে বিষয়বস্তুটি শুনুন',
+  guidePermitTextHeading: '📄বসবাসের পারমিট: সমস্ত তথ্য',
 
   // বিভাগ
   guideCat_documents: 'ডকুমেন্ট ও পারমিট',

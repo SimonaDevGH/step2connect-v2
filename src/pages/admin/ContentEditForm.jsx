@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Save, Send, Upload, Music } from 'lucide-react';
+import { ChevronLeft, Save, Send, Upload, Music, Video } from 'lucide-react';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 
 // Route admin: URL sempre relativi (proxy Vite in dev, Express stesso origin in prod).
@@ -30,9 +30,11 @@ async function apiFetch(path, token, opts = {}) {
   return data;
 }
 
-const emptyLang = () => ({ title: '', body: '', audioUrl: '', metaDesc: '' });
+const emptyLang = () => ({
+  title: '', body: '', audioUrl: '', videoUrl: '', metaDesc: '', emoji: '📄', imageUrl: '',
+});
 const defaultForm = () => ({
-  id: '', type: 'guides', category: '', emoji: '📄', imageUrl: '', url: '',
+  id: '', type: 'guides', category: '', url: '',
   it: emptyLang(), en: emptyLang(), bn: emptyLang(),
 });
 
@@ -42,13 +44,15 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
   const navigate = useNavigate();
 
   const [form,         setForm]         = useState(() => ({ ...defaultForm(), type: contentType || 'guides' }));
-  const [activeLang,   setActiveLang]   = useState('it');
+  // Mantiene l'ID dell'ultimo draft salvato: dopo una rinomina il successivo
+  // "Pubblica" deve puntare alla nuova chiave S3, non a quella precedente.
+  const [savedId,      setSavedId]      = useState(contentId || '');
   const [loading,      setLoading]      = useState(!isNew);
   const [saving,       setSaving]       = useState(false);
   const [publishing,   setPublishing]   = useState(false);
   const [error,        setError]        = useState('');
   const [success,      setSuccess]      = useState('');
-  const [uploadingImg, setUploadingImg] = useState(false);
+  const [uploadingImg, setUploadingImg] = useState('');
 
   const handleAuthError = (err) => {
     if (err.message.includes('401') || err.message.toLowerCase().includes('token')) {
@@ -82,10 +86,13 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
     setError('');
     setSuccess('');
     try {
-      await apiFetch(`/api/admin/content/${form.type}/${form.id}`, adminToken, {
+      const requestId = savedId || form.id;
+      const saved = await apiFetch(`/api/admin/content/${form.type}/${requestId}`, adminToken, {
         method: 'PUT',
         body: JSON.stringify(form),
       });
+      setForm((prev) => ({ ...prev, id: saved.id || prev.id, url: saved.url ?? prev.url }));
+      setSavedId(saved.id || form.id);
       setSuccess('Bozza salvata ✓');
     } catch (err) {
       handleAuthError(err);
@@ -101,11 +108,15 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
     setError('');
     setSuccess('');
     try {
-      await apiFetch(`/api/admin/content/${form.type}/${form.id}`, adminToken, {
+      const requestId = savedId || form.id;
+      const saved = await apiFetch(`/api/admin/content/${form.type}/${requestId}`, adminToken, {
         method: 'PUT',
         body: JSON.stringify(form),
       });
-      await apiFetch(`/api/admin/content/${form.type}/${form.id}/publish`, adminToken, { method: 'POST' });
+      const publishedId = saved.id || form.id;
+      setForm((prev) => ({ ...prev, id: publishedId, url: saved.url ?? prev.url }));
+      setSavedId(publishedId);
+      await apiFetch(`/api/admin/content/${form.type}/${publishedId}/publish`, adminToken, { method: 'POST' });
       setSuccess('Pubblicato! ✓');
     } catch (err) {
       handleAuthError(err);
@@ -115,10 +126,10 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
     }
   };
 
-  const handleImageUpload = async (e) => {
+  const handleImageUpload = async (lang, e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setUploadingImg(true);
+    setUploadingImg(lang);
     setError('');
     try {
       const fd = new FormData();
@@ -128,21 +139,23 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
         adminToken,
         { method: 'POST', body: fd }
       );
-      setForm((prev) => ({ ...prev, imageUrl: data.url }));
+      setLangField(lang, 'imageUrl', data.url);
       setSuccess('Immagine caricata ✓');
     } catch (err) {
       handleAuthError(err);
       setError('Upload fallito: ' + err.message);
     } finally {
-      setUploadingImg(false);
+      setUploadingImg('');
     }
   };
 
   if (loading) return <div className="admin-loading">Caricamento…</div>;
 
-  const curLang    = form[activeLang];
   const isPages    = form.type === 'pages';
   const isGuides   = form.type === 'guides';
+  const guidePath  = isGuides && form.category && form.id
+    ? `/guides/${form.category}/${form.id}`
+    : '';
 
   return (
     <div className="page-content">
@@ -160,14 +173,22 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
 
         {/* Metadati base */}
         <div className="admin-section">
-          <label className="admin-label">ID univoco *</label>
+          <label className="admin-label">{isGuides ? 'Nome pagina / ID *' : 'ID univoco *'}</label>
           <input
             className="admin-input"
             value={form.id}
             onChange={(e) => setForm((p) => ({ ...p, id: e.target.value }))}
-            placeholder="es. permitRequest"
-            disabled={!isNew}
+            placeholder={isGuides ? 'es. permesso-di-soggiorno' : 'es. news-001'}
           />
+          {isGuides && (
+            <>
+              <label className="admin-label">URL pubblico della guida</label>
+              <div className="admin-public-url">{guidePath || 'Scegli prima categoria e nome pagina'}</div>
+              <p className="admin-hint">
+                Modifica “Nome pagina / ID” per cambiare l’ultima parte dell’URL. Al momento della pubblicazione il vecchio URL verrà disattivato.
+              </p>
+            </>
+          )}
 
           <label className="admin-label">Tipo *</label>
           <select
@@ -200,17 +221,7 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
             />
           )}
 
-          <label className="admin-label">Emoji</label>
-          <input
-            className="admin-input"
-            value={form.emoji}
-            onChange={(e) => setForm((p) => ({ ...p, emoji: e.target.value }))}
-            placeholder="📄"
-            maxLength={4}
-            style={{ width: 80 }}
-          />
-
-          {/* URL pagina — visibile e obbligatorio solo per pages */}
+          {/* URL libero per le pagine CMS. Per le guide viene sempre calcolato da categoria + ID. */}
           {isPages && (
             <>
               <label className="admin-label" style={{ color: '#c0392b' }}>
@@ -228,124 +239,140 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
           )}
         </div>
 
-        {/* Immagine */}
-        <div className="admin-section">
-          <label className="admin-label">Immagine copertina</label>
-          {form.imageUrl && (
-            <img src={form.imageUrl} alt="" className="admin-img-preview" />
-          )}
-          <label className="admin-upload-btn">
-            {uploadingImg ? 'Caricamento…' : <><Upload size={16} /> Carica immagine</>}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-              style={{ display: 'none' }}
-              disabled={uploadingImg || !form.id}
-            />
-          </label>
-          {!form.id && (
-            <p className="admin-hint">Inserisci prima un ID per caricare l'immagine</p>
-          )}
-          <input
-            className="admin-input"
-            value={form.imageUrl}
-            onChange={(e) => setForm((p) => ({ ...p, imageUrl: e.target.value }))}
-            placeholder="URL immagine (oppure incolla link manuale)"
-          />
-        </div>
+        <p className="admin-language-intro">
+          Compila ogni lingua separatamente. Titolo, testo, media, immagine e icona
+          vengono salvati solo nella rispettiva versione.
+        </p>
 
-        {/* Tab lingua */}
-        <div className="admin-lang-tabs">
-          {LANGS.map((l) => (
-            <button
-              key={l.code}
-              className={`admin-lang-tab ${activeLang === l.code ? 'active' : ''}`}
-              onClick={() => setActiveLang(l.code)}
-            >
-              {l.label}
-            </button>
-          ))}
-        </div>
+        {LANGS.map(({ code, label }) => {
+          const language = form[code];
+          return (
+            <section className="admin-language-section" key={code}>
+              <h3 className="admin-language-heading">{label}</h3>
 
-        {/* Campi lingua attiva */}
-        <div className="admin-section">
-          <label className="admin-label">Titolo ({activeLang.toUpperCase()}) *</label>
-          <input
-            className="admin-input"
-            value={curLang.title}
-            onChange={(e) => setLangField(activeLang, 'title', e.target.value)}
-            placeholder="Titolo"
-          />
+              <label className="admin-label">Titolo ({code.toUpperCase()}) *</label>
+              <input
+                className="admin-input"
+                value={language.title}
+                onChange={(e) => setLangField(code, 'title', e.target.value)}
+                placeholder="Titolo"
+              />
 
-          {/* Meta description — prominente per pages, disponibile anche per altri */}
-          {isPages ? (
-            <>
-              <label className="admin-label" style={{ color: '#c0392b' }}>
-                Meta description ({activeLang.toUpperCase()}) — SEO
-                <span style={{ fontWeight: 400, color: '#666', fontSize: 12, marginLeft: 6 }}>
-                  max 300 caratteri
-                </span>
+              {isPages ? (
+                <>
+                  <label className="admin-label" style={{ color: '#c0392b' }}>
+                    Meta description ({code.toUpperCase()}) — SEO
+                    <span style={{ fontWeight: 400, color: '#666', fontSize: 12, marginLeft: 6 }}>
+                      max 300 caratteri
+                    </span>
+                  </label>
+                  <textarea
+                    className="admin-textarea admin-meta-textarea"
+                    value={language.metaDesc}
+                    onChange={(e) => setLangField(code, 'metaDesc', e.target.value)}
+                    placeholder="Breve descrizione per i motori di ricerca e le anteprime social"
+                    rows={2}
+                    maxLength={300}
+                  />
+                </>
+              ) : (
+                <>
+                  <label className="admin-label">
+                    Meta description ({code.toUpperCase()})
+                    <span style={{ fontWeight: 400, color: '#666', fontSize: 12, marginLeft: 6 }}>
+                      opzionale, max 300 car.
+                    </span>
+                  </label>
+                  <input
+                    className="admin-input"
+                    value={language.metaDesc}
+                    onChange={(e) => setLangField(code, 'metaDesc', e.target.value)}
+                    placeholder="Descrizione breve (opzionale)"
+                    maxLength={300}
+                  />
+                </>
+              )}
+
+              <label className="admin-label">
+                Testo / Corpo ({code.toUpperCase()})
+                {isPages && (
+                  <span style={{ fontWeight: 400, color: '#666', fontSize: 12, marginLeft: 6 }}>
+                    HTML: b, i, ul, ol, li, p, br, a, h2, h3, img
+                  </span>
+                )}
               </label>
               <textarea
                 className="admin-textarea"
-                value={curLang.metaDesc}
-                onChange={(e) => setLangField(activeLang, 'metaDesc', e.target.value)}
-                placeholder="Breve descrizione per i motori di ricerca e le anteprime social"
-                rows={2}
-                maxLength={300}
+                value={language.body}
+                onChange={(e) => setLangField(code, 'body', e.target.value)}
+                placeholder={
+                  isPages
+                    ? 'Corpo della pagina — HTML consentito incluso <img src="..." alt="...">'
+                    : 'Testo del contenuto (HTML: b, i, ul, ol, li, p, br, a, h2, h3)'
+                }
+                rows={10}
               />
-            </>
-          ) : (
-            <>
+
               <label className="admin-label">
-                Meta description ({activeLang.toUpperCase()})
-                <span style={{ fontWeight: 400, color: '#666', fontSize: 12, marginLeft: 6 }}>
-                  opzionale, max 300 car.
-                </span>
+                <Music size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+                Audio MP3 ({code.toUpperCase()}) — opzionale
               </label>
               <input
                 className="admin-input"
-                value={curLang.metaDesc}
-                onChange={(e) => setLangField(activeLang, 'metaDesc', e.target.value)}
-                placeholder="Descrizione breve (opzionale)"
-                maxLength={300}
+                type="url"
+                value={language.audioUrl}
+                onChange={(e) => setLangField(code, 'audioUrl', e.target.value)}
+                placeholder="https://…/audio.mp3"
               />
-            </>
-          )}
 
-          <label className="admin-label">
-            Testo / Corpo ({activeLang.toUpperCase()})
-            {isPages && (
-              <span style={{ fontWeight: 400, color: '#666', fontSize: 12, marginLeft: 6 }}>
-                HTML: b, i, ul, ol, li, p, br, a, h2, h3, img
-              </span>
-            )}
-          </label>
-          <textarea
-            className="admin-textarea"
-            value={curLang.body}
-            onChange={(e) => setLangField(activeLang, 'body', e.target.value)}
-            placeholder={
-              isPages
-                ? 'Corpo della pagina — HTML consentito incluso <img src="..." alt="...">'
-                : 'Testo del contenuto (HTML: b, i, ul, ol, li, p, br, a, h2, h3)'
-            }
-            rows={12}
-          />
+              <label className="admin-label">
+                <Video size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+                URL video ({code.toUpperCase()}) — opzionale
+              </label>
+              <input
+                className="admin-input"
+                type="url"
+                value={language.videoUrl}
+                onChange={(e) => setLangField(code, 'videoUrl', e.target.value)}
+                placeholder="https://…/video.mp4"
+              />
 
-          <label className="admin-label">
-            <Music size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} />
-            Audio MP3 ({activeLang.toUpperCase()}) — opzionale
-          </label>
-          <input
-            className="admin-input"
-            value={curLang.audioUrl}
-            onChange={(e) => setLangField(activeLang, 'audioUrl', e.target.value)}
-            placeholder="URL audio MP3"
-          />
-          <p className="admin-hint">In futuro questo campo sarà popolato automaticamente da text-to-speech.</p>
-        </div>
+              <label className="admin-label">Icona ({code.toUpperCase()})</label>
+              <input
+                className="admin-input admin-emoji-input"
+                value={language.emoji}
+                onChange={(e) => setLangField(code, 'emoji', e.target.value)}
+                placeholder="📄"
+                maxLength={10}
+              />
+
+              <label className="admin-label">Immagine copertina ({code.toUpperCase()})</label>
+              {language.imageUrl && (
+                <img src={language.imageUrl} alt={`Anteprima ${label}`} className="admin-img-preview" />
+              )}
+              <label className="admin-upload-btn">
+                {uploadingImg === code ? 'Caricamento…' : <><Upload size={16} /> Carica immagine {code.toUpperCase()}</>}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleImageUpload(code, e)}
+                  style={{ display: 'none' }}
+                  disabled={Boolean(uploadingImg) || !form.id}
+                />
+              </label>
+              {!form.id && (
+                <p className="admin-hint">Inserisci prima un ID per caricare l'immagine</p>
+              )}
+              <input
+                className="admin-input"
+                type="url"
+                value={language.imageUrl}
+                onChange={(e) => setLangField(code, 'imageUrl', e.target.value)}
+                placeholder="URL immagine (oppure incolla link manuale)"
+              />
+            </section>
+          );
+        })}
 
         {/* Azioni */}
         <div className="admin-actions">

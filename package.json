@@ -8,13 +8,16 @@
     "dev:frontend": "vite --host 0.0.0.0 --port 5000",
     "dev:server": "nodemon server/index.js",
     "build": "vite build",
+    "test": "node --test",
     "preview": "vite preview",
     "start": "NODE_ENV=production node server/index.js",
     "migrate": "node scripts/migrate-to-s3.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1116.0",
     "@aws-sdk/client-s3": "^3.1111.0",
     "@aws-sdk/client-ses": "^3.1111.0",
+    "@aws-sdk/lib-dynamodb": "^3.1116.0",
     "@aws-sdk/lib-storage": "^3.1111.0",
     "aws-amplify": "^6.19.0",
     "concurrently": "^9.2.4",
