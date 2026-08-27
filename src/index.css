@@ -200,6 +200,24 @@ input, textarea { font-family: inherit; }
   border-radius: 8px;
   color: #b91c1c;
   font-size: 0.84rem;
+  line-height: 1.45;
+}
+.admin-error-list {
+  margin: 8px 0 0 18px;
+  padding: 0;
+}
+.admin-error-list li + li {
+  margin-top: 4px;
+}
+.admin-field-error {
+  margin-top: 4px;
+  color: #b42318;
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+.admin-input--error {
+  border-color: #d92d20 !important;
+  background: #fffafa;
 }
 .admin-success {
   margin: 12px 16px;
@@ -868,6 +886,28 @@ input, textarea { font-family: inherit; }
 }
 .btn-ghost:hover { background: var(--off-white); }
 
+.account-notice {
+  background: #eef5ff;
+  border: 1px solid #c9dcf5;
+  border-radius: 10px;
+  color: var(--navy);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  margin: -8px 0 18px;
+  padding: 11px 12px;
+  text-align: center;
+  white-space: pre-line;
+}
+.login-phone-hint,
+.otp-resend-hint {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  margin: -8px 0 12px;
+  text-align: center;
+  white-space: pre-line;
+}
+.otp-resend-hint { margin: 14px 0 0; }
 .otp-hint { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 4px; text-align: center; }
 .otp-demo-hint { font-size: 0.8rem; color: #888; text-align: center; background: #fffbe6; border-radius: 6px; padding: 6px 10px; margin-bottom: 12px; }
 .error-text { color: #E63946; font-size: 0.88rem; text-align: center; margin-top: 8px; }
@@ -1492,6 +1532,65 @@ input, textarea { font-family: inherit; }
   margin: 0;
   line-height: 1.4;
   opacity: 0.8;
+}
+
+.guides-featured-wrap {
+  padding: 14px 16px 0;
+}
+
+.guide-featured-card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--white);
+  border: 1.5px solid #b8d9e8;
+  border-left: 4px solid #06A77D;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  text-align: left;
+  position: relative;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.guide-featured-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+.guide-featured-emoji {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #e6f6f1;
+  font-size: 1.6rem;
+}
+.guide-featured-text {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.guide-featured-title {
+  color: var(--navy);
+  font-size: 0.92rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+.guide-featured-desc {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.3;
+}
+.guide-featured-arrow {
+  flex-shrink: 0;
+  color: #06A77D;
+  font-size: 1.5rem;
+  line-height: 1;
 }
 
 .guides-grid {

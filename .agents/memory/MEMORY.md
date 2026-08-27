@@ -5,3 +5,7 @@
 - [Admin content overview](admin-content-overview.md) — la scheda Pages è il riepilogo di guide, news e library, non un tipo CMS separato
 - [Localized media fallback](localized-media-fallback.md) — i fallback legacy devono distinguere campi assenti da valori vuoti intenzionali per lingua
 - [Authenticated profile lookup](authenticated-profile-lookup.md) — il profilo DynamoDB va cercato solo dal telefono nel JWT Cognito verificato
+- [Preview/CMS auth boundary](admin-menu-visibility.md) — la preview telefonica può abilitare il link ma non autorizza mai le API CMS
+- [DynamoDB profile IAM](dynamodb-profile-iam.md) — il runtime richiede lettura per telefono e UpdateItem su Step2Connect_Users
+- [Profile sync preservation](profile-sync-preservation.md) — i login normali non devono inviare campi vuoti che cancellano dati DynamoDB esistenti
+- [Pre-login account disclosure](pre-login-account-disclosure.md) — il prodotto accetta il rischio di enumerazione per instradare telefono e ruolo prima dell’OTP

@@ -1,412 +1,654 @@
 # Step2Connect v2
 
-> PWA mobile-first per lavoratori bangladesi negli stabilimenti Fincantieri in Italia.  
-> Progettata per utenti con bassa alfabetizzazione: testo minimo, icone grandi, supporto trilingue IT / EN / BN.
+PWA mobile-first e trilingue per supportare lavoratori bangladesi negli
+stabilimenti Fincantieri in Italia.
 
----
+L’interfaccia privilegia testo essenziale, icone grandi e percorsi semplici per
+utenti con livelli diversi di alfabetizzazione digitale e linguistica. Le lingue
+supportate sono:
+
+- italiano (`it`)
+- inglese (`en`)
+- bengalese (`bn`)
 
 ## Indice
 
-1. [Stack tecnico](#stack-tecnico)
-2. [Architettura](#architettura)
-3. [Avvio locale](#avvio-locale)
-4. [Struttura del progetto](#struttura-del-progetto)
-5. [Autenticazione utente (Cognito)](#autenticazione-utente-cognito)
-6. [Pannello CMS Admin](#pannello-cms-admin)
-7. [Contenuti su S3](#contenuti-su-s3)
-8. [Route attive](#route-attive)
-9. [Variabili d'ambiente e segreti](#variabili-dambiente-e-segreti)
-10. [Integrazione LivePerson](#integrazione-liveperson)
-11. [Stato attuale e TODO](#stato-attuale-e-todo)
-12. [Deploy](#deploy)
+1. [Funzionalità principali](#funzionalità-principali)
+2. [Stack tecnico](#stack-tecnico)
+3. [Architettura](#architettura)
+4. [Installazione e avvio](#installazione-e-avvio)
+5. [Configurazione](#configurazione)
+6. [Autenticazione degli utenti](#autenticazione-degli-utenti)
+7. [Profili e ruoli DynamoDB](#profili-e-ruoli-dynamodb)
+8. [Opzioni di registrazione da S3](#opzioni-di-registrazione-da-s3)
+9. [Pannello CMS](#pannello-cms)
+10. [Contenuti e media su S3](#contenuti-e-media-su-s3)
+11. [API disponibili](#api-disponibili)
+12. [Route frontend](#route-frontend)
+13. [Struttura del repository](#struttura-del-repository)
+14. [PWA e asset pubblici](#pwa-e-asset-pubblici)
+15. [LivePerson e WhatsApp](#liveperson-e-whatsapp)
+16. [Test e controlli](#test-e-controlli)
+17. [Script operativi](#script-operativi)
+18. [Sicurezza](#sicurezza)
+19. [Limiti attuali](#limiti-attuali)
+20. [Deploy e repository](#deploy-e-repository)
 
----
+## Funzionalità principali
+
+- Login e registrazione passwordless con AWS Cognito e SMS OTP.
+- Instradamento automatico tra login e registrazione in base al profilo
+  applicativo presente in DynamoDB.
+- Validazione dei numeri italiani e bangladesi prima di contattare Cognito o il
+  backend.
+- Percorso preview dedicato agli amministratori autorizzati.
+- Interfaccia utente in italiano, inglese e bengalese.
+- PWA installabile con manifest e service worker.
+- Guide pratiche, notizie, libreria, quiz, uffici, notifiche, traduttore e
+  analisi documenti.
+- Pannello CMS separato con autenticazione email/password.
+- Contenuti multilingua con bozze, pubblicazione e archiviazione su AWS S3.
+- Immagini, audio e video localizzati per lingua.
+- Gestione dei ruoli applicativi tramite comando operatore, senza endpoint HTTP
+  di promozione pubblici.
+- Integrazione LivePerson e collegamenti WhatsApp.
 
 ## Stack tecnico
 
 ### Frontend
-| Tecnologia | Versione | Ruolo |
-|---|---|---|
-| React | 18 | UI framework |
-| Vite | 5 | Dev server + bundler |
-| React Router | v6 | Client-side routing |
-| aws-amplify | v6 | SDK Cognito (signUp, signIn, OTP) |
-| lucide-react | latest | Icone |
-| vite-plugin-pwa | latest | Service Worker + manifest PWA |
+
+| Tecnologia | Versione principale | Utilizzo |
+|---|---:|---|
+| React | 18 | Componenti e stato UI |
+| Vite | 5 | Dev server e build |
+| React Router | 6 | Routing SPA |
+| AWS Amplify | 6 | Cognito, sessione e OTP |
+| Lucide React | 0.447 | Icone |
+| vite-plugin-pwa | 0.20 | Manifest e service worker |
 
 ### Backend
-| Tecnologia | Versione | Ruolo |
-|---|---|---|
-| Node.js / Express | ≥ 20 | API server REST |
-| jsonwebtoken | latest | JWT per sessioni admin CMS |
-| @aws-sdk/client-s3 | v3 | Lettura/scrittura contenuti su S3 |
-| @aws-sdk/client-ses | v3 | Invio email reset password admin |
-| multer | latest | Upload immagini contenuti |
-| mime-types | latest | Rilevamento MIME per upload |
-| zod | latest | Validazione payload contenuti |
-| dotenv / dotenvx | latest | Gestione variabili d'ambiente |
 
----
+| Tecnologia | Versione principale | Utilizzo |
+|---|---:|---|
+| Node.js | 20+ | Runtime |
+| Express | 5 | API HTTP e static server di produzione |
+| AWS SDK v3 | 3.x | S3, DynamoDB e SES |
+| jsonwebtoken | 9 | Token CMS e sessioni preview |
+| jwks-rsa | 4 | Verifica JWT Cognito |
+| Multer | 2 | Upload immagini |
+| Zod | 4 | Validazione contenuti CMS |
+| sanitize-html | 2 | Sanificazione HTML |
+
+Il package principale usa moduli ESM. Il backend mantiene CommonJS tramite
+`server/package.json`, così i file in `server/` usano `require()` mentre gli
+script operativi usano `.mjs`.
 
 ## Architettura
 
-```
-┌──────────────────────────────────────┐
-│              Browser                 │
-│  React SPA  ←→  AWS Amplify (auth)   │
-│                      ↕               │
-│              AWS Cognito             │
-│          (User Pool eu-west-2)       │
-│           phone + SMS OTP            │
-└──────────────┬───────────────────────┘
-               │ /api/*
-               ↓
-┌──────────────────────────────────────┐
-│         Express API Server           │
-│  dev: porta 3001 (Vite proxia /api)  │
-│  prod: porta 5000 (serve anche SPA)  │
-│                                      │
-│  /api/content/*      → solo lettura  │
-│  /api/admin/auth/*   → auth CMS      │
-│  /api/admin/content/* → CRUD CMS     │
-└──────────────┬───────────────────────┘
-               │ AWS SDK v3
-               ↓
-┌──────────────────────────────────────┐
-│             AWS S3                   │
-│  content/{draft|published|archive}/  │
-│    {type}/{lang}/{id}.json           │
-│  admin-users/users.csv               │
-│  step2connect/img/{type}/{id}/…      │
-└──────────────────────────────────────┘
+```text
+Browser
+  |
+  |-- React SPA / PWA
+  |     |-- AWS Amplify --> AWS Cognito (telefono + SMS OTP)
+  |     `-- /api/* ------> Express
+  |
+Express
+  |-- verifica JWT Cognito tramite JWKS
+  |-- sessioni preview e CMS tramite SESSION_SECRET
+  |-- profili e ruoli --------------------------> DynamoDB
+  |-- contenuti, utenti CMS e CSV registrazione -> S3
+  |-- email reset password ---------------------> SES
+  `-- in produzione serve anche dist/
 ```
 
-**Dev:** `concurrently` avvia Vite (5000) + Express (3001). Vite proxia tutte le richieste `/api` a `localhost:3001`.  
-**Prod:** Express fa il build di Vite (`dist/`) e serve sia le API sia la SPA sullo stesso processo e porta.
+### Sviluppo
 
----
+`npm run dev` avvia due processi tramite `concurrently`:
 
-## Avvio locale
+- Vite su porta `5000`
+- Express su porta `3001`
+
+Vite inoltra tutte le richieste `/api` a Express. Le chiamate frontend alle API
+interne devono quindi usare URL relativi, ad esempio `/api/content`.
+
+### Produzione
+
+`npm run start` avvia Express in modalità produzione. Express:
+
+- ascolta su `PORT`, con fallback `5000`;
+- espone tutte le route `/api/*`;
+- serve la build Vite da `dist/`;
+- restituisce `dist/index.html` per le route SPA.
+
+## Installazione e avvio
+
+### Requisiti
+
+- Node.js 20 o superiore
+- npm
+- configurazione AWS/Cognito disponibile nei Replit Secrets
+
+### Comandi
 
 ```bash
 npm install
-npm run dev        # avvia Vite (5000) + Express (3001) in parallelo
-npm run build      # build produzione → dist/
-npm run preview    # anteprima build produzione
+npm run dev
 ```
 
-Configura i segreti (vedi sezione [Variabili d'ambiente](#variabili-dambiente-e-segreti)) prima di avviare.
+Altri script:
 
----
-
-## Struttura del progetto
-
-```
-public/
-  favicon.svg
-  hero-venezia.jpg
-  logo-dark.png
-  logo-white.png                         # logo nella top bar
-  logo-fincantieri.png
-  logo-fincantieri-white.png             # logo bianco nel SideMenu
-  analyze-document.jpg
-  guides-*.jpg                           # hero immagini categorie guide
-
-src/
-  lib/
-    cognito.js                           # Inizializza Amplify con User Pool + Client ID
-    userApi.js                           # syncProfile / getMyProfile / updateMyProfile → VITE_API_BASE_URL
-
-  context/
-    AuthContext.jsx                      # Auth Cognito: signUp (solo phone_number), signIn OTP,
-                                         #   autoSignIn, syncProfile post-login; dev bypass via localStorage
-    LanguageContext.jsx                  # i18n IT/EN/BN con persistenza localStorage
-    AdminAuthContext.jsx                 # JWT admin CMS — decode lato client, persistenza localStorage
-
-  i18n/
-    it.js / en.js / bn.js               # Chiavi di traduzione
-
-  components/
-    BottomBar.jsx                        # Nav fissa: lingua | home | bot
-    SideMenu.jsx                         # Drawer hamburger + link "Gestione contenuti" → /admin/login
-    LivePersonBubble.jsx                 # Tracker route LP (lpTag.newPage()) senza UI
-
-  data/
-    guides.js                            # Array guide (placeholder — verrà sostituito da CMS S3)
-
-  pages/
-    LoginPage.jsx                        # Telefono + OTP (registrazione e login)
-    HomePage.jsx                         # Hero, box bot LP, griglia servizi
-    GuidesPage.jsx                       # Lista categorie guide
-    GuideCategoryPage.jsx                # Guide filtrate per categoria
-    GuideDetailPage.jsx                  # Dettaglio singola guida
-    PageResolver.jsx                     # Catch-all: cerca pagina CMS su S3, poi 404
-    ServiceDetailPage.jsx                # Servizi dinamici (salute/lavoro/scuola/documenti)
-    FindOfficesPage.jsx                  # Rubrica uffici Veneto con ricerca
-    NewsPage.jsx                         # Feed notizie multilingue
-    QuizPage.jsx                         # Quiz 4 domande con punteggio
-    LibraryPage.jsx                      # Libreria documenti scaricabili
-    NotificationsPage.jsx                # Notifiche push (placeholder)
-    TranslatorPage.jsx                   # Apre WhatsApp con testo pre-compilato
-    AnalyzeDocumentPage.jsx              # Analisi documenti via WhatsApp +39 349 064 5720
-    PrivacyPage.jsx                      # Informativa Privacy + CGC (testo 14/12/2024)
-
-    admin/
-      AdminLoginPage.jsx                 # Login email+password CMS → JWT 8h
-      AdminForgotPasswordPage.jsx        # Richiesta reset password (risponde sempre 200)
-      AdminResetPasswordPage.jsx         # Imposta nuova password via token URL
-      AdminContentPage.jsx               # Lista e gestione contenuti CMS
-      AdminAccountPage.jsx               # Cambio password admin autenticato
-      ContentEditForm.jsx                # Form editor contenuti (trilingue: IT/EN/BN)
-
-  App.jsx                                # Router root: /admin/* → AdminShell, /* → AppShell
-  main.jsx
-  index.css                              # Stili mobile-first, palette navy #0A1E3A
-
-server/
-  index.js                               # Entry point Express, CORS, routing, static prod
-
-  routes/
-    content.js                           # GET /api/content — contenuti PUBBLICATI (pubblico)
-    admin.js                             # CRUD /api/admin/content — protetto da JWT
-    adminAuth.js                         # Login, cambio/reset password, /me — auth CMS
-
-  middleware/
-    adminAuth.js                         # requireAdminJWT: verifica JWT con SESSION_SECRET
-    auth.js                              # (riservato) Cognito JWT middleware per route utente
-
-  lib/
-    s3.js                                # getJson, putJson, putBuffer, listKeys, copyObject
-    adminUsers.js                        # CSV utenti admin su S3 (email,name,hash,token,expiry)
-    sendEmail.js                         # AWS SES — richiede SES_FROM_EMAIL verificato
-    validate.js                          # Schema Zod per payload contenuti
+```bash
+npm test             # suite Node
+npm run build        # build Vite in dist/
+npm run preview      # anteprima della build Vite
+npm run start        # server di produzione
+npm run migrate      # migrazione iniziale dei contenuti su S3
+npm run user:role -- promote +393123456789
+npm run user:role -- standard +393123456789
 ```
 
----
+Il workflow Replit configurato usa:
 
-## Autenticazione utente (Cognito)
-
-Il flusso è **completamente passwordless**: numero di telefono + SMS OTP.  
-L'implementazione usa **AWS Amplify v6** con `USER_AUTH` flow.
-
-### Flusso registrazione
-```
-1. Utente inserisce telefono + dati anagrafici
-2. signUp({ username: phoneE164, password: <throwaway uuid+Xz9!>, userAttributes: { phone_number } })
-   ↑ IMPORTANTE: solo phone_number viene inviato a Cognito.
-     Il pool non ha altri attributi nello schema → inviarne altri causa "Attributes did not conform to the schema".
-     Nome, email, azienda, sito vengono salvati nel backend (syncProfile) DOPO il login.
-3. autoSignIn → SMS OTP inviato
-4. confirmSignUp(phoneE164, codiceOTP)
-5. autoSignIn() completa la sessione
-6. fetchUserAttributes() + fetchAuthSession() → token ID
-7. syncProfile(idToken, { phone, firstName, lastName, email, company, site }) → backend API
+```bash
+npm run dev
 ```
 
-### Flusso login
-```
-1. signIn({ username: phoneE164, authFlowType: 'USER_AUTH', preferredChallenge: 'SMS_OTP' })
-2. SMS OTP inviato
-3. confirmSignIn({ challengeResponse: codiceOTP })
-4. fetchUserAttributes() + getIdToken()
-5. syncProfile() → aggiorna profilo backend
-```
+## Configurazione
 
-### Password throwaway
-Cognito richiede una password anche nei flussi passwordless.  
-`crypto.randomUUID()` genera solo hex minuscolo + trattini, non soddisfa la policy Cognito  
-(≥ 1 maiuscola, ≥ 1 simbolo). Si usa `${crypto.randomUUID()}Xz9!` come throwaway —  
-non viene mai usata per accedere.
+Non inserire valori reali nel repository. Tutte le credenziali devono essere
+gestite tramite Replit Secrets.
 
-### Dev bypass
-`devLogin()` in `AuthContext.jsx` scrive un utente fittizio in `localStorage` (`s2c_dev_session`).  
-Al mount, se la chiave è presente viene usata senza passare per Cognito.
+### Variabili richieste
 
----
-
-## Pannello CMS Admin
-
-Raggiungibile da `/admin/login` (o dal link "Gestione contenuti ⚙" nel SideMenu).  
-**Completamente separato dall'autenticazione Cognito** — usa JWT proprio firmato con `SESSION_SECRET`.
-
-### Utenti admin
-Gli utenti admin sono un CSV su S3: `admin-users/users.csv`  
-Formato: `email,name,passwordHash,resetToken,resetExpiry`  
-- `passwordHash` = `salt:hash` con scrypt (hex, 64 byte)  
-- `resetToken` / `resetExpiry` = usati per il flusso di reset password via email
-
-### Route admin
-| Metodo | Path | Descrizione |
-|---|---|---|
-| `POST` | `/api/admin/auth/login` | Verifica email+password → JWT 8h |
-| `GET` | `/api/admin/auth/me` | Restituisce dati utente dal JWT |
-| `POST` | `/api/admin/auth/change-password` | Cambia password (richiede JWT) |
-| `POST` | `/api/admin/auth/forgot-password` | Genera token reset → email SES (sempre 200) |
-| `POST` | `/api/admin/auth/reset-password` | Imposta nuova password via token URL |
-
-### Flusso reset password
-1. Admin va su `/admin/forgot-password` e inserisce l'email
-2. Server genera token hex-32 con scadenza +1 ora, lo salva nel CSV S3
-3. AWS SES invia email con link `{origin}/admin/reset-password?token=…`
-4. Admin clicca il link → inserisce nuova password (min 8 caratteri)
-5. Server verifica token + scadenza → aggiorna hash password, cancella token
-
-> ⚠️ **Pending:** `SES_FROM_EMAIL` non è ancora configurato come Secret Replit.  
-> Finché non viene impostato, la chiamata SES lancia eccezione e l'email non parte.
-
----
-
-## Contenuti su S3
-
-### Schema chiavi S3
-```
-content/
-  draft/      {type}/{lang}/{id}.json   ← bozze CMS (solo admin)
-  published/  {type}/{lang}/{id}.json   ← contenuti live (API pubblica)
-  archive/    {type}/{lang}/{id}_{ts}.json  ← eliminati (conservati per audit)
-
-admin-users/
-  users.csv                             ← utenti CMS admin
-
-step2connect/
-  img/{type}/{id}/{timestamp}.{ext}     ← immagini caricate dal CMS
-```
-
-### Tipi di contenuto supportati
-- `guides` — guide pratiche trilingue
-- `news` — notizie
-- `library` — documenti scaricabili
-- `pages` — pagine CMS generiche (cercate da `PageResolver.jsx` per URL)
-
-### Ciclo di vita contenuto
-```
-Admin crea/edita → draft su S3 (3 file per lingua: it/en/bn)
-Admin clicca "Pubblica" → copyObject da draft/ a published/
-Admin clicca "Elimina" → copyObject da draft/ a archive/ (non cancella mai)
-```
-
-### API pubblica
-`GET /api/content?type=guides&lang=it` → lista contenuti pubblicati  
-`GET /api/content/:type/:id?lang=it` → dettaglio singolo  
-`GET /api/content/pages-by-url?url=/percorso&lang=it` → pagina per URL
-
----
-
-## Route attive
-
-### App utente (protette da Cognito)
-| Path | Pagina | Note |
-|---|---|---|
-| `/` | redirect → `/home` | |
-| `/home` | HomePage | Hero, box bot LivePerson, griglia servizi |
-| `/service/:service` | ServiceDetailPage | salute, lavoro, scuola, documenti |
-| `/guides` | GuidesPage | Categorie guide |
-| `/guides/:category` | GuideCategoryPage | |
-| `/guides/:category/:item` | GuideDetailPage | |
-| `/quiz` | QuizPage | |
-| `/offices` | FindOfficesPage | Rubrica uffici Veneto |
-| `/news` | NewsPage | |
-| `/library` | LibraryPage | |
-| `/notifications` | NotificationsPage | |
-| `/translator` | TranslatorPage | |
-| `/analyze-document` | AnalyzeDocumentPage | Bottone WhatsApp |
-| `/privacy` | PrivacyPage | |
-| `/*` | PageResolver | Cerca pagina CMS su S3, poi 404 |
-
-### Pannello admin (protette da JWT)
-| Path | Pagina |
+| Variabile | Utilizzo |
 |---|---|
-| `/admin/login` | AdminLoginPage |
-| `/admin/forgot-password` | AdminForgotPasswordPage |
-| `/admin/reset-password` | AdminResetPasswordPage |
-| `/admin/content` | AdminContentPage (lista + editor) |
-| `/admin/account` | AdminAccountPage (cambio password) |
+| `AWS_ACCESS_KEY_ID` | Accesso server ad AWS |
+| `AWS_SECRET_ACCESS_KEY` | Accesso server ad AWS |
+| `AWS_REGION` | Regione AWS, fallback `eu-west-2` |
+| `S3_BUCKET_NAME` | Bucket contenuti, CSV e utenti CMS |
+| `SESSION_SECRET` | Firma JWT CMS, challenge e sessioni preview |
+| `VITE_COGNITO_USER_POOL_ID` | User Pool Cognito frontend e verifica backend |
+| `VITE_COGNITO_USER_POOL_CLIENT_ID` | App Client Cognito |
+| `VITE_API_BASE_URL` | Backend esterno usato per la sincronizzazione completa del profilo; `PageResolver` conserva anche un override legacy quando è valorizzato |
 
----
+### Variabili opzionali
 
-## Variabili d'ambiente e segreti
-
-Tutti configurati come **Replit Secrets** — non committare mai valori reali.
-
-| Variabile | Dove usata | Note |
+| Variabile | Default | Utilizzo |
 |---|---|---|
-| `VITE_COGNITO_USER_POOL_ID` | `src/lib/cognito.js` | ID del User Pool AWS Cognito (eu-west-2) |
-| `VITE_COGNITO_USER_POOL_CLIENT_ID` | `src/lib/cognito.js` | Client ID Cognito (app client) |
-| `VITE_API_BASE_URL` | `src/lib/userApi.js` | Base URL backend per syncProfile (es. API Gateway) |
-| `AWS_ACCESS_KEY_ID` | server — S3 + SES | Credenziali IAM AWS |
-| `AWS_SECRET_ACCESS_KEY` | server — S3 + SES | Credenziali IAM AWS |
-| `AWS_REGION` | server | Default: `eu-west-2` |
-| `S3_BUCKET_NAME` | server | Bucket contenuti e utenti admin |
-| `SESSION_SECRET` | server — JWT admin | Secret per firmare/verificare JWT CMS |
-| `SES_FROM_EMAIL` | server — `sendEmail.js` | ⚠️ Non ancora configurato — indirizzo verificato SES per email reset password |
+| `PORT` | `5000` | Porta Express in produzione |
+| `API_PORT` | `3001` | Porta Express in sviluppo |
+| `COGNITO_REGION` | `AWS_REGION` | Regione Cognito lato server |
+| `COGNITO_USER_POOL_ID` | valore `VITE_*` | Override server del User Pool |
+| `COGNITO_USER_POOL_CLIENT_ID` | valore `VITE_*` | Override server del Client ID |
+| `DYNAMODB_REGION` | `AWS_REGION` | Regione tabella profili |
+| `DYNAMODB_USERS_TABLE` | `Step2Connect_Users` | Nome tabella profili |
+| `DYNAMODB_PHONE_INDEX` | vuoto | Indice DynamoDB con partition key `phone` |
+| `SES_FROM_EMAIL` | nessuno | Mittente verificato SES per reset password |
 
----
+`VITE_*` viene incorporato nella build client: non usare mai questo prefisso per
+segreti.
 
-## Menu laterale (ordine definitivo)
+## Autenticazione degli utenti
 
+### Formati telefonici supportati
+
+Il client valida il numero prima di effettuare qualsiasi chiamata a DynamoDB o
+Cognito:
+
+- Italia: `+393XXXXXXXXX`
+- Bangladesh: `+880 1XXXXXXXXX`
+
+Il carattere `+` iniziale è obbligatorio. Spazi, parentesi, punti e trattini
+comuni vengono ignorati durante il controllo, ma il numero normalizzato deve
+rispettare uno dei due formati.
+
+### Controllo account pre-login
+
+Entrambi i form chiamano `POST /api/users/account-status`.
+
+- Numero non presente durante **Accedi**: il form passa a **Registrati**.
+- Numero già presente durante **Registrati**: il form passa ad **Accedi**.
+- Profilo standard: viene avviato Cognito.
+- Profilo admin con preview abilitata: viene avviata la challenge preview.
+- Errore o timeout DynamoDB: il flusso si blocca in modalità fail-closed.
+
+La route restituisce solo `exists` e il tipo minimo di flusso richiesto
+dall’interfaccia. È limitata per IP. La distinzione pre-login è una scelta di
+prodotto intenzionale per questa applicazione interna; l’OTP resta obbligatorio.
+
+### Registrazione Cognito
+
+1. Il client invia a Cognito esclusivamente `phone_number`.
+2. Cognito richiede comunque una password tecnica: viene generato un UUID con il
+   suffisso `Xz9!` per rispettare la policy.
+3. `confirmSignUp` verifica il codice ricevuto via SMS.
+4. `autoSignIn` completa la sessione.
+5. Nome, cognome, email, azienda e cantiere vengono inviati al backend profili
+   dopo il login.
+
+I login normali non inviano campi vuoti al backend: in questo modo non cancellano
+dati già presenti nel profilo DynamoDB.
+
+### Login Cognito
+
+Il login usa il flusso Amplify `USER_AUTH` con challenge preferita `SMS_OTP`.
+Dopo `confirmSignIn`, il client recupera attributi e ID token. La lettura del
+profilo DynamoDB avviene senza bloccare il primo render.
+
+### Preview amministratore
+
+Un profilo è idoneo alla preview solo quando DynamoDB contiene:
+
+```text
+type = admin
+adminPsw = true
 ```
-Home
-Guide pratiche
-Quiz
-Analizza documento
-Trova uffici
-Notifiche
-──────────────
-Privacy Policy
-Lingua
-Esci
-Gestione contenuti ⚙  ← apre /admin/login in nuova tab
-[Logo Fincantieri bianco]
+
+Il numero deve inoltre corrispondere alla stessa riga del codice `adminOTP` nel
+CSV `admin-users/users.csv` su S3.
+
+Il server:
+
+1. rilascia una challenge firmata di 5 minuti;
+2. verifica telefono, OTP, profilo DynamoDB e riga CSV;
+3. rilascia una sessione preview firmata di 8 ore;
+4. ricontrolla ruolo e versione della credenziale quando ripristina la sessione.
+
+Una sessione preview può mostrare l’interfaccia principale con ruolo admin, ma
+non autorizza le API del CMS. Il CMS richiede sempre il proprio JWT.
+
+## Profili e ruoli DynamoDB
+
+La tabella predefinita è `Step2Connect_Users` nella regione `eu-west-2`.
+
+Il profilo viene cercato esclusivamente tramite il telefono presente nel JWT
+Cognito verificato. Il client non può scegliere il numero usato da
+`GET /api/users/me`.
+
+Se `DYNAMODB_PHONE_INDEX` è configurato viene usata una query sull’indice;
+altrimenti il server esegue una scansione paginata filtrata per `phone`.
+
+I ruoli possono essere modificati solo da un operatore:
+
+```bash
+npm run user:role -- promote <telefono>
+npm run user:role -- standard <telefono>
 ```
 
----
+Il comando aggiorna soltanto un profilo esistente e verifica il risultato.
+Il template IAM a privilegio minimo è in
+`infra/step2connect-users-iam.yaml`.
 
-## Integrazione LivePerson
+## Opzioni di registrazione da S3
 
-Il tag LP è caricato in `index.html` (siteId `91669831`).
+Le liste **Azienda** e **Cantiere** non sono hardcoded nel frontend.
 
-- **Engagement div:** `LP_DIV_1785257734021` in `HomePage.jsx` (sezione Assistente Virtuale)
-- **Tracker route:** `LivePersonBubble.jsx` chiama `lpTag.newPage()` ad ogni cambio di route
-- **CSP:** meta tag `Content-Security-Policy` in `index.html` include tutti i sottodomini LP:
-  - `*.liveperson.net`, `*.lpsnmedia.net`
-  - `*.tokenizer.liveperson.net`, `*.idp.liveperson.net`, `*.shiftstatus.liveperson.net`
+Il server legge:
 
-> Il widget LP non appare finché l'engagement non è attivo nella console LP (normale in staging).
+```text
+content/registration-login/form_registrazione_lista_aziende_cantieri.csv
+```
 
----
+Caratteristiche del parser:
 
-## Stato attuale e TODO
+- delimitatore `;` o `,` rilevato automaticamente;
+- BOM UTF-8;
+- CRLF e LF;
+- celle tra virgolette;
+- doppi apici escapati;
+- rimozione di valori vuoti e duplicati;
+- colonne obbligatorie `Azienda` e `Cantieri`;
+- cache server di 5 minuti.
 
-### ✅ Completato
-- [x] Autenticazione reale AWS Cognito — telefono + SMS OTP (signUp / signIn)
-- [x] Fix critico: `signUp` invia **solo `phone_number`** — il pool non accetta altri attributi
-- [x] Fix password throwaway Cognito: suffisso `Xz9!` per soddisfare policy maiuscola+simbolo
-- [x] `syncProfile` post-login salva nome, email, azienda, sito nel backend (non-blocking)
-- [x] Pannello CMS admin (`/admin/*`) — login email+password JWT, completamente separato da Cognito
-- [x] CRUD contenuti trilingue (IT/EN/BN) su S3 con stati: draft → published → archive
-- [x] Upload immagini contenuti su S3 (JPEG/PNG/WebP/GIF, max 5 MB)
-- [x] Gestione account admin: cambio password, forgot/reset via email AWS SES
-- [x] Link "Gestione contenuti" nel SideMenu utente
-- [x] `PageResolver`: catch-all che cerca pagine CMS su S3 prima del 404
+Il browser riceve solo gli array elaborati da
+`GET /api/registration-options`; non accede direttamente al file S3 privato.
 
-### ⚠️ Pending / Da completare
-- [ ] **`SES_FROM_EMAIL`** — configurare il Secret Replit con un indirizzo verificato in AWS SES per attivare le email di reset password admin
-- [ ] **Contenuti guide** — popolare S3 con i 26 articoli da step2connect.it tramite il CMS
-- [ ] **News** — sostituire array statico `NewsPage.jsx` con contenuti pubblicati via CMS
-- [ ] **Libreria** — sostituire array statico `LibraryPage.jsx` con contenuti S3 (task #9)
-- [ ] **Pagine CMS nell'app** — collegare `GuideDetailPage.jsx` e `GuideCategoryPage.jsx` ai contenuti pubblicati su S3 (task #8)
-- [ ] **Flash di lingua** — prevenire flash di contenuto vecchio al cambio lingua (task #10)
-- [ ] **Deploy produzione** — pubblicare l'app su Replit dopo ogni milestone significativa
+## Pannello CMS
 
----
+Il CMS è disponibile sotto `/admin/*` ed è separato dall’autenticazione Cognito.
 
-## Deploy
+### Autenticazione CMS
 
-App pubblicata su Replit:  
-**https://step-2-connect-v-2.replit.app**
+- login email/password;
+- utenti nel file S3 `admin-users/users.csv`;
+- password con scrypt nel formato `salt:hash`;
+- JWT firmato con `SESSION_SECRET`;
+- durata sessione: 8 ore;
+- cambio password;
+- reset password con token monouso valido un’ora;
+- invio email tramite AWS SES.
 
-Repository GitHub:  
-**https://github.com/SimonaDevGH/step2connect-v2**
+Il reset risponde sempre con successo quando la richiesta è formalmente valida,
+anche se l’email non esiste, per evitare enumerazione degli account CMS.
 
-> Per pubblicare: usa il pulsante **Publish** nel pannello Replit (non `npm run build` manuale).  
-> In produzione Express compila la SPA da `dist/` e serve tutto sulla porta 5000.
+### Tipi di contenuto
+
+- `guides`
+- `news`
+- `library`
+- `pages`
+
+La scheda riepilogativa `all` dell’admin combina guide, news e library; non è un
+tipo di contenuto S3 separato.
+
+### Campi
+
+Metadati condivisi:
+
+- `id`
+- `type`
+- `category`
+- `url`
+
+Campi localizzati per `it`, `en` e `bn`:
+
+- `title`
+- `body`
+- `metaDesc`
+- `emoji`
+- `imageUrl`
+- `audioUrl`
+- `videoUrl`
+
+Per le guide l’URL pubblico è sempre derivato da categoria e ID. Per le pagine
+CMS generiche l’URL deve iniziare con `/`.
+
+Titolo, corpo e meta description vengono sanificati. Sono ammessi soltanto tag
+HTML controllati, inclusi paragrafi, liste, link, titoli e immagini HTTP/HTTPS.
+
+### Media
+
+- Le immagini possono essere caricate dal form CMS.
+- Formati immagine: JPEG, PNG, WebP e GIF.
+- Dimensione massima: 5 MB.
+- Audio e video sono localizzati per lingua e attualmente vengono inseriti come
+  URL.
+- Un valore vuoto inviato intenzionalmente per una lingua non viene sostituito
+  dal media di un’altra lingua.
+
+## Contenuti e media su S3
+
+### Chiavi dei contenuti
+
+```text
+content/
+  draft/{type}/{lang}/{id}.json
+  published/{type}/{lang}/{id}.json
+  archive/{type}/{lang}/{id}_{timestamp}.json
+```
+
+Ogni lingua usa un file separato.
+
+### Altri oggetti
+
+```text
+admin-users/users.csv
+content/registration-login/form_registrazione_lista_aziende_cantieri.csv
+step2connect/img/{type}/{id}/{timestamp}.{ext}
+```
+
+### Ciclo di vita
+
+1. **Salva bozza** scrive i tre file localizzati in `draft`.
+2. **Pubblica** copia i file disponibili in `published`.
+3. Una rinomina crea il nuovo ID e disattiva il vecchio URL dopo la
+   pubblicazione.
+4. **Elimina** archivia la bozza e rimuove le chiavi attive di bozza e
+   pubblicazione.
+
+Le liste e i dettagli pubblici di guide, news e library leggono dallo stesso
+origin:
+
+```text
+/api/content/...
+```
+
+In sviluppo la richiesta passa dal proxy Vite; in produzione raggiunge Express
+direttamente. `PageResolver` mantiene per compatibilità un override tramite
+`VITE_API_BASE_URL` quando la variabile è valorizzata; le nuove letture CMS non
+devono estendere questa dipendenza legacy.
+
+News e libreria conservano dati statici di fallback per mostrare un contenuto
+minimo quando l’API non è disponibile.
+
+## API disponibili
+
+### Sistema
+
+| Metodo | Endpoint | Autorizzazione | Descrizione |
+|---|---|---|---|
+| `GET` | `/api/health` | Pubblica | Health check |
+
+### Utenti
+
+| Metodo | Endpoint | Autorizzazione | Descrizione |
+|---|---|---|---|
+| `POST` | `/api/users/account-status` | Pubblica, rate limited | Instrada login/registrazione |
+| `POST` | `/api/users/preview-admin` | Pubblica, rate limited | Crea challenge preview |
+| `POST` | `/api/users/preview-admin/verify` | Pubblica, rate limited | Verifica OTP preview |
+| `GET` | `/api/users/preview-admin/session` | JWT preview | Ripristina sessione preview |
+| `GET` | `/api/users/me` | JWT Cognito | Legge nome e ruolo applicativo |
+| `GET` | `/api/registration-options` | Pubblica | Aziende e cantieri da CSV S3 |
+
+La sincronizzazione estesa del profilo usa il backend configurato in
+`VITE_API_BASE_URL`.
+
+### Contenuti pubblici
+
+| Metodo | Endpoint | Descrizione |
+|---|---|---|
+| `GET` | `/api/content?type={type}&lang={lang}` | Elenco pubblicato |
+| `GET` | `/api/content/pages-by-url?url={path}&lang={lang}` | Pagina CMS per URL |
+| `GET` | `/api/content/{type}/{id}?lang={lang}` | Dettaglio pubblicato |
+
+### Autenticazione CMS
+
+| Metodo | Endpoint | Autorizzazione |
+|---|---|---|
+| `POST` | `/api/admin/auth/login` | Pubblica |
+| `GET` | `/api/admin/auth/me` | JWT CMS |
+| `POST` | `/api/admin/auth/change-password` | JWT CMS |
+| `POST` | `/api/admin/auth/forgot-password` | Pubblica |
+| `POST` | `/api/admin/auth/reset-password` | Token reset |
+
+### Contenuti CMS
+
+Tutte le route richiedono JWT CMS:
+
+| Metodo | Endpoint | Descrizione |
+|---|---|---|
+| `GET` | `/api/admin/content?type={type}&lang={lang}` | Lista bozze e stato pubblicazione |
+| `GET` | `/api/admin/content/{type}/{id}` | Bozza multilingua |
+| `PUT` | `/api/admin/content/{type}/{id}` | Crea o aggiorna bozza |
+| `POST` | `/api/admin/content/{type}/{id}/publish` | Pubblica |
+| `DELETE` | `/api/admin/content/{type}/{id}` | Archivia e rimuove |
+| `POST` | `/api/admin/content/{type}/{id}/media` | Carica immagine |
+
+## Route frontend
+
+### App utente
+
+| Route | Pagina |
+|---|---|
+| `/` | Login oppure redirect all’app |
+| `/home` | Home |
+| `/service/:service` | Dettaglio servizio |
+| `/guides` | Categorie guide |
+| `/guides/:category` | Elenco categoria o guida diretta |
+| `/guides/:category/:item` | Dettaglio guida |
+| `/news` | Notizie |
+| `/news/:id` | Dettaglio notizia CMS |
+| `/library` | Libreria |
+| `/library/:id` | Dettaglio elemento libreria |
+| `/quiz` | Quiz |
+| `/offices` | Ricerca uffici |
+| `/notifications` | Notifiche |
+| `/translator` | Traduttore WhatsApp |
+| `/analyze-document` | Analisi documento via WhatsApp |
+| `/privacy` | Privacy |
+| `/*` | Risoluzione pagina CMS, poi fallback |
+
+Le route applicative richiedono una sessione Cognito o preview valida.
+
+### CMS
+
+| Route | Pagina |
+|---|---|
+| `/admin/login` | Login CMS |
+| `/admin/forgot-password` | Richiesta reset |
+| `/admin/reset-password` | Impostazione nuova password |
+| `/admin/content` | Gestione contenuti |
+| `/admin/account` | Cambio password |
+
+## Struttura del repository
+
+```text
+public/                         asset runtime e icone PWA
+src/
+  components/                   navigazione e LivePerson
+  context/                      autenticazione, CMS e lingua
+  data/                         metadati statici delle guide
+  i18n/                         traduzioni IT / EN / BN
+  lib/                          Cognito, API, ruoli e validazioni
+  pages/                        pagine utente
+  pages/admin/                  pagine CMS
+  App.jsx                       router e shell
+  main.jsx                      bootstrap React
+  index.css                     stile mobile-first
+server/
+  lib/                          S3, DynamoDB, CSV, email e validazione
+  middleware/                   JWT Cognito e CMS
+  routes/                       API Express
+  index.js                      entrypoint server
+scripts/                        strumenti operativi e migrazioni
+infra/                          template IAM
+test/                           test Node
+```
+
+La cartella `attached_assets/` contiene caricamenti temporanei della chat Replit
+e non fa parte del runtime. È ignorata da Git; gli asset necessari all’app devono
+essere copiati in `public/` oppure caricati su S3.
+
+## PWA e asset pubblici
+
+Il manifest è generato da `vite-plugin-pwa`.
+
+- nome: Step2Connect
+- display: `standalone`
+- orientamento: `portrait`
+- colore tema: `#0A1E3A`
+- icone: `public/icon-192.png` e `public/icon-512.png`
+- service worker: aggiornamento automatico
+
+Logo, hero e immagini statiche usate dal frontend sono conservati in `public/`.
+La build `dist/` è generata e non viene tracciata da Git.
+
+## LivePerson e WhatsApp
+
+Il tag LivePerson viene caricato da `index.html`. Il componente
+`LivePersonBubble` notifica i cambi di route con `lpTag.newPage()`.
+
+Il widget dipende dalla configurazione dell’engagement nella console LivePerson;
+la sua assenza in staging non indica necessariamente un errore dell’app.
+
+Le pagine Traduttore e Analizza documento aprono conversazioni WhatsApp con testo
+precompilato. I numeri di destinazione sono configurati nei rispettivi componenti.
+
+## Test e controlli
+
+Eseguire:
+
+```bash
+npm test
+npm run build
+```
+
+La suite copre:
+
+- media localizzati e compatibilità con contenuti legacy;
+- ruoli admin e visibilità del menu CMS;
+- sicurezza delle sessioni preview;
+- routing account pre-login e rate limiting;
+- preservazione dei profili durante il login;
+- parsing del CSV di registrazione;
+- validazione dei numeri italiani e bangladesi.
+
+Dopo modifiche a codice, dipendenze o comandi di avvio, riavviare anche il
+workflow Replit e controllare log e preview.
+
+## Script operativi
+
+### Gestione utenti CMS
+
+```bash
+node scripts/manage-admin-users.mjs list
+node scripts/manage-admin-users.mjs add <email> <nome> <password>
+node scripts/manage-admin-users.mjs remove <email>
+```
+
+### Ruoli applicativi
+
+```bash
+npm run user:role -- promote <telefono>
+npm run user:role -- standard <telefono>
+```
+
+### Migrazione iniziale S3
+
+```bash
+npm run migrate
+```
+
+Lo script di migrazione è una procedura una-tantum per inizializzare contenuti
+hardcoded nel bucket. Non eseguirlo automaticamente in produzione.
+
+## Sicurezza
+
+- Non committare `.env`, credenziali AWS, token o dati personali.
+- Il CMS e la preview amministratore usano token con tipo, issuer e audience
+  distinti.
+- Una sessione preview non autorizza le API CMS.
+- I JWT Cognito vengono verificati tramite JWKS, issuer, audience e `token_use`.
+- Le route account e preview sono rate limited in memoria.
+- I profili vengono cercati dal telefono verificato nel JWT, non da parametri
+  inviati dal browser.
+- Le password CMS sono hashate con scrypt e salt casuale.
+- L’HTML CMS è validato e sanificato prima del salvataggio.
+- Le API pubbliche leggono solo da `content/published`.
+
+## Limiti attuali
+
+- Gli elementi `library` possono mostrare contenuti CMS, ma l’upload diretto di
+  file PDF non è ancora disponibile.
+- Audio e video supportano URL localizzati; l’upload binario dal CMS non è ancora
+  disponibile.
+- News e libreria mantengono fallback statici se l’API non risponde.
+- Il cambio lingua può mostrare brevemente il contenuto precedente durante un
+  nuovo caricamento.
+- L’invio email di reset richiede `SES_FROM_EMAIL` configurato e verificato in
+  AWS SES.
+- Le notifiche push sono ancora dimostrative.
+
+## Deploy e repository
+
+Repository GitHub:
+
+<https://github.com/SimonaDevGH/step2connect-v2>
+
+Applicazione pubblicata:
+
+<https://step-2-connect-v-2.replit.app>
+
+La pubblicazione su Replit usa il comando di produzione:
+
+```bash
+npm run start
+```
+
+Prima di pubblicare:
+
+1. eseguire test e build;
+2. verificare il workflow di sviluppo;
+3. controllare che i Secrets richiesti siano disponibili;
+4. verificare `/api/health`;
+5. pubblicare tramite il flusso Replit Publish.

@@ -21,7 +21,17 @@ export default {
   selectSite: 'Cantiere in cui lavori *',
   back: 'Indietro',
   otpSent: 'Codice inviato al numero',
+  accessCodePrompt: 'Inserisci il codice di accesso per',
+  sendSmsOtp: 'Ricevi codice via SMS',
   otpHint: 'Inserisci qualsiasi codice per continuare (demo)',
+  accountNotRegistered: 'Ops, sembra che tu non sia ancora registrato. Effettua la registrazione in pochi passi per accedere a Step2connect',
+  accountAlreadyRegistered: 'Sembra che tu sia già registrato. Per accedere inserisci il tuo numero di telefono e clicca Invia codice. Riceverai un codice via SMS da inserire per il login.',
+  loginPhoneHint: 'Inserisci il tuo numero di telefono compreso del prefisso internazionale come nell\'esempio:\n+393XXXXXXXXX o +880 1XXXXXXXXX',
+  invalidPhoneNumber: 'Il numero inserito non è corretto. Per favore assicurati di inserire il prefisso internazionale come nell\'esempio: +39 o +880',
+  otpResendHint: 'Se non hai ancora ricevuto l\'SMS, clicca "Ricevi codice via SMS".',
+  accountCheckError: 'Impossibile verificare il numero in questo momento. Riprova.',
+  registrationOptionsLoading: 'Caricamento elenco...',
+  registrationOptionsError: 'Impossibile caricare l’elenco di aziende e cantieri. Riprova più tardi.',
 
   // Bottom bar
   translate: 'Traduci',
@@ -107,6 +117,8 @@ export default {
   guidePermitVideoPrompt: '📽️ Guarda il video per sapere come richiedere il permesso di soggiorno',
   guidePermitAudioPrompt: '🔊 Ascolta il contenuto per avere tutte le informazioni sul permesso di soggiorno',
   guidePermitTextHeading: '📄Permesso di soggiorno: tutte le informazioni',
+  featuredGuideTitle: 'Guida al servizio',
+  featuredGuideDesc: 'Tutte le informazioni utili in un unico posto',
 
   // Categorie
   guideCat_documents: 'Documenti e permessi',

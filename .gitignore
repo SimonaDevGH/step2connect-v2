@@ -11,6 +11,9 @@ node_modules
 dist
 dist-ssr
 
+# Replit chat/reference uploads (move runtime assets to public/)
+attached_assets/
+
 # Local env
 .env
 .env.local

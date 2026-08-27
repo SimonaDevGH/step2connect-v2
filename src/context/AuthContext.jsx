@@ -11,7 +11,7 @@ import {
   fetchUserAttributes,
 } from 'aws-amplify/auth';
 import '../lib/cognito.js'; // initialise Amplify once
-import { getMyProfile, syncProfile } from '../lib/userApi.js';
+import { getMyProfile, syncProfile, getPreviewSession } from '../lib/userApi.js';
 
 const AuthContext = createContext(null);
 
@@ -43,18 +43,23 @@ function buildUserFromAttributes(attrs) {
     company: attrs['custom:company'] ?? '',
     site: attrs['custom:site'] ?? '',
     name: `${attrs.given_name ?? ''} ${attrs.family_name ?? ''}`.trim() || attrs.phone_number,
+    type: 'standard',
   };
 }
 
 function mergeProfileIntoUser(setUser, profile, expectedPhone) {
-  if (!profile || typeof profile.firstName !== 'string' || !profile.firstName.trim()) return;
+  if (!profile) return;
   setUser((current) => {
     if (!current || current.phone !== expectedPhone) return current;
-    const firstName = profile.firstName.trim();
+    const firstName = typeof profile.firstName === 'string' ? profile.firstName.trim() : '';
+    const type = profile.type === 'admin' ? 'admin' : 'standard';
     return {
       ...current,
-      firstName,
-      name: `${firstName} ${current.lastName ?? ''}`.trim() || current.phone,
+      type,
+      ...(firstName ? {
+        firstName,
+        name: `${firstName} ${current.lastName ?? ''}`.trim() || current.phone,
+      } : {}),
     };
   });
 }
@@ -63,18 +68,31 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
 
-  // Al mount: controlla prima la sessione dev, poi Amplify
+  // Al mount: controlla prima la sessione preview firmata, poi Amplify
   useEffect(() => {
     (async () => {
       try {
-        // 1. Bypass dev — persiste in localStorage
-        const devSession = localStorage.getItem('s2c_dev_session');
-        if (devSession) {
-          setUser(JSON.parse(devSession));
-          setAuthReady(true);
-          return;
+        const previewToken = localStorage.getItem('s2c_preview_session');
+        if (previewToken) {
+          const previewProfile = await getPreviewSession(previewToken);
+          if (previewProfile) {
+            setUser({
+              phone: '',
+              firstName: previewProfile.firstName ?? '',
+              lastName: '',
+              email: '',
+              company: '',
+              site: '',
+              name: previewProfile.firstName || 'Admin',
+              type: 'admin',
+            });
+            setAuthReady(true);
+            return;
+          }
+          localStorage.removeItem('s2c_preview_session');
         }
-        // 2. Sessione Cognito reale
+
+        // Sessione Cognito reale
         await getCurrentUser();
         const [attrs, idToken] = await Promise.all([
           fetchUserAttributes(),
@@ -202,7 +220,7 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    localStorage.removeItem('s2c_dev_session');
+    localStorage.removeItem('s2c_preview_session');
     try {
       await signOut();
     } catch (err) {
@@ -212,22 +230,22 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const devLogin = () => {
-    const devUser = {
-      phone: '+390000000000',
-      firstName: 'Utente',
-      lastName: 'Test',
+  const loginPreviewSession = (previewSession) => {
+    localStorage.setItem('s2c_preview_session', previewSession.token);
+    setUser({
+      phone: '',
+      firstName: previewSession.firstName ?? '',
+      lastName: '',
       email: '',
-      company: 'Fincantieri S.p.A.',
-      site: 'Monfalcone (GO)',
-      name: 'Utente Test (anteprima)',
-    };
-    localStorage.setItem('s2c_dev_session', JSON.stringify(devUser));
-    setUser(devUser);
+      company: '',
+      site: '',
+      name: previewSession.firstName || 'Admin',
+      type: 'admin',
+    });
   };
 
   return (
-    <AuthContext.Provider value={{ user, authReady, login, requestOTP, logout, devLogin }}>
+    <AuthContext.Provider value={{ user, authReady, login, requestOTP, logout, loginPreviewSession }}>
       {children}
     </AuthContext.Provider>
   );

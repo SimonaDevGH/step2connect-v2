@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { X, Home, BookOpen, HelpCircle, FileSearch, MapPin, Bell, ShieldCheck, Languages, LogOut, Settings } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { isCmsAdmin } from '../lib/userRoles';
 
 const LANGS = [
   { code: 'it', label: 'Italiano' },
@@ -11,7 +12,7 @@ const LANGS = [
 
 export default function SideMenu({ open, onClose }) {
   const { t, lang, changeLang } = useLanguage();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const go = (path) => { navigate(path); onClose(); };
@@ -54,18 +55,20 @@ export default function SideMenu({ open, onClose }) {
           <span>{t('privacyTitle')}</span>
         </button>
 
-        {/* Link al pannello CMS admin */}
-        <a
-          href="/admin/login"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="side-menu-item"
-          style={{ textDecoration: 'none', color: 'inherit' }}
-          onClick={onClose}
-        >
-          <span className="side-menu-icon" style={{ color: '#94a3b8' }}><Settings size={20} /></span>
-          <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Gestione contenuti</span>
-        </a>
+        {/* Link al pannello CMS admin: visibile solo agli utenti marcati admin */}
+        {isCmsAdmin(user) && (
+          <a
+            href="/admin/login"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="side-menu-item"
+            style={{ textDecoration: 'none', color: 'inherit' }}
+            onClick={onClose}
+          >
+            <span className="side-menu-icon" style={{ color: '#94a3b8' }}><Settings size={20} /></span>
+            <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Gestione contenuti</span>
+          </a>
+        )}
 
         <div className="side-menu-footer">
           {/* Lingua */}

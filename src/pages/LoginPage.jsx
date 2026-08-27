@@ -1,8 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Phone, Hash, User, Mail, Building2, HardHat } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import {
+  checkPreviewAdmin,
+  getPhoneAccountStatus,
+  getRegistrationOptions,
+  verifyPreviewAdmin,
+} from '../lib/userApi.js';
+import { beginPhoneLogin } from '../lib/loginFlow.js';
+import { validatePhoneNumber } from '../lib/phoneValidation.js';
 
 const LANGS = [
   { code: 'it', label: 'IT', flag: '🇮🇹' },
@@ -10,22 +18,9 @@ const LANGS = [
   { code: 'bn', label: 'বাং', flag: '🇧🇩' },
 ];
 
-const COMPANIES = ['Fincantieri S.p.A.', 'Altra azienda'];
-
-const SITES = [
-  'Monfalcone (GO)',
-  'Marghera – Venezia (VE)',
-  'Castellammare di Stabia (NA)',
-  'Genova Sestri Ponente (GE)',
-  'Riva Trigoso – La Spezia (SP)',
-  'Palermo (PA)',
-  'Ancona (AN)',
-  'Trieste (TS)',
-];
-
 export default function LoginPage() {
   const { t, lang, changeLang } = useLanguage();
-  const { login, requestOTP, devLogin } = useAuth();
+  const { login, requestOTP, loginPreviewSession } = useAuth();
   const navigate = useNavigate();
 
   const [mode, setMode] = useState('login'); // 'login' | 'register'
@@ -36,6 +31,8 @@ export default function LoginPage() {
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+  const [noticeKey, setNoticeKey] = useState('');
 
   // Register-only fields
   const [firstName, setFirstName] = useState('');
@@ -43,31 +40,116 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [company, setCompany] = useState('');
   const [site, setSite] = useState('');
+  const [registrationOptions, setRegistrationOptions] = useState({ companies: [], sites: [] });
+  const [registrationOptionsLoading, setRegistrationOptionsLoading] = useState(false);
+  const [registrationOptionsFailed, setRegistrationOptionsFailed] = useState(false);
+  const [registrationOptionsReload, setRegistrationOptionsReload] = useState(0);
 
   // Stato interno per passare dati tra step
   const [otpMeta, setOtpMeta] = useState({ phoneE164: '', isRegister: false, userData: {} });
+
+  useEffect(() => {
+    if (mode !== 'register') return undefined;
+
+    let active = true;
+    setRegistrationOptionsLoading(true);
+    setRegistrationOptionsFailed(false);
+    getRegistrationOptions()
+      .then((options) => {
+        if (!active) return;
+        setRegistrationOptions(options);
+        setCompany((current) => options.companies.includes(current) ? current : '');
+        setSite((current) => options.sites.includes(current) ? current : '');
+      })
+      .catch(() => {
+        if (active) setRegistrationOptionsFailed(true);
+      })
+      .finally(() => {
+        if (active) setRegistrationOptionsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [mode, registrationOptionsReload]);
 
   const resetForm = (newMode) => {
     setMode(newMode);
     setStep('form');
     setError('');
+    setPhoneError('');
+    setNoticeKey('');
     setOtp('');
   };
 
-  const isRegisterValid = firstName.trim() && lastName.trim() && phone.trim() && company && site;
+  const isRegisterValid = firstName.trim() && lastName.trim() && phone.trim()
+    && company && site && !registrationOptionsFailed && !registrationOptionsLoading;
   const isLoginValid = phone.trim();
 
   const handleSendOTP = async () => {
+    if (!validatePhoneNumber(phone).valid) {
+      setPhoneError(t('invalidPhoneNumber'));
+      setError('');
+      return;
+    }
+
     setLoading(true);
     setError('');
+    setPhoneError('');
 
     const userData = mode === 'register'
       ? { firstName, lastName, email, company, site }
       : {};
 
-    const result = await requestOTP(phone, userData);
+    let flow;
+    try {
+      flow = await beginPhoneLogin({
+        mode,
+        phone,
+        userData,
+        getPhoneAccountStatus,
+        checkPreviewAdmin,
+        requestOTP,
+      });
+    } catch {
+      flow = { kind: 'error' };
+    }
     setLoading(false);
 
+    if (flow.kind === 'switch-to-register') {
+      setMode('register');
+      setStep('form');
+      setNoticeKey('accountNotRegistered');
+      setOtp('');
+      return;
+    }
+
+    if (flow.kind === 'switch-to-login') {
+      setMode('login');
+      setStep('form');
+      setNoticeKey('accountAlreadyRegistered');
+      setOtp('');
+      return;
+    }
+
+    if (flow.kind === 'error') {
+      setError(t('accountCheckError'));
+      return;
+    }
+
+    if (flow.kind === 'admin-preview-code') {
+      setOtpMeta({
+        phoneE164: phone,
+        isRegister: false,
+        userData: {},
+        isPreviewAdmin: true,
+        previewChallenge: flow.challenge,
+      });
+      setStep('otp');
+      return;
+    }
+
+    const { result } = flow;
     if (!result.success) {
       setError(result.error || 'Errore invio OTP');
       return;
@@ -81,15 +163,23 @@ export default function LoginPage() {
     setStep('otp');
   };
 
-  const DEV_BYPASS_CODE = 's2c-preview-9x7';
-
   const handleVerify = async () => {
     if (!otp.trim()) return;
     setLoading(true);
     setError('');
 
-    if (otp.trim() === DEV_BYPASS_CODE) {
-      devLogin();
+    if (otpMeta.isPreviewAdmin) {
+      const previewSession = await verifyPreviewAdmin(
+        phone,
+        otp,
+        otpMeta.previewChallenge,
+      );
+      if (!previewSession) {
+        setLoading(false);
+        setError('Codice preview non valido');
+        return;
+      }
+      loginPreviewSession(previewSession);
       setLoading(false);
       navigate('/home');
       return;
@@ -108,6 +198,24 @@ export default function LoginPage() {
     } else {
       setError(result.error || 'Errore');
     }
+  };
+
+  const handleRequestSmsOTP = async () => {
+    setLoading(true);
+    setError('');
+    const result = await requestOTP(phone, {});
+    setLoading(false);
+    if (!result.success) {
+      setError(result.error || 'Errore invio OTP');
+      return;
+    }
+    setOtp('');
+    setOtpMeta({
+      phoneE164: result.phoneE164,
+      isRegister: result.isRegister,
+      userData: {},
+      isPreviewAdmin: false,
+    });
   };
 
   return (
@@ -151,6 +259,7 @@ export default function LoginPage() {
 
         {step === 'form' ? (
           <>
+            {noticeKey && <p className="account-notice">{t(noticeKey)}</p>}
             {mode === 'register' ? (
               <>
                 {/* Nome */}
@@ -180,13 +289,17 @@ export default function LoginPage() {
                 </div>
 
                 {/* Telefono */}
+                <p className="login-phone-hint">{t('loginPhoneHint')}</p>
                 <div className="input-group">
                   <Phone size={18} className="input-icon" />
                   <input
                     className="text-input"
                     type="tel"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      setPhoneError('');
+                    }}
                     placeholder={t('phonePlaceholder')}
                     inputMode="tel"
                     required
@@ -214,8 +327,14 @@ export default function LoginPage() {
                     onChange={(e) => setCompany(e.target.value)}
                     required
                   >
-                    <option value="">{t('selectCompany')}</option>
-                    {COMPANIES.map((c) => (
+                    <option value="">
+                      {registrationOptions.companies.length
+                        ? t('selectCompany')
+                        : t(registrationOptionsLoading
+                          ? 'registrationOptionsLoading'
+                          : 'selectCompany')}
+                    </option>
+                    {registrationOptions.companies.map((c) => (
                       <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
@@ -230,8 +349,14 @@ export default function LoginPage() {
                     onChange={(e) => setSite(e.target.value)}
                     required
                   >
-                    <option value="">{t('selectSite')}</option>
-                    {SITES.map((s) => (
+                    <option value="">
+                      {registrationOptions.sites.length
+                        ? t('selectSite')
+                        : t(registrationOptionsLoading
+                          ? 'registrationOptionsLoading'
+                          : 'selectSite')}
+                    </option>
+                    {registrationOptions.sites.map((s) => (
                       <option key={s} value={s}>{s}</option>
                     ))}
                   </select>
@@ -244,17 +369,33 @@ export default function LoginPage() {
                 >
                   {loading ? '...' : t('sendOtp')}
                 </button>
+                {registrationOptionsFailed && (
+                  <>
+                    <p className="error-text">{t('registrationOptionsError')}</p>
+                    <button
+                      className="btn-ghost"
+                      onClick={() => setRegistrationOptionsReload((value) => value + 1)}
+                      disabled={registrationOptionsLoading}
+                    >
+                      {t('retry')}
+                    </button>
+                  </>
+                )}
               </>
             ) : (
               <>
                 {/* Login: solo telefono */}
+                <p className="login-phone-hint">{t('loginPhoneHint')}</p>
                 <div className="input-group">
                   <Phone size={18} className="input-icon" />
                   <input
                     className="text-input"
                     type="tel"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      setPhoneError('');
+                    }}
                     placeholder={t('phonePlaceholder')}
                     inputMode="tel"
                   />
@@ -269,11 +410,15 @@ export default function LoginPage() {
               </>
             )}
             {/* Errore invio OTP — visibile nello step form, non solo nell'OTP step */}
+            {phoneError && <p className="error-text">{phoneError}</p>}
             {error && <p className="error-text">{error}</p>}
           </>
         ) : (
           <>
-            <p className="otp-hint">{t('otpSent')}: <strong>{otpMeta.phoneE164 || phone}</strong></p>
+            <p className="otp-hint">
+              {otpMeta.isPreviewAdmin ? t('accessCodePrompt') : t('otpSent')}:{' '}
+              <strong>{otpMeta.phoneE164 || phone}</strong>
+            </p>
             <div className="input-group">
               <Hash size={18} className="input-icon" />
               <input
@@ -293,6 +438,18 @@ export default function LoginPage() {
             >
               {loading ? '...' : t('verifyOtp')}
             </button>
+            {!otpMeta.isRegister && (
+              <>
+                <p className="otp-resend-hint">{t('otpResendHint')}</p>
+                <button
+                  className="btn-ghost"
+                  onClick={handleRequestSmsOTP}
+                  disabled={loading}
+                >
+                  {t('sendSmsOtp')}
+                </button>
+              </>
+            )}
             <button className="btn-ghost" onClick={() => setStep('form')}>← {t('back')}</button>
           </>
         )}

@@ -26,7 +26,13 @@ async function apiFetch(path, token, opts = {}) {
   if (!(opts.body instanceof FormData)) headers['Content-Type'] = 'application/json';
   const res = await fetch(`${API}${path}`, { ...opts, headers });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  if (!res.ok) {
+    const error = new Error(data.error || `HTTP ${res.status}`);
+    error.status = res.status;
+    error.code = data.code;
+    error.details = data.details;
+    throw error;
+  }
   return data;
 }
 
@@ -37,6 +43,81 @@ const defaultForm = () => ({
   id: '', type: 'guides', category: '', url: '',
   it: emptyLang(), en: emptyLang(), bn: emptyLang(),
 });
+
+const LANGUAGE_NAMES = { it: 'italiano', en: 'inglese', bn: 'bengalese' };
+
+function validationIssueMessage(issue) {
+  const path = Array.isArray(issue.path) ? issue.path : [];
+  const [section, field] = path;
+  const language = LANGUAGE_NAMES[section];
+
+  if (section === 'id') {
+    if (issue.code === 'too_small') return 'Inserisci un ID univoco.';
+    if (issue.validation === 'regex' || issue.format === 'regex' || issue.code === 'invalid_format') {
+      return 'L’ID può contenere solo lettere, numeri, trattini (-) e underscore (_).';
+    }
+    if (issue.code === 'too_big') return 'L’ID non può superare 100 caratteri.';
+    return 'Controlla l’ID inserito.';
+  }
+  if (section === 'type') return 'Seleziona un tipo di contenuto valido.';
+  if (section === 'category' && issue.code === 'too_big') {
+    return 'La categoria non può superare 100 caratteri.';
+  }
+  if (section === 'url') {
+    if (issue.message?.includes('obbligatorio')) return 'Per le pagine CMS l’URL pubblico è obbligatorio.';
+    if (issue.message?.includes('iniziare')) return 'L’URL pubblico deve iniziare con /.';
+    if (issue.code === 'too_big') return 'L’URL pubblico non può superare 500 caratteri.';
+    return 'Controlla l’URL pubblico inserito.';
+  }
+
+  if (language) {
+    if (!field) return `Compila la sezione in ${language}.`;
+    if (field === 'title') {
+      if (issue.code === 'too_small') return `Il titolo in ${language} è obbligatorio.`;
+      if (issue.code === 'too_big') return `Il titolo in ${language} non può superare 500 caratteri.`;
+      return `Controlla il titolo in ${language}.`;
+    }
+    if (field === 'body' && issue.code === 'too_big') {
+      return `Il testo in ${language} non può superare 50.000 caratteri.`;
+    }
+    if (field === 'metaDesc' && issue.code === 'too_big') {
+      return `La meta description in ${language} non può superare 300 caratteri.`;
+    }
+    if (['audioUrl', 'videoUrl', 'imageUrl'].includes(field)) {
+      const labels = { audioUrl: 'audio', videoUrl: 'video', imageUrl: 'immagine' };
+      return `L’URL ${labels[field]} in ${language} non è valido. Usa un indirizzo completo che inizi con http:// o https://.`;
+    }
+    if (field === 'emoji' && issue.code === 'too_big') {
+      return `L’icona in ${language} non può superare 10 caratteri.`;
+    }
+    return `Controlla il campo ${field} in ${language}.`;
+  }
+
+  return issue.message || 'Controlla i dati inseriti.';
+}
+
+function getValidationError(error) {
+  if (!Array.isArray(error?.details) || error.details.length === 0) return null;
+
+  const fieldErrors = {};
+  error.details.forEach((issue) => {
+    const path = Array.isArray(issue.path) ? issue.path.join('.') : '';
+    if (path && !fieldErrors[path]) fieldErrors[path] = validationIssueMessage(issue);
+  });
+  const messages = [...new Set(error.details.map(validationIssueMessage))];
+  return {
+    summary: messages.length === 1
+      ? 'Impossibile salvare il contenuto. Correggi il problema indicato:'
+      : 'Impossibile salvare il contenuto. Correggi i problemi indicati:',
+    fieldErrors,
+    messages,
+  };
+}
+
+function FieldError({ fieldErrors, path }) {
+  const message = fieldErrors[path];
+  return message ? <div className="admin-field-error" role="alert">{message}</div> : null;
+}
 
 export default function ContentEditForm({ contentType, contentId, onClose }) {
   const isNew = !contentId;
@@ -51,6 +132,7 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
   const [saving,       setSaving]       = useState(false);
   const [publishing,   setPublishing]   = useState(false);
   const [error,        setError]        = useState('');
+  const [fieldErrors,  setFieldErrors]  = useState({});
   const [success,      setSuccess]      = useState('');
   const [uploadingImg, setUploadingImg] = useState('');
 
@@ -77,13 +159,41 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
     })();
   }, [contentId, contentType, isNew, adminToken]);
 
+  const clearFieldError = (path) => {
+    setFieldErrors((prev) => {
+      if (!prev[path]) return prev;
+      const next = { ...prev };
+      delete next[path];
+      return next;
+    });
+  };
+
+  const setBaseField = (field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    clearFieldError(field);
+  };
+
   const setLangField = (lang, field, value) => {
     setForm((prev) => ({ ...prev, [lang]: { ...prev[lang], [field]: value } }));
+    clearFieldError(`${lang}.${field}`);
+  };
+
+  const showRequestError = (err, fallback) => {
+    handleAuthError(err);
+    const validation = getValidationError(err);
+    if (validation) {
+      setError(validation.summary);
+      setFieldErrors(validation.fieldErrors);
+      return;
+    }
+    setFieldErrors({});
+    setError(err.message || fallback);
   };
 
   const handleSaveDraft = async () => {
     setSaving(true);
     setError('');
+    setFieldErrors({});
     setSuccess('');
     try {
       const requestId = savedId || form.id;
@@ -95,8 +205,7 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
       setSavedId(saved.id || form.id);
       setSuccess('Bozza salvata ✓');
     } catch (err) {
-      handleAuthError(err);
-      setError(err.message);
+      showRequestError(err, 'Errore durante il salvataggio della bozza.');
     } finally {
       setSaving(false);
     }
@@ -106,6 +215,7 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
     if (!confirm('Pubblicare? Il contenuto sarà visibile a tutti gli utenti.')) return;
     setPublishing(true);
     setError('');
+    setFieldErrors({});
     setSuccess('');
     try {
       const requestId = savedId || form.id;
@@ -119,8 +229,7 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
       await apiFetch(`/api/admin/content/${form.type}/${publishedId}/publish`, adminToken, { method: 'POST' });
       setSuccess('Pubblicato! ✓');
     } catch (err) {
-      handleAuthError(err);
-      setError(err.message);
+      showRequestError(err, 'Errore durante la pubblicazione.');
     } finally {
       setPublishing(false);
     }
@@ -143,6 +252,7 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
       setSuccess('Immagine caricata ✓');
     } catch (err) {
       handleAuthError(err);
+      setFieldErrors({});
       setError('Upload fallito: ' + err.message);
     } finally {
       setUploadingImg('');
@@ -168,18 +278,31 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
       </div>
 
       <div className="admin-form">
-        {error   && <div className="admin-error">⚠️ {error}</div>}
+        {error && (
+          <div className="admin-error" role="alert">
+            <strong>{error}</strong>
+            {Object.keys(fieldErrors).length > 0 && (
+              <ul className="admin-error-list">
+                {Object.entries(fieldErrors).map(([path, message]) => (
+                  <li key={path}>{message}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
         {success && <div className="admin-success">✓ {success}</div>}
 
         {/* Metadati base */}
         <div className="admin-section">
           <label className="admin-label">{isGuides ? 'Nome pagina / ID *' : 'ID univoco *'}</label>
           <input
-            className="admin-input"
+            className={`admin-input${fieldErrors.id ? ' admin-input--error' : ''}`}
             value={form.id}
-            onChange={(e) => setForm((p) => ({ ...p, id: e.target.value }))}
+            onChange={(e) => setBaseField('id', e.target.value)}
             placeholder={isGuides ? 'es. permesso-di-soggiorno' : 'es. news-001'}
+            aria-invalid={Boolean(fieldErrors.id)}
           />
+          <FieldError fieldErrors={fieldErrors} path="id" />
           {isGuides && (
             <>
               <label className="admin-label">URL pubblico della guida</label>
@@ -194,7 +317,7 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
           <select
             className="admin-input"
             value={form.type}
-            onChange={(e) => setForm((p) => ({ ...p, type: e.target.value }))}
+            onChange={(e) => setBaseField('type', e.target.value)}
           >
             {TYPES.map((tp) => <option key={tp} value={tp}>{tp}</option>)}
           </select>
@@ -203,9 +326,9 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
           <label className="admin-label">Categoria</label>
           {isGuides ? (
             <select
-              className="admin-input"
+              className={`admin-input${fieldErrors.category ? ' admin-input--error' : ''}`}
               value={form.category}
-              onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
+              onChange={(e) => setBaseField('category', e.target.value)}
             >
               <option value="">— seleziona categoria —</option>
               {GUIDE_CATEGORIES.map((c) => (
@@ -214,12 +337,13 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
             </select>
           ) : (
             <input
-              className="admin-input"
+                className={`admin-input${fieldErrors.category ? ' admin-input--error' : ''}`}
               value={form.category}
-              onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
+                onChange={(e) => setBaseField('category', e.target.value)}
               placeholder="es. documents"
             />
           )}
+          <FieldError fieldErrors={fieldErrors} path="category" />
 
           {/* URL libero per le pagine CMS. Per le guide viene sempre calcolato da categoria + ID. */}
           {isPages && (
@@ -230,18 +354,21 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
                 </span>
               </label>
               <input
-                className="admin-input"
+                className={`admin-input${fieldErrors.url ? ' admin-input--error' : ''}`}
                 value={form.url}
-                onChange={(e) => setForm((p) => ({ ...p, url: e.target.value }))}
+                onChange={(e) => setBaseField('url', e.target.value)}
                 placeholder="/percorso/pubblico/della-pagina"
+                aria-invalid={Boolean(fieldErrors.url)}
               />
+              <FieldError fieldErrors={fieldErrors} path="url" />
             </>
           )}
         </div>
 
         <p className="admin-language-intro">
           Compila ogni lingua separatamente. Titolo, testo, media, immagine e icona
-          vengono salvati solo nella rispettiva versione.
+          vengono salvati solo nella rispettiva versione. I titoli contrassegnati
+          con * sono obbligatori in italiano, inglese e bengalese.
         </p>
 
         {LANGS.map(({ code, label }) => {
@@ -252,11 +379,13 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
 
               <label className="admin-label">Titolo ({code.toUpperCase()}) *</label>
               <input
-                className="admin-input"
+                className={`admin-input${fieldErrors[`${code}.title`] ? ' admin-input--error' : ''}`}
                 value={language.title}
                 onChange={(e) => setLangField(code, 'title', e.target.value)}
                 placeholder="Titolo"
+                aria-invalid={Boolean(fieldErrors[`${code}.title`])}
               />
+              <FieldError fieldErrors={fieldErrors} path={`${code}.title`} />
 
               {isPages ? (
                 <>
@@ -267,13 +396,15 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
                     </span>
                   </label>
                   <textarea
-                    className="admin-textarea admin-meta-textarea"
+                    className={`admin-textarea admin-meta-textarea${fieldErrors[`${code}.metaDesc`] ? ' admin-input--error' : ''}`}
                     value={language.metaDesc}
                     onChange={(e) => setLangField(code, 'metaDesc', e.target.value)}
                     placeholder="Breve descrizione per i motori di ricerca e le anteprime social"
                     rows={2}
                     maxLength={300}
+                    aria-invalid={Boolean(fieldErrors[`${code}.metaDesc`])}
                   />
+                  <FieldError fieldErrors={fieldErrors} path={`${code}.metaDesc`} />
                 </>
               ) : (
                 <>
@@ -284,12 +415,14 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
                     </span>
                   </label>
                   <input
-                    className="admin-input"
+                    className={`admin-input${fieldErrors[`${code}.metaDesc`] ? ' admin-input--error' : ''}`}
                     value={language.metaDesc}
                     onChange={(e) => setLangField(code, 'metaDesc', e.target.value)}
                     placeholder="Descrizione breve (opzionale)"
                     maxLength={300}
+                    aria-invalid={Boolean(fieldErrors[`${code}.metaDesc`])}
                   />
+                  <FieldError fieldErrors={fieldErrors} path={`${code}.metaDesc`} />
                 </>
               )}
 
@@ -302,7 +435,7 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
                 )}
               </label>
               <textarea
-                className="admin-textarea"
+                className={`admin-textarea${fieldErrors[`${code}.body`] ? ' admin-input--error' : ''}`}
                 value={language.body}
                 onChange={(e) => setLangField(code, 'body', e.target.value)}
                 placeholder={
@@ -311,40 +444,48 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
                     : 'Testo del contenuto (HTML: b, i, ul, ol, li, p, br, a, h2, h3)'
                 }
                 rows={10}
+                aria-invalid={Boolean(fieldErrors[`${code}.body`])}
               />
+              <FieldError fieldErrors={fieldErrors} path={`${code}.body`} />
 
               <label className="admin-label">
                 <Music size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} />
                 Audio MP3 ({code.toUpperCase()}) — opzionale
               </label>
               <input
-                className="admin-input"
+                className={`admin-input${fieldErrors[`${code}.audioUrl`] ? ' admin-input--error' : ''}`}
                 type="url"
                 value={language.audioUrl}
                 onChange={(e) => setLangField(code, 'audioUrl', e.target.value)}
                 placeholder="https://…/audio.mp3"
+                aria-invalid={Boolean(fieldErrors[`${code}.audioUrl`])}
               />
+              <FieldError fieldErrors={fieldErrors} path={`${code}.audioUrl`} />
 
               <label className="admin-label">
                 <Video size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} />
                 URL video ({code.toUpperCase()}) — opzionale
               </label>
               <input
-                className="admin-input"
+                className={`admin-input${fieldErrors[`${code}.videoUrl`] ? ' admin-input--error' : ''}`}
                 type="url"
                 value={language.videoUrl}
                 onChange={(e) => setLangField(code, 'videoUrl', e.target.value)}
                 placeholder="https://…/video.mp4"
+                aria-invalid={Boolean(fieldErrors[`${code}.videoUrl`])}
               />
+              <FieldError fieldErrors={fieldErrors} path={`${code}.videoUrl`} />
 
               <label className="admin-label">Icona ({code.toUpperCase()})</label>
               <input
-                className="admin-input admin-emoji-input"
+                className={`admin-input admin-emoji-input${fieldErrors[`${code}.emoji`] ? ' admin-input--error' : ''}`}
                 value={language.emoji}
                 onChange={(e) => setLangField(code, 'emoji', e.target.value)}
                 placeholder="📄"
                 maxLength={10}
+                aria-invalid={Boolean(fieldErrors[`${code}.emoji`])}
               />
+              <FieldError fieldErrors={fieldErrors} path={`${code}.emoji`} />
 
               <label className="admin-label">Immagine copertina ({code.toUpperCase()})</label>
               {language.imageUrl && (
@@ -364,12 +505,14 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
                 <p className="admin-hint">Inserisci prima un ID per caricare l'immagine</p>
               )}
               <input
-                className="admin-input"
+                className={`admin-input${fieldErrors[`${code}.imageUrl`] ? ' admin-input--error' : ''}`}
                 type="url"
                 value={language.imageUrl}
                 onChange={(e) => setLangField(code, 'imageUrl', e.target.value)}
                 placeholder="URL immagine (oppure incolla link manuale)"
+                aria-invalid={Boolean(fieldErrors[`${code}.imageUrl`])}
               />
+              <FieldError fieldErrors={fieldErrors} path={`${code}.imageUrl`} />
             </section>
           );
         })}

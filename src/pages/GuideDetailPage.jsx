@@ -8,8 +8,10 @@ import { getCategoryById, GUIDE_ITEMS } from '../data/guides';
 // /api a Express e in produzione Express serve entrambe le parti.
 const API = '';
 
-export default function GuideDetailPage() {
-  const { category, item } = useParams();
+export default function GuideDetailPage({ directCategory, directItem }) {
+  const params = useParams();
+  const category = directCategory || params.category;
+  const item = directItem || params.item;
   const { t, lang }        = useLanguage();
   const navigate           = useNavigate();
 
@@ -53,9 +55,6 @@ export default function GuideDetailPage() {
   const audioLabel = isResidencePermitGuide
     ? t('guidePermitAudioPrompt')
     : t('guideAudioPrompt');
-  const textHeading = isResidencePermitGuide
-    ? t('guidePermitTextHeading')
-    : `📄 ${displayTitle}`;
 
   return (
     <div className="page-content">
@@ -137,7 +136,6 @@ export default function GuideDetailPage() {
 
             {hasBody && (
               <section className="guide-detail-section">
-                <h3 className="guide-content-heading">{textHeading}</h3>
                 <div
                   className="guide-cms-body"
                   dangerouslySetInnerHTML={{ __html: cmsContent.body }}

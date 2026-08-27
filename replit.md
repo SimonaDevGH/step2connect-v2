@@ -1,61 +1,119 @@
 # Step2Connect v2
 
-Mobile-first PWA for Bangladeshi workers at Fincantieri plants in Italy. Designed for low literacy users with minimal text, clear icons, and trilingual support (IT/EN/BN).
+PWA mobile-first per lavoratori bangladesi negli stabilimenti Fincantieri in
+Italia. L’interfaccia supporta italiano, inglese e bengalese con testo essenziale
+e controlli grandi.
 
-## Stack
-- **React 18 + Vite 5** — frontend
-- **React Router v6** — client-side routing
-- **lucide-react** — icons
-- **vite-plugin-pwa** — PWA manifest + service worker
+## Comandi
 
-## Run
-```
+```bash
 npm install
-npm run dev       # http://localhost:5000
-npm run build     # dist/
+npm run dev
+npm test
+npm run build
+npm run start
 ```
 
-## Structure
-```
-src/
-  context/
-    AuthContext.jsx       # Mock OTP login — INTEGRATION POINT for AWS Cognito
-    LanguageContext.jsx   # IT/EN/BN i18n with localStorage persistence
-  i18n/
-    it.js / en.js / bn.js # Translation strings
-  components/
-    BottomBar.jsx         # Fixed bottom nav: language | home | bot
-    SideMenu.jsx          # Hamburger side drawer
-    LivePersonBubble.jsx  # Chat panel — INTEGRATION POINT for LivePerson SDK
-  pages/
-    LoginPage.jsx         # Pre-auth: phone + OTP (any code accepted in mock)
-    HomePage.jsx          # Hero + bot box + services grid + tools list
-    ServiceDetailPage.jsx # Dynamic page for health/work/school/documents
-    FindOfficesPage.jsx   # Searchable office directory (Veneto)
-    NewsPage.jsx          # News feed with multilingual content
-    QuizPage.jsx          # 4-question quiz with scoring
-    LibraryPage.jsx       # Downloadable document library
-    NotificationsPage.jsx # Push notifications (mock)
-    TranslatorPage.jsx    # Opens WhatsApp with pre-filled translation request
-  App.jsx                 # Router + auth guard + app shell
-  main.jsx
-  index.css               # All styles — mobile-first, navy #0A1E3A palette
+Il workflow Replit esegue `npm run dev`, che avvia:
+
+- Vite su porta 5000;
+- Express su porta 3001;
+- proxy Vite `/api` verso Express.
+
+In produzione Express usa la porta `PORT` o 5000, espone le API e serve `dist/`.
+
+## Architettura
+
+- Frontend: React 18, Vite 5, React Router 6.
+- Backend: Express 5 in `server/`.
+- Auth utenti: AWS Cognito passwordless con telefono e SMS OTP.
+- Profili e ruoli: DynamoDB, tabella predefinita `Step2Connect_Users`.
+- CMS: autenticazione email/password separata e JWT firmato con
+  `SESSION_SECRET`.
+- Contenuti: S3, un JSON per tipo, stato e lingua.
+- Lingue: `it`, `en`, `bn`.
+
+Il root package usa ESM. `server/package.json` imposta CommonJS per tutti i file
+backend.
+
+## Convenzioni importanti
+
+- Le API interne e i contenuti pubblici usano URL relativi `/api/...`.
+- Le nuove letture CMS devono usare lo stesso origin. `VITE_API_BASE_URL` resta
+  usato dalla sincronizzazione estesa del profilo e come override legacy in
+  `PageResolver`.
+- Le route CMS richiedono JWT CMS; una sessione preview non è autorizzazione CMS.
+- Il telefono del profilo viene sempre dal JWT Cognito verificato.
+- I login normali non inviano campi vuoti che possano cancellare dati DynamoDB.
+- Media, immagini e icone localizzati preservano anche valori vuoti intenzionali.
+- Gli asset runtime appartengono a `public/` o S3. `attached_assets/` è temporanea
+  e ignorata da Git.
+
+## Autenticazione telefono
+
+Formati supportati:
+
+- Italia: `+393XXXXXXXXX`
+- Bangladesh: `+880 1XXXXXXXXX`
+
+Il `+` iniziale è obbligatorio. Prima di Cognito, il frontend chiama
+`/api/users/account-status` per scegliere tra registrazione, login Cognito e
+preview amministratore.
+
+Preview admin:
+
+- profilo DynamoDB `type=admin`;
+- `adminPsw=true`;
+- telefono e OTP sulla stessa riga di `admin-users/users.csv` in S3.
+
+## Registrazione
+
+Le aziende e i cantieri arrivano da:
+
+```text
+content/registration-login/form_registrazione_lista_aziende_cantieri.csv
 ```
 
-## Integration points
-| Feature | File | Notes |
-|---------|------|-------|
-| OTP / auth | `src/context/AuthContext.jsx` | Replace `sendOTP`/`verifyOTP` with AWS Cognito calls |
-| LivePerson bot | `src/components/LivePersonBubble.jsx` | Load `lpTag` script in `index.html`, render into `#lpChat` div |
-| WhatsApp translator | `src/pages/TranslatorPage.jsx` | Replace `WA_NUMBER` const with real number |
-| News / content | `src/pages/NewsPage.jsx` | Replace `NEWS` array with CMS/API feed |
-| Documents | `src/pages/LibraryPage.jsx` | Replace `DOCUMENTS` array with real S3/CDN URLs |
-| Offices | `src/pages/FindOfficesPage.jsx` | Replace `OFFICES` array with Google Places / OpenStreetMap API |
-| Notifications | `src/pages/NotificationsPage.jsx` | Replace `NOTIFICATIONS` array with Firebase FCM or AWS SNS |
+Il backend espone `/api/registration-options` e mantiene una cache di 5 minuti.
+Il browser non legge direttamente il CSV privato.
 
-## User preferences
-- Mobile-first, max 480px wide
-- Palette: navy blue #0A1E3A
-- Language support: IT / EN / BN (Bengali)
-- Minimal text, large icons — target users have low Italian literacy
-- No real passwords — phone + OTP flow only
+## CMS e S3
+
+Tipi supportati:
+
+- `guides`
+- `news`
+- `library`
+- `pages`
+
+Schema:
+
+```text
+content/draft/{type}/{lang}/{id}.json
+content/published/{type}/{lang}/{id}.json
+content/archive/{type}/{lang}/{id}_{timestamp}.json
+step2connect/img/{type}/{id}/{timestamp}.{ext}
+```
+
+Il form CMS gestisce titolo, corpo, meta description, icona, immagine, audio e
+video separatamente per ogni lingua. L’upload binario attuale è limitato alle
+immagini; audio e video usano URL.
+
+## Segreti
+
+Non inserire segreti nel repository. Le principali variabili sono:
+
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_REGION`
+- `S3_BUCKET_NAME`
+- `SESSION_SECRET`
+- `VITE_COGNITO_USER_POOL_ID`
+- `VITE_COGNITO_USER_POOL_CLIENT_ID`
+- `VITE_API_BASE_URL`
+
+Variabili opzionali includono `DYNAMODB_USERS_TABLE`,
+`DYNAMODB_PHONE_INDEX`, `DYNAMODB_REGION` e `SES_FROM_EMAIL`.
+
+Per la documentazione completa, le route e gli script operativi consultare
+`README.md`.

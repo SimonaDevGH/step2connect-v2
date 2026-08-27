@@ -20,7 +20,17 @@ export default {
   selectSite: 'Shipyard you work at *',
   back: 'Back',
   otpSent: 'Code sent to',
+  accessCodePrompt: 'Enter the access code for',
+  sendSmsOtp: 'Receive code by SMS',
   otpHint: 'Enter any code to continue (demo)',
+  accountNotRegistered: 'Oops, it looks like you are not registered yet. Complete the registration in a few steps to access Step2connect.',
+  accountAlreadyRegistered: 'It looks like you are already registered. To sign in, enter your phone number and click Send code. You will receive an SMS code to enter for login.',
+  loginPhoneHint: 'Enter your phone number including the international dialling code as shown in the example:\n+393XXXXXXXXX or +880 1XXXXXXXXX',
+  invalidPhoneNumber: 'The number entered is not correct. Please make sure to include the international prefix as shown in the example: +39 or +880',
+  otpResendHint: 'If you have not received the SMS yet, click "Receive code by SMS".',
+  accountCheckError: 'We cannot verify this number right now. Please try again.',
+  registrationOptionsLoading: 'Loading list...',
+  registrationOptionsError: 'We could not load the company and site list. Please try again later.',
 
   translate: 'Translate',
   home: 'Home',
@@ -97,6 +107,8 @@ export default {
   guidePermitVideoPrompt: '📽️ Watch the video to learn how to apply for a residence permit',
   guidePermitAudioPrompt: '🔊 Listen to the content for all the information about the residence permit',
   guidePermitTextHeading: '📄Residence permit: all the information',
+  featuredGuideTitle: 'Service guide',
+  featuredGuideDesc: 'All the useful information in one place',
 
   // Categories
   guideCat_documents: 'Documents & Permits',

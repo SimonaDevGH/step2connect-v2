@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { AdminAuthProvider, useAdminAuth } from './context/AdminAuthContext';
@@ -64,6 +64,28 @@ function AdminShell() {
       <Route path="*"                element={<Navigate to="/admin/login" replace />} />
     </Routes>
   );
+}
+
+const DIRECT_GUIDE_ROUTES = {
+  'guida-al-servizio': { category: 'documents', item: 'guida-al-servizio' },
+};
+
+// Le categorie e le guide condividono lo stesso percorso a un segmento.
+// Risolviamo qui il segmento speciale senza rompere /guides/documents.
+function GuideSingleSegmentPage() {
+  const { category: segment } = useParams();
+  const directGuide = DIRECT_GUIDE_ROUTES[segment];
+
+  if (directGuide) {
+    return (
+      <GuideDetailPage
+        directCategory={directGuide.category}
+        directItem={directGuide.item}
+      />
+    );
+  }
+
+  return <GuideCategoryPage />;
 }
 
 // ── Shell principale (app utente con Cognito) ─────────────────────────────────
@@ -138,7 +160,7 @@ function AppShell() {
           <Route path="/library"             element={<ProtectedRoute><LibraryPage /></ProtectedRoute>} />
           <Route path="/library/:id"         element={<ProtectedRoute><ContentDetailPage contentType="library" /></ProtectedRoute>} />
           <Route path="/guides"              element={<ProtectedRoute><GuidesPage /></ProtectedRoute>} />
-          <Route path="/guides/:category"    element={<ProtectedRoute><GuideCategoryPage /></ProtectedRoute>} />
+          <Route path="/guides/:category"    element={<ProtectedRoute><GuideSingleSegmentPage /></ProtectedRoute>} />
           <Route path="/guides/:category/:item" element={<ProtectedRoute><GuideDetailPage /></ProtectedRoute>} />
           <Route path="/notifications"       element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
           <Route path="/translator"          element={<ProtectedRoute><TranslatorPage /></ProtectedRoute>} />

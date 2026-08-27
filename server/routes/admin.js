@@ -192,7 +192,20 @@ router.put('/:type/:id', async (req, res) => {
     res.json({ ok: true, id, url: publicUrl, renamed: isRename, updatedAt: now });
   } catch (err) {
     if (err.name === 'ZodError') {
-      return res.status(400).json({ error: 'Validation error', details: err.errors });
+      const issues = (err.issues || err.errors || []).map((issue) => ({
+        path: issue.path || [],
+        code: issue.code,
+        message: issue.message,
+        validation: issue.validation,
+        format: issue.format,
+        minimum: issue.minimum,
+        maximum: issue.maximum,
+      }));
+      return res.status(400).json({
+        error: 'Validation error',
+        code: 'VALIDATION_ERROR',
+        details: issues,
+      });
     }
     console.error('[admin] put error', err);
     res.status(500).json({ error: 'Internal server error' });

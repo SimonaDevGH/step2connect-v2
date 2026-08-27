@@ -4,6 +4,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { GUIDE_CATEGORIES } from '../data/guides';
 
 const API = '';
+const FEATURED_GUIDE_ID = 'guida-al-servizio';
 
 export default function GuidesPage() {
   const { t, lang } = useLanguage();
@@ -11,6 +12,7 @@ export default function GuidesPage() {
   // Track which categories have published content available via the API.
   // Falls back gracefully: if the API is unreachable every category stays enabled.
   const [publishedIds, setPublishedIds] = useState(null);
+  const [featuredGuide, setFeaturedGuide] = useState(null);
 
   useEffect(() => {
     fetch(`${API}/api/content?type=guides&lang=${lang}`)
@@ -23,6 +25,7 @@ export default function GuidesPage() {
           // Collect the set of category ids that have at least one published guide
           const ids = new Set(data.map((item) => item.category).filter(Boolean));
           setPublishedIds(ids);
+          setFeaturedGuide(data.find((item) => item.id === FEATURED_GUIDE_ID) || null);
         }
       })
       .catch(() => {
@@ -39,6 +42,25 @@ export default function GuidesPage() {
           <h2 className="guides-hero-title">{t('guidesTitle')}</h2>
           <p className="guides-hero-sub">{t('guidesDesc')}</p>
         </div>
+      </div>
+
+      <div className="guides-featured-wrap">
+        <button
+          type="button"
+          className="guide-featured-card"
+          onClick={() => navigate(`/guides/${FEATURED_GUIDE_ID}`)}
+        >
+          <span className="guide-featured-emoji">{featuredGuide?.emoji || '📘'}</span>
+          <span className="guide-featured-text">
+            <span className="guide-featured-title">
+              {featuredGuide?.title || t('featuredGuideTitle')}
+            </span>
+            <span className="guide-featured-desc">
+              {featuredGuide?.metaDesc || t('featuredGuideDesc')}
+            </span>
+          </span>
+          <span className="guide-featured-arrow">›</span>
+        </button>
       </div>
 
       <div className="guides-grid">

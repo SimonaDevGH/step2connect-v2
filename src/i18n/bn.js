@@ -20,7 +20,17 @@ export default {
   selectSite: 'আপনি যে শিপইয়ার্ডে কাজ করেন *',
   back: 'পেছনে',
   otpSent: 'কোড পাঠানো হয়েছে',
+  accessCodePrompt: 'এই নম্বরের অ্যাক্সেস কোড লিখুন',
+  sendSmsOtp: 'SMS-এর মাধ্যমে কোড নিন',
   otpHint: 'যেকোনো কোড দিয়ে এগিয়ে যান (ডেমো)',
+  accountNotRegistered: 'ওহ! মনে হচ্ছে আপনি এখনও নিবন্ধিত নন। Step2connect-এ প্রবেশ করতে কয়েকটি সহজ ধাপে নিবন্ধন করুন।',
+  accountAlreadyRegistered: 'মনে হচ্ছে আপনি ইতিমধ্যে নিবন্ধিত। প্রবেশ করতে আপনার ফোন নম্বর লিখে “কোড পাঠান” চাপুন। লগইন করার জন্য একটি SMS কোড পাবেন।',
+  loginPhoneHint: 'উদাহরণের মতো আন্তর্জাতিক কোডসহ আপনার ফোন নম্বর লিখুন:\n+393XXXXXXXXX অথবা +880 1XXXXXXXXX',
+  invalidPhoneNumber: 'নম্বরটি সঠিক নয়। উদাহরণ অনুযায়ী আন্তর্জাতিক কোড লিখেছেন কিনা নিশ্চিত করুন: +39 অথবা +880',
+  otpResendHint: 'আপনি এখনও SMS না পেলে, “SMS-এর মাধ্যমে কোড নিন” চাপুন।',
+  accountCheckError: 'এই মুহূর্তে নম্বরটি যাচাই করা যাচ্ছে না। আবার চেষ্টা করুন।',
+  registrationOptionsLoading: 'তালিকা লোড হচ্ছে...',
+  registrationOptionsError: 'কোম্পানি ও সাইটের তালিকা লোড করা যায়নি। পরে আবার চেষ্টা করুন।',
 
   translate: 'অনুবাদ',
   home: 'হোম',
@@ -97,6 +107,8 @@ export default {
   guidePermitVideoPrompt: '📽️ বসবাসের পারমিটের জন্য কীভাবে আবেদন করবেন তা জানতে ভিডিওটি দেখুন',
   guidePermitAudioPrompt: '🔊 বসবাসের পারমিট সম্পর্কে সমস্ত তথ্য জানতে বিষয়বস্তুটি শুনুন',
   guidePermitTextHeading: '📄বসবাসের পারমিট: সমস্ত তথ্য',
+  featuredGuideTitle: 'সেবা নির্দেশিকা',
+  featuredGuideDesc: 'প্রয়োজনীয় সব তথ্য এক জায়গায়',
 
   // বিভাগ
   guideCat_documents: 'ডকুমেন্ট ও পারমিট',

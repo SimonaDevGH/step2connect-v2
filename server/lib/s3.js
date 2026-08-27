@@ -29,6 +29,12 @@ async function getJson(key) {
   }
 }
 
+/** Legge un oggetto testuale da S3. */
+async function getText(key) {
+  const res = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
+  return streamToString(res.Body);
+}
+
 /** Scrive un oggetto JSON su S3. */
 async function putJson(key, data) {
   await s3.send(new PutObjectCommand({
@@ -91,4 +97,4 @@ function streamToString(stream) {
   });
 }
 
-module.exports = { getJson, putJson, putBuffer, listKeys, copyObject, deleteObject, BUCKET };
+module.exports = { getJson, getText, putJson, putBuffer, listKeys, copyObject, deleteObject, BUCKET };

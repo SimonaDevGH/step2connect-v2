@@ -10,7 +10,12 @@ const express = require('express');
 const crypto  = require('crypto');
 const jwt     = require('jsonwebtoken');
 const { getAdminUsers, setUserPassword, setResetToken, findByResetToken } = require('../lib/adminUsers');
-const { requireAdminJWT } = require('../middleware/adminAuth');
+const {
+  requireAdminJWT,
+  CMS_TOKEN_KIND,
+  CMS_TOKEN_ISSUER,
+  CMS_TOKEN_AUDIENCE,
+} = require('../middleware/adminAuth');
 const { sendEmail } = require('../lib/sendEmail');
 
 const router = express.Router();
@@ -49,9 +54,13 @@ router.post('/login', async (req, res) => {
     }
 
     const token = jwt.sign(
-      { email: user.email, name: user.name },
+      { kind: CMS_TOKEN_KIND, email: user.email, name: user.name },
       secret,
-      { expiresIn: '8h' }
+      {
+        expiresIn: '8h',
+        issuer: CMS_TOKEN_ISSUER,
+        audience: CMS_TOKEN_AUDIENCE,
+      }
     );
     res.json({ token, email: user.email, name: user.name });
   } catch (err) {

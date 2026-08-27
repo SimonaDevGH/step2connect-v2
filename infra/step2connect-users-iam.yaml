@@ -1,0 +1,36 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Least-privilege DynamoDB access for Step2Connect user-role resolution and provisioning
+
+Parameters:
+  BackendIamUserName:
+    Type: String
+    Default: step2connect-cms-backend
+  UsersTableName:
+    Type: String
+    Default: Step2Connect_Users
+
+Resources:
+  Step2ConnectUsersPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: step2connect-users-profile-access
+      Users:
+        - !Ref BackendIamUserName
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ReadProfilesByPhone
+            Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:Query
+              - dynamodb:Scan
+            Resource:
+              - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${UsersTableName}
+              - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${UsersTableName}/index/*
+          - Sid: ProvisionUserRoles
+            Effect: Allow
+            Action:
+              - dynamodb:UpdateItem
+            Resource:
+              - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${UsersTableName}

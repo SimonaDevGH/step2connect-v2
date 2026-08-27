@@ -9,66 +9,17 @@
  * Richiede le variabili d'ambiente:
  *   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, S3_BUCKET_NAME
  */
-import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { createRequire } from 'module';
 import crypto from 'crypto';
 
 const require = createRequire(import.meta.url);
 require('dotenv').config();
-
-const s3 = new S3Client({
-  region: process.env.AWS_REGION || 'eu-west-2',
-  credentials: {
-    accessKeyId:     process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  },
-});
+const {
+  getAdminUsers: readCSV,
+  saveAdminUsers: writeCSV,
+} = require('../server/lib/adminUsers');
 
 const BUCKET  = process.env.S3_BUCKET_NAME;
-const CSV_KEY = 'admin-users/users.csv';
-const HEADER  = 'email,name,passwordHash\n';
-
-// ── Helpers S3 ────────────────────────────────────────────────────────────────
-
-function streamToString(stream) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    stream.on('data', (c) => chunks.push(c));
-    stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
-    stream.on('error', reject);
-  });
-}
-
-async function readCSV() {
-  try {
-    const res  = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: CSV_KEY }));
-    const text = await streamToString(res.Body);
-    return text.split('\n').slice(1).filter(Boolean).map((line) => {
-      const idx1 = line.indexOf(',');
-      const idx2 = line.indexOf(',', idx1 + 1);
-      return {
-        email:        line.slice(0, idx1).trim().toLowerCase(),
-        name:         line.slice(idx1 + 1, idx2).trim(),
-        passwordHash: line.slice(idx2 + 1).trim(),
-      };
-    }).filter((u) => u.email);
-  } catch (err) {
-    if (err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404) return [];
-    throw err;
-  }
-}
-
-async function writeCSV(users) {
-  const body = HEADER + users
-    .map((u) => `${u.email},${u.name},${u.passwordHash}`)
-    .join('\n') + (users.length ? '\n' : '');
-  await s3.send(new PutObjectCommand({
-    Bucket: BUCKET,
-    Key: CSV_KEY,
-    Body: body,
-    ContentType: 'text/csv',
-  }));
-}
 
 // ── Hash password ─────────────────────────────────────────────────────────────
 
@@ -104,7 +55,15 @@ async function cmdAdd(email, name, password) {
     process.exit(1);
   }
   const passwordHash = hashPassword(password);
-  users.push({ email: norm, name: name.trim(), passwordHash });
+  users.push({
+    email: norm,
+    name: name.trim(),
+    passwordHash,
+    adminOTP: '',
+    adminPhoneNumber: '',
+    resetToken: '',
+    resetExpiry: '',
+  });
   await writeCSV(users);
   console.log(`✅ Utente aggiunto: ${norm} (${name})`);
 }

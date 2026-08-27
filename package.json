@@ -11,7 +11,8 @@
     "test": "node --test",
     "preview": "vite preview",
     "start": "NODE_ENV=production node server/index.js",
-    "migrate": "node scripts/migrate-to-s3.mjs"
+    "migrate": "node scripts/migrate-to-s3.mjs",
+    "user:role": "node scripts/set-user-role.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1116.0",
