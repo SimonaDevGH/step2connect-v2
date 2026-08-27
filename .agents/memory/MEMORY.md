@@ -9,3 +9,4 @@
 - [DynamoDB profile IAM](dynamodb-profile-iam.md) — il runtime richiede lettura per telefono e UpdateItem su Step2Connect_Users
 - [Profile sync preservation](profile-sync-preservation.md) — i login normali non devono inviare campi vuoti che cancellano dati DynamoDB esistenti
 - [Pre-login account disclosure](pre-login-account-disclosure.md) — il prodotto accetta il rischio di enumerazione per instradare telefono e ruolo prima dell’OTP
+- [GitHub sync via connector](github-connector-sync.md) — il connector autorizza le API ma non il push HTTPS; verificare sempre blob e tree SHA
