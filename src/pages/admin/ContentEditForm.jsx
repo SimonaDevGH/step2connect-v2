@@ -2,7 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Save, Send, Upload, Music, Video } from 'lucide-react';
 import { useAdminAuth } from '../../context/AdminAuthContext';
-import { SITE_IMAGES_ID, SITE_IMAGE_SLOTS } from '../../lib/siteImages';
+import {
+  SITE_IMAGES_ID,
+  SITE_IMAGE_GROUPS,
+  SITE_IMAGE_SLOTS,
+} from '../../lib/siteImages';
 
 // Route admin: URL sempre relativi (proxy Vite in dev, Express stesso origin in prod).
 const API = '';
@@ -417,6 +421,33 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
             : 'Compila ogni lingua separatamente. Titolo, testo, media, immagine e icona vengono salvati solo nella rispettiva versione. I titoli contrassegnati con * sono obbligatori in italiano, inglese e bengalese.'}
         </p>
 
+        {isSite && (
+          <nav className="admin-site-jump-menu" aria-label="Vai alla sezione immagini">
+            <label htmlFor="site-image-section">Vai alla sezione</label>
+            <select
+              id="site-image-section"
+              defaultValue=""
+              onChange={(event) => {
+                const target = document.getElementById(event.target.value);
+                target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                event.target.value = '';
+              }}
+            >
+              <option value="" disabled>Scegli lingua e pagina…</option>
+              {LANGS.flatMap(({ code, label }) =>
+                SITE_IMAGE_GROUPS.map((group) => (
+                  <option
+                    key={`${code}-${group.key}`}
+                    value={`site-images-${code}-${group.key}`}
+                  >
+                    {label} — {group.label}
+                  </option>
+                ))
+              )}
+            </select>
+          </nav>
+        )}
+
         {LANGS.map(({ code, label }) => {
           const language = form[code];
           return (
@@ -425,7 +456,14 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
 
               {isSite ? (
                 <div className="admin-site-images">
-                  {SITE_IMAGE_SLOTS.map((slot) => {
+                  {SITE_IMAGE_GROUPS.map((group) => (
+                    <section
+                      id={`site-images-${code}-${group.key}`}
+                      className="admin-site-image-group"
+                      key={group.key}
+                    >
+                      <h4>{group.label}</h4>
+                      {SITE_IMAGE_SLOTS.filter((slot) => slot.group === group.key).map((slot) => {
                     const value = language.assets?.[slot.key] || '';
                     const uploadKey = `${code}:${slot.key}`;
                     return (
@@ -472,7 +510,9 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
                         <FieldError fieldErrors={fieldErrors} path={`${code}.assets.${slot.key}`} />
                       </div>
                     );
-                  })}
+                      })}
+                    </section>
+                  ))}
                 </div>
               ) : (
                 <>
