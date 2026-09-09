@@ -12,6 +12,7 @@ const { validateContent } = require('../lib/validate');
 const router = express.Router();
 const CONTENT_TYPES = ['guides', 'news', 'library', 'pages', 'site'];
 const LIST_LANGUAGES = ['it', 'en', 'bn'];
+const FILE_LANGUAGE_CODES = { it: 'it', en: 'en', bn: 'bd' };
 const hasOwn = (value, key) => Boolean(
   value && Object.prototype.hasOwnProperty.call(value, key)
 );
@@ -269,18 +270,37 @@ router.delete('/:type/:id', async (req, res) => {
 
 // ── MEDIA UPLOAD ──────────────────────────────────────────────────────────────
 // POST /api/admin/content/:type/:id/media
-// Salva in step2connect/img/{type}/{id}/{timestamp}.{ext}
+// Salva in step2connect/img/{type}/{id}/{id}_{lang}.{ext}.
+// Per il record site/app-images, che contiene più immagini per lingua, include
+// anche lo slot: {id}_{slot}_{lang}.{ext}.
 router.post('/:type/:id/media', upload.single('file'), async (req, res) => {
   const { type, id } = req.params;
+  const { lang, slot = '' } = req.query;
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  if (!CONTENT_TYPES.includes(type)) {
+    return res.status(400).json({ error: 'Invalid content type' });
+  }
+  if (!FILE_LANGUAGE_CODES[lang]) {
+    return res.status(400).json({ error: 'Invalid language' });
+  }
+  if (!/^[a-z0-9-]+$/.test(id)) {
+    return res.status(400).json({ error: 'Invalid content ID' });
+  }
+  if (slot && !/^[A-Za-z0-9-]+$/.test(slot)) {
+    return res.status(400).json({ error: 'Invalid image slot' });
+  }
 
   const ext = mime.extension(req.file.mimetype) || 'bin';
-  const key = `step2connect/img/${type}/${id}/${Date.now()}.${ext}`;
+  const slotPart = slot ? `_${slot}` : '';
+  const filename = `${id}${slotPart}_${FILE_LANGUAGE_CODES[lang]}.${ext}`;
+  const key = `step2connect/img/${type}/${id}/${filename}`;
   try {
     await putBuffer(key, req.file.buffer, req.file.mimetype);
     const region = process.env.AWS_REGION || 'eu-west-2';
     const bucket = process.env.S3_BUCKET_NAME;
-    const url = `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
+    // La chiave è stabile e viene sovrascritta quando l'admin sostituisce
+    // l'immagine. La query forza il browser a scaricare la nuova versione.
+    const url = `https://${bucket}.s3.${region}.amazonaws.com/${key}?v=${Date.now()}`;
     res.json({ ok: true, url, key });
   } catch (err) {
     console.error('[admin] media upload error', err);

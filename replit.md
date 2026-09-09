@@ -93,8 +93,12 @@ Schema:
 content/draft/{type}/{lang}/{id}.json
 content/published/{type}/{lang}/{id}.json
 content/archive/{type}/{lang}/{id}_{timestamp}.json
-step2connect/img/{type}/{id}/{timestamp}.{ext}
+step2connect/img/{type}/{id}/{id}_{lang}.{ext}
 ```
+
+Il suffisso file bengalese è `bd` (il codice applicativo resta `bn`). Per
+`site/app-images`, che contiene più immagini, il filename è
+`app-images_{slot}_{lang}.{ext}`.
 
 Il form CMS gestisce titolo, corpo, meta description, icona, immagine, audio e
 video separatamente per ogni lingua. L’upload binario attuale è limitato alle

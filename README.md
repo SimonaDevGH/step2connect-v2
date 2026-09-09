@@ -404,7 +404,15 @@ content/published/site/{lang}/app-images.json
 ```text
 admin-users/users.csv
 content/registration-login/form_registrazione_lista_aziende_cantieri.csv
-step2connect/img/{type}/{id}/{timestamp}.{ext}
+step2connect/img/{type}/{id}/{id}_{lang}.{ext}
+```
+
+Per il bengalese il suffisso del file è `bd`, mentre il codice interno dei
+contenuti resta `bn`. Le immagini del record globale `site/app-images` includono
+anche lo slot per evitare sovrascritture:
+
+```text
+step2connect/img/site/app-images/app-images_{slot}_{lang}.{ext}
 ```
 
 ### Ciclo di vita

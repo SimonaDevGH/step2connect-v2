@@ -274,8 +274,10 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
     try {
       const fd = new FormData();
       fd.append('file', file);
+      const uploadParams = new URLSearchParams({ lang });
+      if (asset) uploadParams.set('slot', asset);
       const data = await apiFetch(
-        `/api/admin/content/${form.type}/${form.id || 'new'}/media`,
+        `/api/admin/content/${form.type}/${form.id || 'new'}/media?${uploadParams}`,
         adminToken,
         { method: 'POST', body: fd }
       );

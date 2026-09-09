@@ -10,7 +10,9 @@ function loadAdminRouterWithMemoryStorage() {
     use() {},
     get(path, handler) { routes.get.push({ path, handler }); },
     put(path, handler) { routes.put.push({ path, handler }); },
-    post(path, handler) { routes.post.push({ path, handler }); },
+    post(path, ...handlers) {
+      routes.post.push({ path, handler: handlers.at(-1), handlers });
+    },
     delete() {},
   };
   const s3 = {
@@ -20,7 +22,9 @@ function loadAdminRouterWithMemoryStorage() {
     async putJson(key, value) {
       objects.set(key, value);
     },
-    async putBuffer() {},
+    async putBuffer(key, buffer, contentType) {
+      objects.set(key, { buffer, contentType });
+    },
     async listKeys() {
       return [];
     },
@@ -62,6 +66,7 @@ function loadAdminRouterWithMemoryStorage() {
     getOne: routes.get.find(({ path }) => path === '/:type/:id').handler,
     save: routes.put.find(({ path }) => path === '/:type/:id').handler,
     publish: routes.post.find(({ path }) => path === '/:type/:id/publish').handler,
+    uploadImage: routes.post.find(({ path }) => path === '/:type/:id/media').handler,
   };
 }
 
@@ -236,4 +241,55 @@ test('site images stay separated by language through save, reopen, and publish',
   assert.equal(objects.get(siteKey('published', 'it')).assets.homeHero, url('home-it.jpg'));
   assert.equal(objects.get(siteKey('published', 'en')).assets.homeHero, url('home-en.jpg'));
   assert.equal(objects.get(siteKey('published', 'bn')).assets.homeHero, url('home-bn.jpg'));
+});
+
+test('uploaded image filenames use page ID and public language suffix', async () => {
+  const { objects, uploadImage } = loadAdminRouterWithMemoryStorage();
+  const previousBucket = process.env.S3_BUCKET_NAME;
+  const previousRegion = process.env.AWS_REGION;
+  process.env.S3_BUCKET_NAME = 'test-bucket';
+  process.env.AWS_REGION = 'eu-west-1';
+
+  try {
+    const italian = response();
+    await uploadImage({
+      params: { type: 'guides', id: 'documenti-casa' },
+      query: { lang: 'it' },
+      file: { buffer: Buffer.from('it'), mimetype: 'image/jpeg' },
+    }, italian);
+    assert.equal(italian.code, 200);
+    assert.equal(
+      italian.body.key,
+      'step2connect/img/guides/documenti-casa/documenti-casa_it.png',
+    );
+    assert.match(italian.body.url, /documenti-casa_it\.png\?v=\d+$/);
+
+    const bengali = response();
+    await uploadImage({
+      params: { type: 'guides', id: 'documenti-casa' },
+      query: { lang: 'bn' },
+      file: { buffer: Buffer.from('bd'), mimetype: 'image/jpeg' },
+    }, bengali);
+    assert.equal(
+      bengali.body.key,
+      'step2connect/img/guides/documenti-casa/documenti-casa_bd.png',
+    );
+
+    const siteSlot = response();
+    await uploadImage({
+      params: { type: 'site', id: 'app-images' },
+      query: { lang: 'en', slot: 'homeHero' },
+      file: { buffer: Buffer.from('en'), mimetype: 'image/png' },
+    }, siteSlot);
+    assert.equal(
+      siteSlot.body.key,
+      'step2connect/img/site/app-images/app-images_homeHero_en.png',
+    );
+    assert.equal(objects.has(siteSlot.body.key), true);
+  } finally {
+    if (previousBucket === undefined) delete process.env.S3_BUCKET_NAME;
+    else process.env.S3_BUCKET_NAME = previousBucket;
+    if (previousRegion === undefined) delete process.env.AWS_REGION;
+    else process.env.AWS_REGION = previousRegion;
+  }
 });
