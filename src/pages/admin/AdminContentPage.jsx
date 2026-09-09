@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Plus, Pencil, Trash2, Send, RefreshCw, LogOut, UserCircle } from 'lucide-react';
+import { ChevronLeft, Plus, Pencil, Trash2, Send, RefreshCw, LogOut, UserCircle, Images } from 'lucide-react';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import ContentEditForm from './ContentEditForm';
 
@@ -9,6 +9,7 @@ const TYPES = [
   { value: 'news', label: 'news' },
   { value: 'library', label: 'library' },
   { value: 'all', label: 'pages' },
+  { value: 'site', label: 'Immagini app' },
 ];
 const LANGS = ['it', 'en', 'bn'];
 
@@ -166,9 +167,10 @@ export default function AdminContentPage() {
         <button className="admin-refresh-btn" onClick={loadItems} title="Ricarica">
           <RefreshCw size={18} />
         </button>
-        {type !== 'all' && (
+        {type !== 'all' && (type !== 'site' || items.length === 0) && (
           <button className="admin-new-btn" onClick={() => setEditItem({ id: 'new', type })}>
-            <Plus size={18} /> Nuovo
+            {type === 'site' ? <Images size={18} /> : <Plus size={18} />}
+            {type === 'site' ? ' Configura immagini' : ' Nuovo'}
           </button>
         )}
         <button

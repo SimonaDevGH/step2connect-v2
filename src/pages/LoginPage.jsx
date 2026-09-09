@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Phone, Hash, User, Mail, Building2, HardHat } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { useSiteImages } from '../context/SiteImagesContext';
 import {
   checkPreviewAdmin,
   getPhoneAccountStatus,
@@ -21,6 +22,7 @@ const LANGS = [
 export default function LoginPage() {
   const { t, lang, changeLang } = useLanguage();
   const { login, requestOTP, loginPreviewSession } = useAuth();
+  const siteImages = useSiteImages();
   const navigate = useNavigate();
 
   const [mode, setMode] = useState('login'); // 'login' | 'register'
@@ -222,7 +224,7 @@ export default function LoginPage() {
     <div className="login-page">
       {/* Header */}
       <div className="login-header">
-        <img src="/logo-white.png" alt="Step2Connect" className="login-logo-img" />
+        <img src={siteImages.appLogo} alt="Step2Connect" className="login-logo-img" />
         <p className="login-tagline">{t('tagline')}</p>
 
         {/* Language selector */}

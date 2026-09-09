@@ -10,7 +10,7 @@ const { getJson, putJson, putBuffer, listKeys, copyObject, deleteObject } = requ
 const { validateContent } = require('../lib/validate');
 
 const router = express.Router();
-const CONTENT_TYPES = ['guides', 'news', 'library', 'pages'];
+const CONTENT_TYPES = ['guides', 'news', 'library', 'pages', 'site'];
 const LIST_LANGUAGES = ['it', 'en', 'bn'];
 const hasOwn = (value, key) => Boolean(
   value && Object.prototype.hasOwnProperty.call(value, key)
@@ -109,6 +109,7 @@ router.get('/:type/:id', async (req, res) => {
       // Immagine e icona erano in precedenza mostrate una sola volta nel form.
       emoji: localizedOrLegacy(record, 'emoji', base.emoji || '📄'),
       imageUrl: localizedOrLegacy(record, 'imageUrl', base.imageUrl || ''),
+      assets: record?.assets && typeof record.assets === 'object' ? record.assets : {},
     });
     res.json({
       id:        base.id,
@@ -171,6 +172,7 @@ router.put('/:type/:id', async (req, res) => {
         audioUrl:  localizedOrLegacy(payload[lang], 'audioUrl', ''),
         imageUrl:  localizedOrLegacy(payload[lang], 'imageUrl', payload.imageUrl || ''),
         videoUrl:  localizedOrLegacy(payload[lang], 'videoUrl', payload.videoUrl || ''),
+        assets:    payload[lang].assets || {},
         url:       publicUrl,
         title:     payload[lang].title,
         body:      payload[lang].body,

@@ -327,6 +327,7 @@ anche se l’email non esiste, per evitare enumerazione degli account CMS.
 - `news`
 - `library`
 - `pages`
+- `site` (record riservato `app-images` per le immagini globali della webApp)
 
 La scheda riepilogativa `all` dell’admin combina guide, news e library; non è un
 tipo di contenuto S3 separato.
@@ -349,6 +350,18 @@ Campi localizzati per `it`, `en` e `bn`:
 - `imageUrl`
 - `audioUrl`
 - `videoUrl`
+
+Il filtro **Immagini app** in `/admin/content` gestisce inoltre, per ogni lingua:
+
+- hero della home;
+- hero principale delle guide;
+- hero delle sei categorie guide;
+- hero della pagina Analizza documento;
+- logo Step2Connect;
+- logo Fincantieri nel menu laterale.
+
+Questi asset sono salvati nel record `site/app-images`. Finché un URL non è
+pubblicato, la webApp continua a usare il corrispondente file in `public/`.
 
 Per le guide l’URL pubblico è sempre derivato da categoria e ID. Per le pagine
 CMS generiche l’URL deve iniziare con `/`.
@@ -378,6 +391,13 @@ content/
 ```
 
 Ogni lingua usa un file separato.
+
+Le immagini globali usano quindi:
+
+```text
+content/draft/site/{lang}/app-images.json
+content/published/site/{lang}/app-images.json
+```
 
 ### Altri oggetti
 

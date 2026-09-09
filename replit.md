@@ -85,6 +85,7 @@ Tipi supportati:
 - `news`
 - `library`
 - `pages`
+- `site` (`app-images`, configurazione immagini globali per lingua)
 
 Schema:
 

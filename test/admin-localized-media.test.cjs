@@ -82,6 +82,7 @@ function response() {
 
 const url = (file) => `https://cdn.example/${file}`;
 const key = (state, lang, id) => `content/${state}/guides/${lang}/${id}.json`;
+const siteKey = (state, lang) => `content/${state}/site/${lang}/app-images.json`;
 
 test('localized media survive save, reopen, publish, and legacy fallback', async () => {
   const { objects, getOne, save, publish } = loadAdminRouterWithMemoryStorage();
@@ -181,4 +182,58 @@ test('localized media survive save, reopen, publish, and legacy fallback', async
   assert.equal(legacy.body.en.videoUrl, url('legacy.mp4'));
   assert.equal(legacy.body.en.emoji, '📄');
   assert.equal(legacy.body.en.imageUrl, url('legacy.png'));
+});
+
+test('site images stay separated by language through save, reopen, and publish', async () => {
+  const { objects, getOne, save, publish } = loadAdminRouterWithMemoryStorage();
+  const id = 'app-images';
+  const payload = {
+    id,
+    category: '',
+    it: {
+      title: 'Immagini applicazione',
+      assets: {
+        homeHero: url('home-it.jpg'),
+        guidesHero: url('guides-it.jpg'),
+      },
+    },
+    en: {
+      title: 'Application images',
+      assets: {
+        homeHero: url('home-en.jpg'),
+        guidesHero: '',
+      },
+    },
+    bn: {
+      title: 'অ্যাপ্লিকেশন ছবি',
+      assets: {
+        homeHero: url('home-bn.jpg'),
+      },
+    },
+  };
+
+  const saved = response();
+  await save({
+    params: { type: 'site', id },
+    body: payload,
+  }, saved);
+  assert.equal(saved.code, 200);
+  assert.equal(objects.get(siteKey('draft', 'it')).assets.homeHero, url('home-it.jpg'));
+  assert.equal(objects.get(siteKey('draft', 'en')).assets.homeHero, url('home-en.jpg'));
+  assert.equal(objects.get(siteKey('draft', 'en')).assets.guidesHero, '');
+  assert.equal(objects.get(siteKey('draft', 'bn')).assets.homeHero, url('home-bn.jpg'));
+
+  const reopened = response();
+  await getOne({ params: { type: 'site', id } }, reopened);
+  assert.equal(reopened.code, 200);
+  assert.deepEqual(reopened.body.it.assets, payload.it.assets);
+  assert.deepEqual(reopened.body.en.assets, payload.en.assets);
+  assert.deepEqual(reopened.body.bn.assets, payload.bn.assets);
+
+  const published = response();
+  await publish({ params: { type: 'site', id } }, published);
+  assert.equal(published.code, 200);
+  assert.equal(objects.get(siteKey('published', 'it')).assets.homeHero, url('home-it.jpg'));
+  assert.equal(objects.get(siteKey('published', 'en')).assets.homeHero, url('home-en.jpg'));
+  assert.equal(objects.get(siteKey('published', 'bn')).assets.homeHero, url('home-bn.jpg'));
 });

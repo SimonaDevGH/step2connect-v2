@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
+import { useSiteImages } from '../context/SiteImagesContext';
 import { GUIDE_CATEGORIES } from '../data/guides';
 
 const API = '';
@@ -9,6 +10,7 @@ const FEATURED_GUIDE_ID = 'guida-al-servizio';
 export default function GuidesPage() {
   const { t, lang } = useLanguage();
   const navigate = useNavigate();
+  const siteImages = useSiteImages();
   // Track which categories have published content available via the API.
   // Falls back gracefully: if the API is unreachable every category stays enabled.
   const [publishedIds, setPublishedIds] = useState(null);
@@ -36,7 +38,7 @@ export default function GuidesPage() {
   return (
     <div className="page-content">
       <div className="guides-hero">
-        <img src="/guides-hero.png" alt="" className="guides-hero-img" />
+        <img src={siteImages.guidesHero} alt="" className="guides-hero-img" />
         <div className="guides-hero-overlay">
           <span className="guides-hero-emoji">📖</span>
           <h2 className="guides-hero-title">{t('guidesTitle')}</h2>

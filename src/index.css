@@ -542,6 +542,32 @@ input, textarea { font-family: inherit; }
   border-radius: 8px;
   margin-bottom: 8px;
 }
+.admin-site-images {
+  display: grid;
+  gap: 14px;
+}
+.admin-site-image-field {
+  padding: 14px;
+  border: 1px solid #dbe4ee;
+  border-radius: 10px;
+  background: #fff;
+}
+.admin-site-image-field .admin-img-preview {
+  max-height: 220px;
+}
+.admin-site-image-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.admin-site-image-actions .admin-refresh-btn {
+  width: auto;
+  padding: 8px 12px;
+  color: #b42318;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
 
 /* ── Top bar language selector ────────────────────────────────────────── */
 .top-lang-wrap {

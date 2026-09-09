@@ -2,14 +2,24 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useSiteImages } from '../context/SiteImagesContext';
 import { getCategoryById, GUIDE_ITEMS } from '../data/guides';
 
 const API = '';
+const CATEGORY_IMAGE_KEYS = {
+  documents: 'guidesDocuments',
+  health: 'guidesHealth',
+  homeBills: 'guidesHomeBills',
+  school: 'guidesSchool',
+  cityLife: 'guidesCityLife',
+  work: 'guidesWork',
+};
 
 export default function GuideCategoryPage() {
   const { category } = useParams();
   const { t, lang }  = useLanguage();
   const navigate     = useNavigate();
+  const siteImages   = useSiteImages();
 
   const cat = getCategoryById(category);
   const [cmsItems, setCmsItems] = useState(null); // null = loading
@@ -37,6 +47,7 @@ export default function GuideCategoryPage() {
   }
 
   const Icon = cat.icon;
+  const heroImage = siteImages[CATEGORY_IMAGE_KEYS[cat.id]] || cat.heroImage;
 
   // L'elenco pubblicato su S3 decide quali guide sono visibili. Il catalogo
   // statico serve solo a conservare l'ordine e le icone delle guide esistenti.
@@ -68,11 +79,11 @@ export default function GuideCategoryPage() {
   return (
     <div className="page-content">
       <div
-        className={`page-hero${cat.heroImage ? ' page-hero--image' : ''}`}
-        style={cat.heroImage ? {} : { background: cat.color }}
+        className={`page-hero${heroImage ? ' page-hero--image' : ''}`}
+        style={heroImage ? {} : { background: cat.color }}
       >
-        {cat.heroImage && <img src={cat.heroImage} alt="" className="page-hero-img" />}
-        <div className="page-hero-overlay" style={cat.heroImage ? { background: 'rgba(10,30,58,0.08)' } : {}}>
+        {heroImage && <img src={heroImage} alt="" className="page-hero-img" />}
+        <div className="page-hero-overlay" style={heroImage ? { background: 'rgba(10,30,58,0.08)' } : {}}>
           <button className="back-btn" onClick={() => navigate('/guides')}>
             <ChevronLeft size={24} /> {t('guidesTitle')}
           </button>

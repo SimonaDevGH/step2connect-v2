@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Save, Send, Upload, Music, Video } from 'lucide-react';
 import { useAdminAuth } from '../../context/AdminAuthContext';
+import { SITE_IMAGES_ID, SITE_IMAGE_SLOTS } from '../../lib/siteImages';
 
 // Route admin: URL sempre relativi (proxy Vite in dev, Express stesso origin in prod).
 const API = '';
@@ -10,7 +11,7 @@ const LANGS = [
   { code: 'en', label: 'English 🇬🇧' },
   { code: 'bn', label: 'বাংলা 🇧🇩' },
 ];
-const TYPES = ['guides', 'news', 'library', 'pages'];
+const TYPES = ['guides', 'news', 'library', 'pages', 'site'];
 
 const GUIDE_CATEGORIES = [
   { value: 'documents', label: '📄 Documenti e permessi' },
@@ -36,19 +37,31 @@ async function apiFetch(path, token, opts = {}) {
   return data;
 }
 
-const emptyLang = () => ({
-  title: '', body: '', audioUrl: '', videoUrl: '', metaDesc: '', emoji: '📄', imageUrl: '',
+const emptyLang = (type = 'guides') => ({
+  title: type === 'site' ? 'Immagini applicazione' : '',
+  body: '',
+  audioUrl: '',
+  videoUrl: '',
+  metaDesc: '',
+  emoji: type === 'site' ? '🖼️' : '📄',
+  imageUrl: '',
+  assets: {},
 });
-const defaultForm = () => ({
-  id: '', type: 'guides', category: '', url: '',
-  it: emptyLang(), en: emptyLang(), bn: emptyLang(),
+const defaultForm = (type = 'guides') => ({
+  id: type === 'site' ? SITE_IMAGES_ID : '',
+  type,
+  category: '',
+  url: '',
+  it: emptyLang(type),
+  en: emptyLang(type),
+  bn: emptyLang(type),
 });
 
 const LANGUAGE_NAMES = { it: 'italiano', en: 'inglese', bn: 'bengalese' };
 
 function validationIssueMessage(issue) {
   const path = Array.isArray(issue.path) ? issue.path : [];
-  const [section, field] = path;
+    const [section, field] = path;
   const language = LANGUAGE_NAMES[section];
 
   if (section === 'id') {
@@ -87,6 +100,9 @@ function validationIssueMessage(issue) {
       const labels = { audioUrl: 'audio', videoUrl: 'video', imageUrl: 'immagine' };
       return `L’URL ${labels[field]} in ${language} non è valido. Usa un indirizzo completo che inizi con http:// o https://.`;
     }
+    if (field === 'assets') {
+      return `L’URL dell’immagine in ${language} non è valido. Usa un indirizzo completo che inizi con http:// o https://.`;
+    }
     if (field === 'emoji' && issue.code === 'too_big') {
       return `L’icona in ${language} non può superare 10 caratteri.`;
     }
@@ -124,7 +140,7 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
   const { adminToken, logout } = useAdminAuth();
   const navigate = useNavigate();
 
-  const [form,         setForm]         = useState(() => ({ ...defaultForm(), type: contentType || 'guides' }));
+  const [form,         setForm]         = useState(() => defaultForm(contentType || 'guides'));
   // Mantiene l'ID dell'ultimo draft salvato: dopo una rinomina il successivo
   // "Pubblica" deve puntare alla nuova chiave S3, non a quella precedente.
   const [savedId,      setSavedId]      = useState(contentId || '');
@@ -176,6 +192,20 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
   const setLangField = (lang, field, value) => {
     setForm((prev) => ({ ...prev, [lang]: { ...prev[lang], [field]: value } }));
     clearFieldError(`${lang}.${field}`);
+  };
+
+  const setLangAsset = (lang, asset, value) => {
+    setForm((prev) => ({
+      ...prev,
+      [lang]: {
+        ...prev[lang],
+        assets: {
+          ...(prev[lang]?.assets || {}),
+          [asset]: value,
+        },
+      },
+    }));
+    clearFieldError(`${lang}.assets.${asset}`);
   };
 
   const showRequestError = (err, fallback) => {
@@ -235,10 +265,11 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
     }
   };
 
-  const handleImageUpload = async (lang, e) => {
+  const handleImageUpload = async (lang, e, asset = '') => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setUploadingImg(lang);
+    const uploadKey = asset ? `${lang}:${asset}` : lang;
+    setUploadingImg(uploadKey);
     setError('');
     try {
       const fd = new FormData();
@@ -248,7 +279,8 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
         adminToken,
         { method: 'POST', body: fd }
       );
-      setLangField(lang, 'imageUrl', data.url);
+      if (asset) setLangAsset(lang, asset, data.url);
+      else setLangField(lang, 'imageUrl', data.url);
       setSuccess('Immagine caricata ✓');
     } catch (err) {
       handleAuthError(err);
@@ -263,6 +295,7 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
 
   const isPages    = form.type === 'pages';
   const isGuides   = form.type === 'guides';
+  const isSite     = form.type === 'site';
   const guidePath  = isGuides && form.category && form.id
     ? `/guides/${form.category}/${form.id}`
     : '';
@@ -293,6 +326,7 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
         {success && <div className="admin-success">✓ {success}</div>}
 
         {/* Metadati base */}
+        {!isSite ? (
         <div className="admin-section">
           <label className="admin-label">{isGuides ? 'Nome pagina / ID *' : 'ID univoco *'}</label>
           <input
@@ -364,11 +398,21 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
             </>
           )}
         </div>
+        ) : (
+          <div className="admin-section">
+            <h3 style={{ marginTop: 0 }}>Immagini generali della webApp</h3>
+            <p className="admin-hint">
+              Questa sezione controlla le immagini delle pagine che non hanno un
+              contenuto CMS dedicato. Le modifiche diventano visibili solo dopo
+              la pubblicazione.
+            </p>
+          </div>
+        )}
 
         <p className="admin-language-intro">
-          Compila ogni lingua separatamente. Titolo, testo, media, immagine e icona
-          vengono salvati solo nella rispettiva versione. I titoli contrassegnati
-          con * sono obbligatori in italiano, inglese e bengalese.
+          {isSite
+            ? 'Carica le immagini separatamente per italiano, inglese e bengalese. Se un campo resta vuoto, la webApp usa automaticamente l’immagine predefinita attuale.'
+            : 'Compila ogni lingua separatamente. Titolo, testo, media, immagine e icona vengono salvati solo nella rispettiva versione. I titoli contrassegnati con * sono obbligatori in italiano, inglese e bengalese.'}
         </p>
 
         {LANGS.map(({ code, label }) => {
@@ -377,6 +421,59 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
             <section className="admin-language-section" key={code}>
               <h3 className="admin-language-heading">{label}</h3>
 
+              {isSite ? (
+                <div className="admin-site-images">
+                  {SITE_IMAGE_SLOTS.map((slot) => {
+                    const value = language.assets?.[slot.key] || '';
+                    const uploadKey = `${code}:${slot.key}`;
+                    return (
+                      <div className="admin-site-image-field" key={slot.key}>
+                        <label className="admin-label">{slot.label}</label>
+                        {value && (
+                          <img
+                            src={value}
+                            alt={`Anteprima ${slot.label} — ${label}`}
+                            className="admin-img-preview"
+                          />
+                        )}
+                        <div className="admin-site-image-actions">
+                          <label className="admin-upload-btn">
+                            {uploadingImg === uploadKey
+                              ? 'Caricamento…'
+                              : <><Upload size={16} /> Carica / sostituisci</>}
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp,image/gif"
+                              onChange={(e) => handleImageUpload(code, e, slot.key)}
+                              style={{ display: 'none' }}
+                              disabled={Boolean(uploadingImg)}
+                            />
+                          </label>
+                          {value && (
+                            <button
+                              type="button"
+                              className="admin-refresh-btn"
+                              onClick={() => setLangAsset(code, slot.key, '')}
+                            >
+                              Rimuovi
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          className={`admin-input${fieldErrors[`${code}.assets.${slot.key}`] ? ' admin-input--error' : ''}`}
+                          type="url"
+                          value={value}
+                          onChange={(e) => setLangAsset(code, slot.key, e.target.value)}
+                          placeholder={`URL immagine; fallback: ${slot.fallback}`}
+                          aria-invalid={Boolean(fieldErrors[`${code}.assets.${slot.key}`])}
+                        />
+                        <FieldError fieldErrors={fieldErrors} path={`${code}.assets.${slot.key}`} />
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <>
               <label className="admin-label">Titolo ({code.toUpperCase()}) *</label>
               <input
                 className={`admin-input${fieldErrors[`${code}.title`] ? ' admin-input--error' : ''}`}
@@ -513,6 +610,8 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
                 aria-invalid={Boolean(fieldErrors[`${code}.imageUrl`])}
               />
               <FieldError fieldErrors={fieldErrors} path={`${code}.imageUrl`} />
+                </>
+              )}
             </section>
           );
         })}
