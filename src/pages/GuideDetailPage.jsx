@@ -46,6 +46,9 @@ export default function GuideDetailPage({ directCategory, directItem }) {
   const hasBody      = cmsContent?.body && cmsContent.body.trim().length > 0;
   const hasPublishedContent = cmsContent !== undefined && cmsContent !== null;
   const hasCoverImage = Boolean(cmsContent?.imageUrl);
+  const isFeaturedServiceGuide = item === 'guida-al-servizio';
+  const backPath = isFeaturedServiceGuide ? '/guides' : `/guides/${category}`;
+  const backLabel = isFeaturedServiceGuide ? t('guidesTitle') : t(`guideCat_${category}`);
   const isResidencePermitGuide =
     item === 'permitRequest' ||
     /permesso di soggiorno|residence permit|বাসস্থান পারমিট/i.test(displayTitle);
@@ -73,8 +76,8 @@ export default function GuideDetailPage({ directCategory, directItem }) {
         <div
           className={hasCoverImage ? 'page-hero-overlay guide-detail-hero-overlay' : undefined}
         >
-          <button className="back-btn" onClick={() => navigate(`/guides/${category}`)}>
-            <ChevronLeft size={24} /> {t(`guideCat_${category}`)}
+          <button className="back-btn" onClick={() => navigate(backPath)}>
+            <ChevronLeft size={24} /> {backLabel}
           </button>
           <div className="page-hero-icon">{cmsContent?.emoji || meta?.emoji || '📌'}</div>
           <h2 className="page-hero-title">{displayTitle}</h2>
