@@ -13,6 +13,7 @@ const router = express.Router();
 const CONTENT_TYPES = ['guides', 'news', 'library', 'pages', 'site'];
 const LIST_LANGUAGES = ['it', 'en', 'bn'];
 const FILE_LANGUAGE_CODES = { it: 'it', en: 'en', bn: 'bd' };
+const FEATURED_SERVICE_GUIDE_ID = 'guida-al-servizio';
 const hasOwn = (value, key) => Boolean(
   value && Object.prototype.hasOwnProperty.call(value, key)
 );
@@ -115,7 +116,8 @@ router.get('/:type/:id', async (req, res) => {
     res.json({
       id:        base.id,
       type:      base.type,
-      category:  base.category || '',
+      category:  base.id === FEATURED_SERVICE_GUIDE_ID ? 'guides' : (base.category || ''),
+      sortOrder: base.sortOrder ?? '',
       emoji:     base.emoji || '📄',
       imageUrl:  base.imageUrl || '',
       videoUrl:  base.videoUrl || '',
@@ -143,6 +145,9 @@ router.put('/:type/:id', async (req, res) => {
     const payload = validateContent({ ...req.body, type });
     const id = payload.id;
     const isRename = previousId !== id;
+    const category = type === 'guides' && id === FEATURED_SERVICE_GUIDE_ID
+      ? 'guides'
+      : payload.category;
 
     // Una rinomina non deve sovrascrivere per errore un contenuto esistente.
     if (isRename) {
@@ -159,7 +164,7 @@ router.put('/:type/:id', async (req, res) => {
     // Per le guide il percorso pubblico è sempre derivato da categoria + ID.
     // Questo evita che JSON, card e route possano finire su URL diversi.
     const publicUrl = type === 'guides'
-      ? `/guides/${payload.category}/${id}`
+      ? (category === 'guides' ? `/guides/${id}` : `/guides/${category}/${id}`)
       : (payload.url || '');
 
     for (const lang of ['it', 'en', 'bn']) {
@@ -168,7 +173,8 @@ router.put('/:type/:id', async (req, res) => {
         id,
         type,
         lang,
-        category:  payload.category,
+        category,
+        sortOrder: payload.sortOrder,
         emoji:     localizedOrLegacy(payload[lang], 'emoji', payload.emoji),
         audioUrl:  localizedOrLegacy(payload[lang], 'audioUrl', ''),
         imageUrl:  localizedOrLegacy(payload[lang], 'imageUrl', payload.imageUrl || ''),

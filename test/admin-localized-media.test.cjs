@@ -293,3 +293,31 @@ test('uploaded image filenames use page ID and public language suffix', async ()
     else process.env.AWS_REGION = previousRegion;
   }
 });
+
+test('featured service guide belongs to guides and preserves its chosen order', async () => {
+  const { objects, getOne, save } = loadAdminRouterWithMemoryStorage();
+  const id = 'guida-al-servizio';
+  const saved = response();
+
+  await save({
+    params: { type: 'guides', id },
+    body: {
+      id,
+      category: 'documents',
+      sortOrder: '2',
+      it: { title: 'Guida al servizio' },
+      en: { title: 'Service guide' },
+      bn: { title: 'সেবা নির্দেশিকা' },
+    },
+  }, saved);
+
+  assert.equal(saved.code, 200);
+  assert.equal(saved.body.url, '/guides/guida-al-servizio');
+  assert.equal(objects.get(key('draft', 'it', id)).category, 'guides');
+  assert.equal(objects.get(key('draft', 'it', id)).sortOrder, 2);
+
+  const reopened = response();
+  await getOne({ params: { type: 'guides', id } }, reopened);
+  assert.equal(reopened.body.category, 'guides');
+  assert.equal(reopened.body.sortOrder, 2);
+});

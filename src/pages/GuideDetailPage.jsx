@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { getCategoryById, GUIDE_ITEMS } from '../data/guides';
+import { FEATURED_SERVICE_GUIDE_ID } from '../lib/guideOrdering';
 
 // L'API pubblica è sullo stesso origin dell'app: in sviluppo Vite inoltra
 // /api a Express e in produzione Express serve entrambe le parti.
@@ -46,7 +47,7 @@ export default function GuideDetailPage({ directCategory, directItem }) {
   const hasBody      = cmsContent?.body && cmsContent.body.trim().length > 0;
   const hasPublishedContent = cmsContent !== undefined && cmsContent !== null;
   const hasCoverImage = Boolean(cmsContent?.imageUrl);
-  const isFeaturedServiceGuide = item === 'guida-al-servizio';
+  const isFeaturedServiceGuide = item === FEATURED_SERVICE_GUIDE_ID;
   const backPath = isFeaturedServiceGuide ? '/guides' : `/guides/${category}`;
   const backLabel = isFeaturedServiceGuide ? t('guidesTitle') : t(`guideCat_${category}`);
   const isResidencePermitGuide =

@@ -4,6 +4,7 @@ import { ChevronLeft } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useSiteImages } from '../context/SiteImagesContext';
 import { getCategoryById, GUIDE_ITEMS } from '../data/guides';
+import { belongsToGuideCategory, orderGuideItems } from '../lib/guideOrdering';
 
 const API = '';
 const CATEGORY_IMAGE_KEYS = {
@@ -34,7 +35,7 @@ export default function GuideCategoryPage() {
       .then((data) => {
         if (!cancelled && Array.isArray(data)) {
           // Filtra per categoria corrente
-          const filtered = data.filter((item) => item.category === category);
+          const filtered = data.filter((item) => belongsToGuideCategory(item, category));
           setCmsItems(filtered);
         }
       })
@@ -63,6 +64,7 @@ export default function GuideCategoryPage() {
     title:   cmsMap[id].title || null, // null → usa i18n
     desc:    cmsMap[id].metaDesc || null,
     emoji:   cmsMap[id]?.emoji || GUIDE_ITEMS[id]?.emoji || '📌',
+    sortOrder: Number.isFinite(cmsMap[id]?.sortOrder) ? cmsMap[id].sortOrder : null,
     }));
 
   // Nuovi item CMS non presenti nel catalogo statico.
@@ -73,8 +75,10 @@ export default function GuideCategoryPage() {
       title:   cmsMap[id].title,
       desc:    cmsMap[id].metaDesc || null,
       emoji:   cmsMap[id].emoji || '📌',
+      sortOrder: Number.isFinite(cmsMap[id]?.sortOrder) ? cmsMap[id].sortOrder : null,
     });
   });
+  const orderedItems = orderGuideItems(mergedItems);
 
   return (
     <div className="page-content">
@@ -112,7 +116,7 @@ export default function GuideCategoryPage() {
             <div className="skeleton-line short" />
           </div>
         </div>
-      ) : mergedItems.length === 0 ? (
+      ) : orderedItems.length === 0 ? (
         <div className="coming-soon-wrap">
           <span className="coming-soon-emoji">🛠️</span>
           <p className="coming-soon-title">{t('comingSoon')}</p>
@@ -120,7 +124,7 @@ export default function GuideCategoryPage() {
         </div>
       ) : (
         <div className="guide-items-list">
-          {mergedItems.map(({ id, title, desc, emoji }) => (
+          {orderedItems.map(({ id, title, desc, emoji }) => (
             <button
               key={id}
               className="guide-item-card"

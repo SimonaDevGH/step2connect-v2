@@ -11,6 +11,10 @@ const ALLOWED_ATTRS = {
 const ALLOWED_SCHEMES = { img: { src: ['http', 'https'] } };
 
 const optionalUrl = z.string().url().optional().or(z.literal(''));
+const optionalSortOrder = z.preprocess(
+  (value) => (value === '' || value === null || value === undefined ? undefined : value),
+  z.coerce.number().int().min(1).optional(),
+);
 const siteAssetsSchema = z.object({
   homeHero: optionalUrl,
   guidesHero: optionalUrl,
@@ -49,6 +53,7 @@ const contentSchema = z.object({
   id:       z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/),
   type:     z.enum(['guides', 'news', 'library', 'pages', 'site']),
   category: z.string().max(100).default(''),
+  sortOrder: optionalSortOrder,
   emoji:    z.string().max(10).default('📄'),
   imageUrl: optionalUrl,
   videoUrl: optionalUrl,

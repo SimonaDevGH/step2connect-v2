@@ -363,6 +363,12 @@ Il filtro **Immagini app** in `/admin/content` gestisce inoltre, per ogni lingua
 Questi asset sono salvati nel record `site/app-images`. Finché un URL non è
 pubblicato, la webApp continua a usare il corrispondente file in `public/`.
 
+Per i contenuti di tipo `guides`, il CMS espone il campo **Ordine nella
+categoria**: i valori più bassi vengono mostrati per primi, mentre i contenuti
+senza numero restano in fondo mantenendo il loro ordine precedente. La guida
+introduttiva `guida-al-servizio` appartiene alla categoria principale `guides`
+e non viene elencata nelle categorie intermedie.
+
 Per le guide l’URL pubblico è sempre derivato da categoria e ID. Per le pagine
 CMS generiche l’URL deve iniziare con `/`.
 

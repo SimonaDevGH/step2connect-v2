@@ -104,6 +104,10 @@ Il form CMS gestisce titolo, corpo, meta description, icona, immagine, audio e
 video separatamente per ogni lingua. L’upload binario attuale è limitato alle
 immagini; audio e video usano URL.
 
+Le guide hanno un `sortOrder` globale opzionale: i numeri più bassi vengono
+prima nella categoria e i contenuti senza numero restano in fondo. Il record
+`guida-al-servizio` usa la categoria principale `guides`, non `documents`.
+
 ## Segreti
 
 Non inserire segreti nel repository. Le principali variabili sono:

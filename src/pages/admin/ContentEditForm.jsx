@@ -18,6 +18,7 @@ const LANGS = [
 const TYPES = ['guides', 'news', 'library', 'pages', 'site'];
 
 const GUIDE_CATEGORIES = [
+  { value: 'guides',    label: '📖 Guide pratiche — pagina principale' },
   { value: 'documents', label: '📄 Documenti e permessi' },
   { value: 'health',    label: '❤️ Salute' },
   { value: 'homeBills', label: '🏠 Casa e bollette' },
@@ -55,6 +56,7 @@ const defaultForm = (type = 'guides') => ({
   id: type === 'site' ? SITE_IMAGES_ID : '',
   type,
   category: '',
+  sortOrder: '',
   url: '',
   it: emptyLang(type),
   en: emptyLang(type),
@@ -79,6 +81,9 @@ function validationIssueMessage(issue) {
   if (section === 'type') return 'Seleziona un tipo di contenuto valido.';
   if (section === 'category' && issue.code === 'too_big') {
     return 'La categoria non può superare 100 caratteri.';
+  }
+  if (section === 'sortOrder') {
+    return 'L’ordine deve essere un numero intero uguale o superiore a 1.';
   }
   if (section === 'url') {
     if (issue.message?.includes('obbligatorio')) return 'Per le pagine CMS l’URL pubblico è obbligatorio.';
@@ -303,7 +308,9 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
   const isGuides   = form.type === 'guides';
   const isSite     = form.type === 'site';
   const guidePath  = isGuides && form.category && form.id
-    ? `/guides/${form.category}/${form.id}`
+    ? (form.category === 'guides'
+      ? `/guides/${form.id}`
+      : `/guides/${form.category}/${form.id}`)
     : '';
 
   return (
@@ -384,6 +391,27 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
             />
           )}
           <FieldError fieldErrors={fieldErrors} path="category" />
+
+          {isGuides && (
+            <>
+              <label className="admin-label">Ordine nella categoria</label>
+              <input
+                className={`admin-input${fieldErrors.sortOrder ? ' admin-input--error' : ''}`}
+                type="number"
+                min="1"
+                step="1"
+                value={form.sortOrder ?? ''}
+                onChange={(e) => setBaseField('sortOrder', e.target.value)}
+                placeholder="es. 1"
+                aria-invalid={Boolean(fieldErrors.sortOrder)}
+              />
+              <p className="admin-hint">
+                Inserisci 1 per il primo contenuto, 2 per il secondo e così via.
+                I contenuti senza numero vengono mostrati dopo quelli ordinati.
+              </p>
+              <FieldError fieldErrors={fieldErrors} path="sortOrder" />
+            </>
+          )}
 
           {/* URL libero per le pagine CMS. Per le guide viene sempre calcolato da categoria + ID. */}
           {isPages && (
