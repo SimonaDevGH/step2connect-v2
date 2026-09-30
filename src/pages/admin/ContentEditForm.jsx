@@ -16,6 +16,7 @@ const LANGS = [
   { code: 'bn', label: 'বাংলা 🇧🇩' },
 ];
 const TYPES = ['guides', 'news', 'library', 'pages', 'site'];
+const MEDIA_UPLOAD_LIMIT_MB = { img: 5, audio: 25, video: 100 };
 
 const GUIDE_CATEGORIES = [
   { value: 'guides',    label: '📖 Guide pratiche — pagina principale' },
@@ -159,7 +160,7 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
   const [error,        setError]        = useState('');
   const [fieldErrors,  setFieldErrors]  = useState({});
   const [success,      setSuccess]      = useState('');
-  const [uploadingImg, setUploadingImg] = useState('');
+  const [uploadingMedia, setUploadingMedia] = useState('');
 
   const handleAuthError = (err) => {
     if (err.message.includes('401') || err.message.toLowerCase().includes('token')) {
@@ -274,16 +275,22 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
     }
   };
 
-  const handleImageUpload = async (lang, e, asset = '') => {
+  const handleMediaUpload = async (lang, kind, e, asset = '') => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const uploadKey = asset ? `${lang}:${asset}` : lang;
-    setUploadingImg(uploadKey);
+    if (file.size > MEDIA_UPLOAD_LIMIT_MB[kind] * 1024 * 1024) {
+      setError(`File troppo grande: il limite per ${kind} è ${MEDIA_UPLOAD_LIMIT_MB[kind]} MB.`);
+      e.target.value = '';
+      return;
+    }
+    const uploadKey = asset ? `${lang}:${asset}` : `${lang}:${kind}`;
+    setUploadingMedia(uploadKey);
     setError('');
+    setSuccess('');
     try {
       const fd = new FormData();
       fd.append('file', file);
-      const uploadParams = new URLSearchParams({ lang });
+      const uploadParams = new URLSearchParams({ lang, mediaType: kind });
       if (asset) uploadParams.set('slot', asset);
       const data = await apiFetch(
         `/api/admin/content/${form.type}/${form.id || 'new'}/media?${uploadParams}`,
@@ -291,14 +298,14 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
         { method: 'POST', body: fd }
       );
       if (asset) setLangAsset(lang, asset, data.url);
-      else setLangField(lang, 'imageUrl', data.url);
-      setSuccess('Immagine caricata ✓');
+      else setLangField(lang, { img: 'imageUrl', audio: 'audioUrl', video: 'videoUrl' }[kind], data.url);
+      setSuccess('File caricato. Salva la bozza o pubblica per collegarlo al contenuto.');
     } catch (err) {
       handleAuthError(err);
-      setFieldErrors({});
       setError('Upload fallito: ' + err.message);
     } finally {
-      setUploadingImg('');
+      e.target.value = '';
+      setUploadingMedia('');
     }
   };
 
@@ -506,15 +513,15 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
                         )}
                         <div className="admin-site-image-actions">
                           <label className="admin-upload-btn">
-                            {uploadingImg === uploadKey
+                            {uploadingMedia === uploadKey
                               ? 'Caricamento…'
                               : <><Upload size={16} /> Carica / sostituisci</>}
                             <input
                               type="file"
                               accept="image/jpeg,image/png,image/webp,image/gif"
-                              onChange={(e) => handleImageUpload(code, e, slot.key)}
+                              onChange={(e) => handleMediaUpload(code, 'img', e, slot.key)}
                               style={{ display: 'none' }}
-                              disabled={Boolean(uploadingImg)}
+                              disabled={Boolean(uploadingMedia)}
                             />
                           </label>
                           {value && (
@@ -617,28 +624,50 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
 
               <label className="admin-label">
                 <Music size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} />
-                Audio MP3 ({code.toUpperCase()}) — opzionale
+                Audio ({code.toUpperCase()}) — opzionale
               </label>
+              <label className="admin-upload-btn">
+                {uploadingMedia === `${code}:audio` ? 'Caricamento audio…' : <><Upload size={16} /> Carica audio {code.toUpperCase()}</>}
+                <input
+                  type="file"
+                  accept=".mp3,.m4a,.wav,.ogg,audio/mpeg,audio/mp4,audio/wav,audio/ogg"
+                  onChange={(e) => handleMediaUpload(code, 'audio', e)}
+                  style={{ display: 'none' }}
+                  disabled={Boolean(uploadingMedia) || !form.id}
+                />
+              </label>
+              {language.audioUrl && <audio controls preload="none" src={language.audioUrl} className="admin-media-preview" />}
               <input
                 className={`admin-input${fieldErrors[`${code}.audioUrl`] ? ' admin-input--error' : ''}`}
                 type="url"
                 value={language.audioUrl}
                 onChange={(e) => setLangField(code, 'audioUrl', e.target.value)}
-                placeholder="https://…/audio.mp3"
+                placeholder="URL audio (oppure carica un file, max 25 MB)"
                 aria-invalid={Boolean(fieldErrors[`${code}.audioUrl`])}
               />
               <FieldError fieldErrors={fieldErrors} path={`${code}.audioUrl`} />
 
               <label className="admin-label">
                 <Video size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} />
-                URL video ({code.toUpperCase()}) — opzionale
+                Video ({code.toUpperCase()}) — opzionale
               </label>
+              <label className="admin-upload-btn">
+                {uploadingMedia === `${code}:video` ? 'Caricamento video…' : <><Upload size={16} /> Carica video {code.toUpperCase()}</>}
+                <input
+                  type="file"
+                  accept=".mp4,.webm,.mov,video/mp4,video/webm,video/quicktime"
+                  onChange={(e) => handleMediaUpload(code, 'video', e)}
+                  style={{ display: 'none' }}
+                  disabled={Boolean(uploadingMedia) || !form.id}
+                />
+              </label>
+              {language.videoUrl && <video controls preload="none" src={language.videoUrl} className="admin-media-preview" />}
               <input
                 className={`admin-input${fieldErrors[`${code}.videoUrl`] ? ' admin-input--error' : ''}`}
                 type="url"
                 value={language.videoUrl}
                 onChange={(e) => setLangField(code, 'videoUrl', e.target.value)}
-                placeholder="https://…/video.mp4"
+                placeholder="URL video (oppure carica un file, max 100 MB)"
                 aria-invalid={Boolean(fieldErrors[`${code}.videoUrl`])}
               />
               <FieldError fieldErrors={fieldErrors} path={`${code}.videoUrl`} />
@@ -659,17 +688,17 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
                 <img src={language.imageUrl} alt={`Anteprima ${label}`} className="admin-img-preview" />
               )}
               <label className="admin-upload-btn">
-                {uploadingImg === code ? 'Caricamento…' : <><Upload size={16} /> Carica immagine {code.toUpperCase()}</>}
+                {uploadingMedia === `${code}:img` ? 'Caricamento…' : <><Upload size={16} /> Carica immagine {code.toUpperCase()}</>}
                 <input
                   type="file"
-                  accept="image/*"
-                  onChange={(e) => handleImageUpload(code, e)}
+                  accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif"
+                  onChange={(e) => handleMediaUpload(code, 'img', e)}
                   style={{ display: 'none' }}
-                  disabled={Boolean(uploadingImg) || !form.id}
+                  disabled={Boolean(uploadingMedia) || !form.id}
                 />
               </label>
               {!form.id && (
-                <p className="admin-hint">Inserisci prima un ID per caricare l'immagine</p>
+                <p className="admin-hint">Inserisci prima un ID per caricare immagini, audio e video</p>
               )}
               <input
                 className={`admin-input${fieldErrors[`${code}.imageUrl`] ? ' admin-input--error' : ''}`}
@@ -691,14 +720,14 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
           <button
             className="admin-btn-draft"
             onClick={handleSaveDraft}
-            disabled={saving || !form.id}
+            disabled={saving || publishing || Boolean(uploadingMedia) || !form.id}
           >
             {saving ? 'Salvataggio…' : <><Save size={16} /> Salva bozza</>}
           </button>
           <button
             className="admin-btn-publish"
             onClick={handlePublish}
-            disabled={publishing || !form.id}
+            disabled={publishing || saving || Boolean(uploadingMedia) || !form.id}
           >
             {publishing ? 'Pubblicazione…' : <><Send size={16} /> Pubblica</>}
           </button>

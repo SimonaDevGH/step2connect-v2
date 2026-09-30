@@ -93,16 +93,17 @@ Schema:
 content/draft/{type}/{lang}/{id}.json
 content/published/{type}/{lang}/{id}.json
 content/archive/{type}/{lang}/{id}_{timestamp}.json
-step2connect/img/{type}/{id}/{id}_{lang}.{ext}
+step2connect/img/{type}/{id}/{id}_{LANG}_{img|audio|video}.{ext}
 ```
 
-Il suffisso file bengalese è `bd` (il codice applicativo resta `bn`). Per
-`site/app-images`, che contiene più immagini, il filename è
-`app-images_{slot}_{lang}.{ext}`.
+Per i contenuti editoriali i suffissi lingua sono `IT`, `EN`, `BN`. Le immagini
+globali `site/app-images` mantengono la chiave storica
+`app-images_{slot}_{lang}.{ext}` (bengalese `bd`).
 
 Il form CMS gestisce titolo, corpo, meta description, icona, immagine, audio e
-video separatamente per ogni lingua. L’upload binario attuale è limitato alle
-immagini; audio e video usano URL.
+video separatamente per ogni lingua. Gli upload diretti verso S3 sono disponibili
+per immagini (5 MB), audio (25 MB) e video (100 MB); gli URL possono anche
+essere inseriti manualmente. Dopo l'upload occorre salvare o pubblicare.
 
 Le guide hanno un `sortOrder` globale opzionale: i numeri più bassi vengono
 prima nella categoria e i contenuti senza numero restano in fondo. Il record

@@ -6,6 +6,7 @@ function loadAdminRouterWithMemoryStorage() {
   const originalLoad = Module._load;
   const routes = { get: [], put: [], post: [] };
   const objects = new Map();
+  let uploadOptions;
   const router = {
     use() {},
     get(path, handler) { routes.get.push({ path, handler }); },
@@ -39,7 +40,10 @@ function loadAdminRouterWithMemoryStorage() {
   Module._load = function loadMockedModule(request, parent, isMain) {
     if (request === 'express') return { Router: () => router };
     if (request === 'multer') {
-      const multer = () => ({ single: () => (_req, _res, next) => next() });
+      const multer = (options) => {
+        uploadOptions = options;
+        return { single: () => (_req, _res, next) => next() };
+      };
       multer.memoryStorage = () => ({});
       return multer;
     }
@@ -67,6 +71,7 @@ function loadAdminRouterWithMemoryStorage() {
     save: routes.put.find(({ path }) => path === '/:type/:id').handler,
     publish: routes.post.find(({ path }) => path === '/:type/:id/publish').handler,
     uploadImage: routes.post.find(({ path }) => path === '/:type/:id/media').handler,
+    getUploadOptions: () => uploadOptions,
   };
 }
 
@@ -243,7 +248,7 @@ test('site images stay separated by language through save, reopen, and publish',
   assert.equal(objects.get(siteKey('published', 'bn')).assets.homeHero, url('home-bn.jpg'));
 });
 
-test('uploaded image filenames use page ID and public language suffix', async () => {
+test('uploaded files use content ID, language and media type; site slots keep existing image names', async () => {
   const { objects, uploadImage } = loadAdminRouterWithMemoryStorage();
   const previousBucket = process.env.S3_BUCKET_NAME;
   const previousRegion = process.env.AWS_REGION;
@@ -251,29 +256,29 @@ test('uploaded image filenames use page ID and public language suffix', async ()
   process.env.AWS_REGION = 'eu-west-1';
 
   try {
-    const italian = response();
-    await uploadImage({
-      params: { type: 'guides', id: 'documenti-casa' },
-      query: { lang: 'it' },
-      file: { buffer: Buffer.from('it'), mimetype: 'image/jpeg' },
-    }, italian);
-    assert.equal(italian.code, 200);
-    assert.equal(
-      italian.body.key,
-      'step2connect/img/guides/documenti-casa/documenti-casa_it.png',
-    );
-    assert.match(italian.body.url, /documenti-casa_it\.png\?v=\d+$/);
-
-    const bengali = response();
-    await uploadImage({
-      params: { type: 'guides', id: 'documenti-casa' },
-      query: { lang: 'bn' },
-      file: { buffer: Buffer.from('bd'), mimetype: 'image/jpeg' },
-    }, bengali);
-    assert.equal(
-      bengali.body.key,
-      'step2connect/img/guides/documenti-casa/documenti-casa_bd.png',
-    );
+    const formats = {
+      img: ['image/jpeg', 'jpg'],
+      audio: ['audio/mpeg', 'mp3'],
+      video: ['video/mp4', 'mp4'],
+    };
+    for (const [lang, suffix] of [['it', 'IT'], ['en', 'EN'], ['bn', 'BN']]) {
+      for (const [kind, [mimetype, ext]] of Object.entries(formats)) {
+        const result = response();
+        const buffer = Buffer.from(`${lang}-${kind}`);
+        await uploadImage({
+          params: { type: 'guides', id: 'permitRenewal' },
+          query: { lang, mediaType: kind },
+          file: { buffer, size: buffer.length, mimetype },
+        }, result);
+        assert.equal(result.code, 200);
+        assert.equal(
+          result.body.key,
+          `step2connect/img/guides/permitRenewal/permitRenewal_${suffix}_${kind}.${ext}`,
+        );
+        assert.match(result.body.url, new RegExp(`permitRenewal_${suffix}_${kind}\\.${ext}\\?v=\\d+$`));
+        assert.equal(objects.get(result.body.key).contentType, mimetype);
+      }
+    }
 
     const siteSlot = response();
     await uploadImage({
@@ -292,6 +297,41 @@ test('uploaded image filenames use page ID and public language suffix', async ()
     if (previousRegion === undefined) delete process.env.AWS_REGION;
     else process.env.AWS_REGION = previousRegion;
   }
+});
+
+test('media upload rejects mismatched formats, oversized files and invalid languages', async () => {
+  const { uploadImage, getUploadOptions } = loadAdminRouterWithMemoryStorage();
+  const options = getUploadOptions();
+  const accepts = (query, mimetype) => new Promise((resolve) =>
+    options.fileFilter({ query }, { mimetype }, (err, accepted) => resolve({ err, accepted }))
+  );
+  assert.equal((await accepts({ mediaType: 'audio' }, 'audio/mpeg')).accepted, true);
+  assert.match((await accepts({ mediaType: 'video' }, 'audio/mpeg')).err.message, /non supportato/);
+  assert.match((await accepts({ mediaType: 'img' }, 'video/mp4')).err.message, /non supportato/);
+
+  const invalid = response();
+  await uploadImage({
+    params: { type: 'guides', id: 'permitRenewal' },
+    query: { lang: 'it', mediaType: 'audio' },
+    file: { buffer: Buffer.from('no'), mimetype: 'video/mp4' },
+  }, invalid);
+  assert.equal(invalid.code, 400);
+
+  const oversized = response();
+  await uploadImage({
+    params: { type: 'guides', id: 'permitRenewal' },
+    query: { lang: 'en', mediaType: 'audio' },
+    file: { buffer: Buffer.from('no'), size: 26 * 1024 * 1024, mimetype: 'audio/mpeg' },
+  }, oversized);
+  assert.equal(oversized.code, 413);
+
+  const language = response();
+  await uploadImage({
+    params: { type: 'guides', id: 'permitRenewal' },
+    query: { lang: 'xx', mediaType: 'img' },
+    file: { buffer: Buffer.from('no'), mimetype: 'image/png' },
+  }, language);
+  assert.equal(language.code, 400);
 });
 
 test('featured service guide belongs to guides and preserves its chosen order', async () => {

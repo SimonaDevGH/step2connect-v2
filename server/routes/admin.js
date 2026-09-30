@@ -4,7 +4,6 @@
  */
 const express = require('express');
 const multer  = require('multer');
-const mime    = require('mime-types');
 const { requireAdminJWT, adminUserId } = require('../middleware/adminAuth');
 const { getJson, putJson, putBuffer, listKeys, copyObject, deleteObject } = require('../lib/s3');
 const { validateContent } = require('../lib/validate');
@@ -21,14 +20,37 @@ const localizedOrLegacy = (translation, field, legacyValue) => (
   hasOwn(translation, field) ? translation[field] : legacyValue
 );
 
-// Multer in memoria (max 5 MB)
+const MEDIA_FORMATS = {
+  img: {
+    'image/jpeg': 'jpg', 'image/png': 'png',
+    'image/webp': 'webp', 'image/gif': 'gif',
+  },
+  audio: {
+    'audio/mpeg': 'mp3', 'audio/mp3': 'mp3',
+    'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a',
+    'audio/wav': 'wav', 'audio/x-wav': 'wav', 'audio/ogg': 'ogg',
+  },
+  video: {
+    'video/mp4': 'mp4', 'video/webm': 'webm',
+    'video/quicktime': 'mov',
+  },
+};
+const MEDIA_LIMITS = {
+  img: 5 * 1024 * 1024,
+  audio: 25 * 1024 * 1024,
+  video: 100 * 1024 * 1024,
+};
+
+// Multer in memoria; limite massimo complessivo, con limite specifico per tipo sotto.
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (allowed.includes(file.mimetype)) cb(null, true);
-    else cb(new Error('Formato immagine non supportato (jpeg, png, webp, gif)'));
+  limits: { fileSize: MEDIA_LIMITS.video },
+  fileFilter: (req, file, cb) => {
+    const kind = req.query.mediaType || 'img';
+    if (!MEDIA_FORMATS[kind]?.[file.mimetype]) {
+      return cb(new Error(`Formato ${kind} non supportato`));
+    }
+    cb(null, true);
   },
 });
 
@@ -276,12 +298,21 @@ router.delete('/:type/:id', async (req, res) => {
 
 // ── MEDIA UPLOAD ──────────────────────────────────────────────────────────────
 // POST /api/admin/content/:type/:id/media
-// Salva in step2connect/img/{type}/{id}/{id}_{lang}.{ext}.
-// Per il record site/app-images, che contiene più immagini per lingua, include
-// anche lo slot: {id}_{slot}_{lang}.{ext}.
-router.post('/:type/:id/media', upload.single('file'), async (req, res) => {
+// Per i contenuti editoriali: {id}_{LINGUA}_{img|audio|video}.{ext}.
+// La configurazione site conserva le chiavi immagini esistenti per non spezzare i link.
+router.post('/:type/:id/media', (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (err) {
+      const tooLarge = err.code === 'LIMIT_FILE_SIZE';
+      return res.status(tooLarge ? 413 : 400).json({
+        error: tooLarge ? 'File troppo grande (massimo 100 MB)' : err.message,
+      });
+    }
+    next();
+  });
+}, async (req, res) => {
   const { type, id } = req.params;
-  const { lang, slot = '' } = req.query;
+  const { lang, slot = '', mediaType = 'img' } = req.query;
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   if (!CONTENT_TYPES.includes(type)) {
     return res.status(400).json({ error: 'Invalid content type' });
@@ -289,23 +320,32 @@ router.post('/:type/:id/media', upload.single('file'), async (req, res) => {
   if (!FILE_LANGUAGE_CODES[lang]) {
     return res.status(400).json({ error: 'Invalid language' });
   }
-  if (!/^[a-z0-9-]+$/.test(id)) {
+  if (!/^[a-zA-Z0-9_-]{1,100}$/.test(id)) {
     return res.status(400).json({ error: 'Invalid content ID' });
   }
-  if (slot && !/^[A-Za-z0-9-]+$/.test(slot)) {
+  if (!MEDIA_FORMATS[mediaType] || !MEDIA_FORMATS[mediaType][req.file.mimetype]) {
+    return res.status(400).json({ error: 'Formato o tipo di file non supportato' });
+  }
+  if (req.file.size > MEDIA_LIMITS[mediaType] || req.file.buffer.length > MEDIA_LIMITS[mediaType]) {
+    return res.status(413).json({ error: `File troppo grande per ${mediaType}` });
+  }
+  if (slot && (type !== 'site' || mediaType !== 'img' || !/^[A-Za-z0-9-]+$/.test(slot))) {
     return res.status(400).json({ error: 'Invalid image slot' });
   }
+  if (type === 'site' && mediaType !== 'img') {
+    return res.status(400).json({ error: 'Solo immagini per la configurazione app' });
+  }
 
-  const ext = mime.extension(req.file.mimetype) || 'bin';
-  const slotPart = slot ? `_${slot}` : '';
-  const filename = `${id}${slotPart}_${FILE_LANGUAGE_CODES[lang]}.${ext}`;
+  const ext = MEDIA_FORMATS[mediaType][req.file.mimetype];
+  const filename = type === 'site'
+    ? `${id}${slot ? `_${slot}` : ''}_${FILE_LANGUAGE_CODES[lang]}.${ext}`
+    : `${id}_${lang.toUpperCase()}_${mediaType}.${ext}`;
   const key = `step2connect/img/${type}/${id}/${filename}`;
   try {
     await putBuffer(key, req.file.buffer, req.file.mimetype);
     const region = process.env.AWS_REGION || 'eu-west-2';
     const bucket = process.env.S3_BUCKET_NAME;
-    // La chiave è stabile e viene sovrascritta quando l'admin sostituisce
-    // l'immagine. La query forza il browser a scaricare la nuova versione.
+    // La chiave è stabile; la query forza il browser a scaricare la nuova versione.
     const url = `https://${bucket}.s3.${region}.amazonaws.com/${key}?v=${Date.now()}`;
     res.json({ ok: true, url, key });
   } catch (err) {

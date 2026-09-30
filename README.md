@@ -410,16 +410,22 @@ content/published/site/{lang}/app-images.json
 ```text
 admin-users/users.csv
 content/registration-login/form_registrazione_lista_aziende_cantieri.csv
-step2connect/img/{type}/{id}/{id}_{lang}.{ext}
+step2connect/img/{type}/{id}/{id}_{LANG}_{img|audio|video}.{ext}
 ```
 
-Per il bengalese il suffisso del file è `bd`, mentre il codice interno dei
-contenuti resta `bn`. Le immagini del record globale `site/app-images` includono
-anche lo slot per evitare sovrascritture:
+Gli upload dei contenuti editoriali sono separati per italiano (IT), inglese
+(EN) e bengalese (BN). Per esempio: `permitRenewal_IT_audio.mp3`,
+`permitRenewal_EN_img.jpg`, `permitRenewal_BN_video.mp4`. Nel CMS puoi caricare
+direttamente immagini (max 5 MB), audio (max 25 MB) e video (max 100 MB);
+poi salva la bozza o pubblica per collegare i file al contenuto.
+Le immagini del record globale `site/app-images` mantengono il naming esistente:
 
 ```text
 step2connect/img/site/app-images/app-images_{slot}_{lang}.{ext}
 ```
+
+Solo per le immagini globali il suffisso bengalese è `bd`; il codice interno
+della lingua resta `bn`.
 
 ### Ciclo di vita
 
@@ -654,8 +660,8 @@ hardcoded nel bucket. Non eseguirlo automaticamente in produzione.
 
 - Gli elementi `library` possono mostrare contenuti CMS, ma l’upload diretto di
   file PDF non è ancora disponibile.
-- Audio e video supportano URL localizzati; l’upload binario dal CMS non è ancora
-  disponibile.
+- Audio e video possono essere caricati nel CMS per ogni lingua oppure inseriti
+  tramite URL.
 - News e libreria mantengono fallback statici se l’API non risponde.
 - Il cambio lingua può mostrare brevemente il contenuto precedente durante un
   nuovo caricamento.
