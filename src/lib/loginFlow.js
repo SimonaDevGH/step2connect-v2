@@ -27,6 +27,13 @@ export async function beginPhoneLogin({
   }
 
   if (mode === 'login') {
+    if (account.flow === 'personal-code') {
+      const preview = await checkPreviewAdmin(phone);
+      // Non ripiegare sull'SMS se non è possibile preparare la challenge.
+      return preview?.challenge
+        ? { kind: 'personal-access-code', challenge: preview.challenge }
+        : { kind: 'error' };
+    }
     if (account.flow === 'preview') {
       const preview = await checkPreviewAdmin(phone);
       if (preview?.isAdmin) {

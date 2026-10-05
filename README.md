@@ -210,6 +210,8 @@ Entrambi i form chiamano `POST /api/users/account-status`.
 - Numero già presente durante **Registrati**: il form passa ad **Accedi**.
 - Profilo standard: viene avviato Cognito.
 - Profilo admin con preview abilitata: viene avviata la challenge preview.
+- Profilo standard o `fincantieri_users` registrato e attivo nella whitelist:
+  viene avviata la challenge con codice personale, senza chiamare Cognito.
 - Errore o timeout DynamoDB: il flusso si blocca in modalità fail-closed.
 
 La route restituisce solo `exists` e il tipo minimo di flusso richiesto
@@ -257,6 +259,55 @@ Il server:
 Una sessione preview può mostrare l’interfaccia principale con ruolo admin, ma
 non autorizza le API del CMS. Il CMS richiede sempre il proprio JWT.
 
+### Codici personali Fincantieri / ELIS
+
+La whitelist privata è separata dal CSV admin e risiede nello stesso bucket:
+`whitelist-users/users.csv`. Il modello senza credenziali è
+`infra/whitelist-users.template.csv`. Le colonne richieste sono:
+
+```csv
+phone,accessCode,firstName,lastName,company,enabled,notes
+```
+
+- `phone` usa la stessa normalizzazione della preview admin.
+- `accessCode` è una stringa di **6 cifre**: non convertirla in numero,
+  nemmeno tramite Excel, altrimenti gli zeri iniziali si perdono.
+- Sono supportati valori tra virgolette, virgole nelle celle e doppi apici
+  escapati, BOM e CRLF. I telefoni duplicati sono rifiutati.
+- Solo `enabled=true` (anche `"true"`) abilita il codice. Qualunque altro
+  valore lo disabilita. Codici con formato non valido non abilitano il flusso.
+- Non c'è cache: il file viene riletto per account-status, verifica e ripristino.
+- La whitelist non registra nuovi utenti: senza profilo DynamoDB rimane la
+  registrazione Cognito attuale.
+- Gli admin continuano a usare `adminPsw` e il CSV admin; non possono usare
+  il codice della whitelist neppure se il loro telefono compare nei due CSV.
+- Al primo codice valido, un aggiornamento DynamoDB condizionale cambia solo
+  il ruolo `standard` in `fincantieri_users`, senza sovrascrivere un admin.
+- La sessione firmata dura **30 giorni**, usa il tipo `fincantieri_users`
+  e viene rifiutata al ripristino se la riga sparisce, è disabilitata o il
+  codice cambia. La durata admin resta 8 ore.
+- La schermata mostra “codice di accesso personale” in IT/EN/BN e non offre
+  il pulsante SMS per questo flusso. Il limite tentativi della preview è invariato.
+- Nessuna sessione preview autorizza le API CMS, che conservano il login
+  email/password e il loro JWT indipendente.
+
+**Permessi e sicurezza:** nessun nuovo Secret. Il backend richiede `s3:GetObject`
+sulla sola chiave whitelist (`infra/whitelist-users-iam.yaml`), oltre ai
+permessi DynamoDB di lettura e `UpdateItem` già documentati. L'operatore che
+carica il CSV necessita anche di `s3:PutObject`. Il CSV contiene credenziali:
+deve rimanere **privato**, non va committato né reso pubblico tramite ACL,
+bucket policy, distribuzioni o proxy. Un errore S3/IAM blocca il flusso
+anziché concedere una sessione o inviare un SMS in fallback.
+
+**Compatibilità pagine:** home, servizi, guide, news, library, quiz, uffici,
+notifiche, traduttore, analisi documento, privacy e pagine CMS pubbliche
+utilizzano l'utente applicativo oppure API pubbliche, non token Cognito.
+LivePerson e WhatsApp restano integrazioni esterne. `GET /api/users/me`,
+la sincronizzazione `/users/sync` e `updateMyProfile` (`PATCH /users/me`
+del backend esterno) richiedono invece Cognito: non possono usare una sessione
+con codice personale. Il login e il ripristino con codice usano il profilo
+restituito dalla verifica server e non chiamano queste API.
+
 ## Profili e ruoli DynamoDB
 
 La tabella predefinita è `Step2Connect_Users` nella regione `eu-west-2`.
@@ -273,6 +324,7 @@ I ruoli possono essere modificati solo da un operatore:
 ```bash
 npm run user:role -- promote <telefono>
 npm run user:role -- standard <telefono>
+npm run user:role -- fincantieri_users <telefono>
 ```
 
 Il comando aggiorna soltanto un profilo esistente e verifica il risultato.
@@ -409,6 +461,7 @@ content/published/site/{lang}/app-images.json
 
 ```text
 admin-users/users.csv
+whitelist-users/users.csv
 content/registration-login/form_registrazione_lista_aziende_cantieri.csv
 step2connect/img/{type}/{id}/{id}_{LANG}_{img|audio|video}.{ext}
 ```
@@ -465,8 +518,8 @@ minimo quando l’API non è disponibile.
 |---|---|---|---|
 | `POST` | `/api/users/account-status` | Pubblica, rate limited | Instrada login/registrazione |
 | `POST` | `/api/users/preview-admin` | Pubblica, rate limited | Crea challenge preview |
-| `POST` | `/api/users/preview-admin/verify` | Pubblica, rate limited | Verifica OTP preview |
-| `GET` | `/api/users/preview-admin/session` | JWT preview | Ripristina sessione preview |
+| `POST` | `/api/users/preview-admin/verify` | Pubblica, rate limited | Verifica codice admin o whitelist |
+| `GET` | `/api/users/preview-admin/session` | JWT preview | Ripristina e rivalida sessione admin o whitelist |
 | `GET` | `/api/users/me` | JWT Cognito | Legge nome e ruolo applicativo |
 | `GET` | `/api/registration-options` | Pubblica | Aziende e cantieri da CSV S3 |
 

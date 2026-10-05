@@ -60,6 +60,18 @@ Il `+` iniziale è obbligatorio. Prima di Cognito, il frontend chiama
 `/api/users/account-status` per scegliere tra registrazione, login Cognito e
 preview amministratore.
 
+Utenti Fincantieri/ELIS con codice personale:
+
+- CSV **privato** separato: `whitelist-users/users.csv`, stesso bucket contenuti;
+- colonne `phone,accessCode,firstName,lastName,company,enabled,notes`;
+- `accessCode` stringa di 6 cifre (preservare zeri iniziali), `enabled` esattamente `true`;
+- profilo DynamoDB già registrato; altrimenti registrazione Cognito invariata;
+- login e ripristino riusano le route preview e il tipo server `fincantieri_users`;
+- durata 30 giorni; revoca alla rivalidazione per rimozione, disabilitazione o cambio codice;
+- promozione automatica condizionale solo da `standard`, mai da `admin`;
+- nessun link CMS e nessuna autorizzazione CMS; admin preview e login CMS invariati;
+- nessun nuovo Secret; occorrono lettura S3 della chiave e lettura/UpdateItem DynamoDB.
+
 Preview admin:
 
 - profilo DynamoDB `type=admin`;

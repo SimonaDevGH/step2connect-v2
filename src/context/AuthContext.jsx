@@ -12,6 +12,7 @@ import {
 } from 'aws-amplify/auth';
 import '../lib/cognito.js'; // initialise Amplify once
 import { getMyProfile, syncProfile, getPreviewSession } from '../lib/userApi.js';
+import { buildPreviewUser } from '../lib/previewSession.js';
 
 const AuthContext = createContext(null);
 
@@ -52,7 +53,7 @@ function mergeProfileIntoUser(setUser, profile, expectedPhone) {
   setUser((current) => {
     if (!current || current.phone !== expectedPhone) return current;
     const firstName = typeof profile.firstName === 'string' ? profile.firstName.trim() : '';
-    const type = profile.type === 'admin' ? 'admin' : 'standard';
+    const type = ['admin', 'fincantieri_users'].includes(profile.type) ? profile.type : 'standard';
     return {
       ...current,
       type,
@@ -76,16 +77,7 @@ export function AuthProvider({ children }) {
         if (previewToken) {
           const previewProfile = await getPreviewSession(previewToken);
           if (previewProfile) {
-            setUser({
-              phone: '',
-              firstName: previewProfile.firstName ?? '',
-              lastName: '',
-              email: '',
-              company: '',
-              site: '',
-              name: previewProfile.firstName || 'Admin',
-              type: 'admin',
-            });
+            setUser(buildPreviewUser(previewProfile));
             setAuthReady(true);
             return;
           }
@@ -232,16 +224,7 @@ export function AuthProvider({ children }) {
 
   const loginPreviewSession = (previewSession) => {
     localStorage.setItem('s2c_preview_session', previewSession.token);
-    setUser({
-      phone: '',
-      firstName: previewSession.firstName ?? '',
-      lastName: '',
-      email: '',
-      company: '',
-      site: '',
-      name: previewSession.firstName || 'Admin',
-      type: 'admin',
-    });
+    setUser(buildPreviewUser(previewSession));
   };
 
   return (

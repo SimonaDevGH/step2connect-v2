@@ -58,6 +58,9 @@ function loadUsersRouter(profile, {
         findAdminByPhoneAndOTP: findCsvByPhoneAndOTP,
       };
     }
+    if (request === '../lib/whitelistUsers') {
+      return { findWhitelistByPhone: async () => null, matchesAccessCode: () => false };
+    }
     return originalLoad.call(this, request, parent, isMain);
   };
 
