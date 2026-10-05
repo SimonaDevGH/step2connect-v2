@@ -62,7 +62,7 @@ preview amministratore.
 
 Utenti Fincantieri/ELIS con codice personale:
 
-- CSV **privato** separato: `whitelist-users/users.csv`, stesso bucket contenuti;
+- CSV **privato** separato: `whitelist-users/whitelist-users.csv`, stesso bucket contenuti, senza ripiego legacy;
 - colonne `phone,accessCode,firstName,lastName,company,enabled,notes`;
 - `accessCode` stringa di 6 cifre (preservare zeri iniziali), `enabled` esattamente `true`;
 - profilo DynamoDB già registrato; altrimenti registrazione Cognito invariata;
@@ -76,7 +76,11 @@ Preview admin:
 
 - profilo DynamoDB `type=admin`;
 - `adminPsw=true`;
-- telefono e OTP sulla stessa riga di `admin-users/users.csv` in S3.
+- telefono e OTP sulla stessa riga di `admin-users/admin-users.csv` in S3.
+
+Il CSV admin ripiega su `admin-users/users.csv` **solo in lettura** se il nuovo
+file non esiste, con avviso nei log. Cambio password, reset e comandi operatore
+scrivono sempre `admin-users/admin-users.csv`.
 
 ## Registrazione
 

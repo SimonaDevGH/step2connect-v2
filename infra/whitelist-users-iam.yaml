@@ -21,4 +21,4 @@ Resources:
           - Sid: ReadPersonalCodeWhitelist
             Effect: Allow
             Action: s3:GetObject
-            Resource: !Sub arn:${AWS::Partition}:s3:::${ContentBucketName}/whitelist-users/users.csv
+            Resource: !Sub arn:${AWS::Partition}:s3:::${ContentBucketName}/whitelist-users/whitelist-users.csv

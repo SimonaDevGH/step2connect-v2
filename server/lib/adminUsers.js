@@ -1,5 +1,6 @@
 /**
- * Gestione utenti admin CMS — CSV su S3: admin-users/users.csv
+ * Gestione utenti admin CMS — CSV su S3: admin-users/admin-users.csv
+ * Ripiego di lettura legacy: admin-users/users.csv (mai usato per scrivere).
  * Formato: email,name,passwordHash,adminOTP,adminPhoneNumber,resetToken,resetExpiry
  * passwordHash = salt:hash  (scrypt, hex)
  * resetToken   = stringa hex 64 car. (opzionale, vuota se non in uso)
@@ -24,7 +25,8 @@ const s3 = new S3Client({
 });
 
 const BUCKET  = process.env.S3_BUCKET_NAME;
-const CSV_KEY = 'admin-users/users.csv';
+const CSV_KEY = 'admin-users/admin-users.csv';
+const LEGACY_CSV_KEY = 'admin-users/users.csv';
 const CSV_FIELDS = [
   'email',
   'name',
@@ -71,10 +73,17 @@ function parseLine(line, headerFields) {
   };
 }
 
-/** Legge tutti gli utenti dal CSV su S3. Restituisce [] se non esiste. */
+/** Legge il nuovo CSV; solo se assente tenta il legacy. Nessuna scrittura legacy. */
 async function getAdminUsers() {
   try {
-    const res = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: CSV_KEY }));
+    let res;
+    try {
+      res = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: CSV_KEY }));
+    } catch (err) {
+      if (err.name !== 'NoSuchKey' && err.$metadata?.httpStatusCode !== 404) throw err;
+      console.warn(`[admin-users] ${CSV_KEY} non trovato; ripiego in sola lettura su ${LEGACY_CSV_KEY}. Le scritture usano sempre ${CSV_KEY}.`);
+      res = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: LEGACY_CSV_KEY }));
+    }
     const text = await streamToString(res.Body);
     const lines = text.split(/\r?\n/);
     const headerFields = (lines.shift() || '')
@@ -91,7 +100,7 @@ async function getAdminUsers() {
   }
 }
 
-/** Sovrascrive il CSV su S3 con la lista aggiornata. */
+/** Scrive sempre admin-users/admin-users.csv, anche dopo una lettura legacy. */
 async function saveAdminUsers(users) {
   const body = HEADER + users
     .map((u) => [
