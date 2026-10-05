@@ -10,6 +10,25 @@ const ALLOWED_ATTRS = {
 };
 const ALLOWED_SCHEMES = { img: { src: ['http', 'https'] } };
 
+const optionalUrl = z.string().url().optional().or(z.literal(''));
+const optionalSortOrder = z.preprocess(
+  (value) => (value === '' || value === null || value === undefined ? undefined : value),
+  z.coerce.number().int().min(1).optional(),
+);
+const siteAssetsSchema = z.object({
+  homeHero: optionalUrl,
+  guidesHero: optionalUrl,
+  guidesDocuments: optionalUrl,
+  guidesHealth: optionalUrl,
+  guidesHomeBills: optionalUrl,
+  guidesSchool: optionalUrl,
+  guidesCityLife: optionalUrl,
+  guidesWork: optionalUrl,
+  analyzeDocumentHero: optionalUrl,
+  appLogo: optionalUrl,
+  partnerLogo: optionalUrl,
+}).default({});
+
 function sanitize(str) {
   if (typeof str !== 'string') return str;
   return sanitizeHtml(str, {
@@ -22,20 +41,22 @@ function sanitize(str) {
 const translationSchema = z.object({
   title:    z.string().min(1).max(500),
   body:     z.string().max(50000).default(''),
-  audioUrl: z.string().url().optional().or(z.literal('')),
-  videoUrl: z.string().url().optional().or(z.literal('')),
+  audioUrl: optionalUrl,
+  videoUrl: optionalUrl,
   metaDesc: z.string().max(300).default(''),
   emoji:    z.string().max(10).optional(),
-  imageUrl: z.string().url().optional().or(z.literal('')),
+  imageUrl: optionalUrl,
+  assets: siteAssetsSchema,
 });
 
 const contentSchema = z.object({
   id:       z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/),
-  type:     z.enum(['guides', 'news', 'library', 'pages']),
+  type:     z.enum(['guides', 'news', 'library', 'pages', 'site']),
   category: z.string().max(100).default(''),
+  sortOrder: optionalSortOrder,
   emoji:    z.string().max(10).default('📄'),
-  imageUrl: z.string().url().optional().or(z.literal('')),
-  videoUrl: z.string().url().optional().or(z.literal('')),
+  imageUrl: optionalUrl,
+  videoUrl: optionalUrl,
   url:      z.string().max(500).optional().or(z.literal('')), // percorso pubblico, obbligatorio per pages lato UI
   it: translationSchema,
   en: translationSchema,

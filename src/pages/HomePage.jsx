@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { MapPin, Newspaper, HelpCircle, BookOpen, Bell, Languages, Bot } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { useSiteImages } from '../context/SiteImagesContext';
 import { GUIDE_CATEGORIES } from '../data/guides';
 
 // Single source of truth: pull the 4 featured categories directly from
@@ -21,13 +22,14 @@ const TOOLS = [
 export default function HomePage() {
   const { t, lang } = useLanguage();
   const { user } = useAuth();
+  const siteImages = useSiteImages();
   const navigate = useNavigate();
 
   return (
     <div className="page-content home-page">
       {/* Hero */}
       <section className="hero">
-        <img src="/hero-venezia.jpg" alt="Famiglia a Venezia" className="hero-img" />
+        <img src={siteImages.homeHero} alt="" className="hero-img" />
         <div className="hero-overlay">
           <div className={`hero-text-block lang-${lang}`}>
             <h2 className="hero-title">

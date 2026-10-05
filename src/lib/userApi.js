@@ -93,7 +93,7 @@ export async function getPhoneAccountStatus(phone) {
 
     const data = await res.json();
     if (data?.exists === false) return { exists: false };
-    if (data?.exists === true && ['preview', 'cognito'].includes(data.flow)) {
+    if (data?.exists === true && ['preview', 'personal-code', 'cognito'].includes(data.flow)) {
       return { exists: true, flow: data.flow };
     }
     return null;
@@ -161,7 +161,8 @@ export async function verifyPreviewAdmin(phone, code, challenge) {
     });
     if (!res.ok) return null;
     const data = await res.json();
-    return data?.isAdmin === true && typeof data.token === 'string' ? data : null;
+    return ['admin', 'fincantieri_users'].includes(data?.type)
+      && typeof data.token === 'string' ? data : null;
   } catch {
     return null;
   }
@@ -177,7 +178,7 @@ export async function getPreviewSession(token) {
     });
     if (!res.ok) return null;
     const data = await res.json();
-    return data?.isAdmin === true && data.type === 'admin' ? data : null;
+    return ['admin', 'fincantieri_users'].includes(data?.type) ? data : null;
   } catch {
     return null;
   }

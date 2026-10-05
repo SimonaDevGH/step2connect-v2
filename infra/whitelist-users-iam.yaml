@@ -1,0 +1,24 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Read-only access to the private personal-code whitelist for Step2Connect
+
+Parameters:
+  BackendIamUserName:
+    Type: String
+    Default: step2connect-cms-backend
+  ContentBucketName:
+    Type: String
+
+Resources:
+  Step2ConnectWhitelistPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: step2connect-whitelist-read
+      Users:
+        - !Ref BackendIamUserName
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ReadPersonalCodeWhitelist
+            Effect: Allow
+            Action: s3:GetObject
+            Resource: !Sub arn:${AWS::Partition}:s3:::${ContentBucketName}/whitelist-users/fincantieri-users.csv

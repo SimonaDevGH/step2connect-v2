@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { AdminAuthProvider, useAdminAuth } from './context/AdminAuthContext';
+import { SiteImagesProvider, useSiteImages } from './context/SiteImagesContext';
 
 import LoginPage          from './pages/LoginPage';
 import HomePage           from './pages/HomePage';
@@ -94,6 +95,7 @@ function AppShell() {
   const { t, lang, changeLang } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
+  const siteImages = useSiteImages();
 
   if (!authReady) {
     return (
@@ -119,7 +121,7 @@ function AppShell() {
           <Menu size={26} />
         </button>
 
-        <img src="/logo-white.png" alt="Step2Connect" className="top-bar-logo" />
+        <img src={siteImages.appLogo} alt="Step2Connect" className="top-bar-logo" />
 
         <div className="top-lang-wrap">
           <button
@@ -182,16 +184,18 @@ export default function App() {
   return (
     <BrowserRouter>
       <LanguageProvider>
-        <AuthProvider>
-          <AdminAuthProvider>
-            <Routes>
-              {/* Area admin — routing completamente separato, senza Cognito */}
-              <Route path="/admin/*" element={<AdminShell />} />
-              {/* App principale */}
-              <Route path="/*"       element={<AppShell />} />
-            </Routes>
-          </AdminAuthProvider>
-        </AuthProvider>
+        <SiteImagesProvider>
+          <AuthProvider>
+            <AdminAuthProvider>
+              <Routes>
+                {/* Area admin — routing completamente separato, senza Cognito */}
+                <Route path="/admin/*" element={<AdminShell />} />
+                {/* App principale */}
+                <Route path="/*"       element={<AppShell />} />
+              </Routes>
+            </AdminAuthProvider>
+          </AuthProvider>
+        </SiteImagesProvider>
       </LanguageProvider>
     </BrowserRouter>
   );

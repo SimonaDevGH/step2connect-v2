@@ -6,15 +6,19 @@ const {
   getUserByPhone,
   isAdminProfile,
   isPreviewAdminProfile,
+  isStandardProfile,
+  promoteWhitelistUserByPhone,
 } = require('../lib/userProfiles');
 const {
   findAdminByPhone,
   findAdminByPhoneAndOTP,
 } = require('../lib/adminUsers');
+const { findWhitelistByPhone, matchesAccessCode } = require('../lib/whitelistUsers');
 
 const router = express.Router();
 const PREVIEW_CHALLENGE_TTL = '5m';
 const PREVIEW_SESSION_TTL = '8h';
+const USERS_SESSION_TTL = '30d';
 const PREVIEW_RATE_WINDOW_MS = 60_000;
 const PREVIEW_RATE_MAX = 10;
 const ACCOUNT_STATUS_RATE_MAX = 20;
@@ -111,6 +115,21 @@ function secureStringEqual(left, right) {
   return crypto.timingSafeEqual(leftBuffer, rightBuffer);
 }
 
+function whitelistCredentialVersion(secret, phone, code) {
+  return previewCredentialVersion(secret, `fincantieri_users:${phone}`, code);
+}
+
+function whitelistSessionProfile(profile, entry, phone) {
+  return {
+    isAdmin: false,
+    type: 'fincantieri_users',
+    phone,
+    firstName: profile.firstName || entry.firstName || '',
+    lastName: entry.lastName || '',
+    company: entry.company || '',
+  };
+}
+
 // Restituisce solo lo stato minimo necessario al routing pre-login.
 // La distinzione esistenza/flusso è richiesta dalla UX ed è limitata per IP.
 router.post('/account-status', limitAccountStatusAttempts, async (req, res) => {
@@ -121,9 +140,12 @@ router.post('/account-status', limitAccountStatusAttempts, async (req, res) => {
     const profile = await getUserByPhone(phone);
     if (!profile) return res.json({ exists: false });
 
+    const whitelisted = !isAdminProfile(profile)
+      && (isStandardProfile(profile) || profile.type === 'fincantieri_users')
+      ? await findWhitelistByPhone(phone) : null;
     res.json({
       exists: true,
-      flow: isPreviewAdminProfile(profile) ? 'preview' : 'cognito',
+      flow: isPreviewAdminProfile(profile) ? 'preview' : whitelisted ? 'personal-code' : 'cognito',
     });
   } catch (err) {
     console.error('[users] account status lookup error:', err);
@@ -168,7 +190,7 @@ router.post('/preview-admin/verify', limitPreviewAttempts, async (req, res) => {
   const challenge = typeof req.body?.challenge === 'string' ? req.body.challenge : '';
   const secret = getPreviewSecret();
 
-    if (!phone || !code || !challenge || !secret) {
+  if (!phone || !/^\d{6}$/.test(code) || !challenge || !secret) {
     return res.status(401).json({ isAdmin: false });
   }
 
@@ -180,10 +202,34 @@ router.post('/preview-admin/verify', limitPreviewAttempts, async (req, res) => {
     if (challengePayload.kind !== 'preview-challenge' || challengePayload.phone !== phone) {
       return res.status(401).json({ isAdmin: false });
     }
-    const [profile, csvAdmin] = await Promise.all([
-      getUserByPhone(phone),
-      findAdminByPhoneAndOTP(phone, code),
-    ]);
+    let profile = await getUserByPhone(phone);
+    if (!profile) return res.status(401).json({ isAdmin: false });
+
+    // Gli admin non possono mai passare dalla whitelist utenti.
+    if (!isAdminProfile(profile)) {
+      const entry = await findWhitelistByPhone(phone);
+      if (!(isStandardProfile(profile) || profile.type === 'fincantieri_users')
+        || !matchesAccessCode(entry, code)) {
+        return res.status(401).json({ isAdmin: false });
+      }
+      profile = await promoteWhitelistUserByPhone(phone);
+      if (profile?.type !== 'fincantieri_users') {
+        return res.status(401).json({ isAdmin: false });
+      }
+      const token = jwt.sign({
+        kind: 'preview-session',
+        phone,
+        type: 'fincantieri_users',
+        credentialVersion: whitelistCredentialVersion(secret, phone, entry.accessCode),
+      }, secret, {
+        expiresIn: USERS_SESSION_TTL,
+        issuer: PREVIEW_TOKEN_ISSUER,
+        audience: PREVIEW_TOKEN_AUDIENCE,
+      });
+      return res.json({ ...whitelistSessionProfile(profile, entry, phone), token });
+    }
+
+    const csvAdmin = await findAdminByPhoneAndOTP(phone, code);
     if (!isPreviewAdminProfile(profile) || !csvAdmin) {
       return res.status(401).json({ isAdmin: false });
     }
@@ -230,6 +276,19 @@ router.get('/preview-admin/session', async (req, res) => {
       return res.status(401).json({ isAdmin: false });
     }
     const profile = await getUserByPhone(payload.phone);
+    if (payload.type === 'fincantieri_users') {
+      if (profile?.type !== 'fincantieri_users') {
+        return res.status(401).json({ isAdmin: false });
+      }
+      const entry = await findWhitelistByPhone(payload.phone);
+      const currentVersion = entry
+        ? whitelistCredentialVersion(secret, payload.phone, entry.accessCode) : '';
+      if (!secureStringEqual(payload.credentialVersion, currentVersion)) {
+        return res.status(401).json({ isAdmin: false });
+      }
+      return res.json(whitelistSessionProfile(profile, entry, payload.phone));
+    }
+    if (payload.type !== 'admin') return res.status(401).json({ isAdmin: false });
     if (!isPreviewAdminProfile(profile)) {
       return res.status(401).json({ isAdmin: false });
     }
@@ -258,7 +317,7 @@ router.get('/me', requireAuth, async (req, res) => {
     const profile = await getUserByPhone(phone);
     res.json({
       firstName: typeof profile?.firstName === 'string' ? profile.firstName : '',
-      type: isAdminProfile(profile) ? 'admin' : 'standard',
+      type: ['admin', 'fincantieri_users'].includes(profile?.type) ? profile.type : 'standard',
     });
   } catch (err) {
     console.error('[users] profile lookup error:', err);

@@ -2,14 +2,25 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useSiteImages } from '../context/SiteImagesContext';
 import { getCategoryById, GUIDE_ITEMS } from '../data/guides';
+import { belongsToGuideCategory, orderGuideItems } from '../lib/guideOrdering';
 
 const API = '';
+const CATEGORY_IMAGE_KEYS = {
+  documents: 'guidesDocuments',
+  health: 'guidesHealth',
+  homeBills: 'guidesHomeBills',
+  school: 'guidesSchool',
+  cityLife: 'guidesCityLife',
+  work: 'guidesWork',
+};
 
 export default function GuideCategoryPage() {
   const { category } = useParams();
   const { t, lang }  = useLanguage();
   const navigate     = useNavigate();
+  const siteImages   = useSiteImages();
 
   const cat = getCategoryById(category);
   const [cmsItems, setCmsItems] = useState(null); // null = loading
@@ -24,7 +35,7 @@ export default function GuideCategoryPage() {
       .then((data) => {
         if (!cancelled && Array.isArray(data)) {
           // Filtra per categoria corrente
-          const filtered = data.filter((item) => item.category === category);
+          const filtered = data.filter((item) => belongsToGuideCategory(item, category));
           setCmsItems(filtered);
         }
       })
@@ -37,6 +48,7 @@ export default function GuideCategoryPage() {
   }
 
   const Icon = cat.icon;
+  const heroImage = siteImages[CATEGORY_IMAGE_KEYS[cat.id]] || cat.heroImage;
 
   // L'elenco pubblicato su S3 decide quali guide sono visibili. Il catalogo
   // statico serve solo a conservare l'ordine e le icone delle guide esistenti.
@@ -52,6 +64,7 @@ export default function GuideCategoryPage() {
     title:   cmsMap[id].title || null, // null → usa i18n
     desc:    cmsMap[id].metaDesc || null,
     emoji:   cmsMap[id]?.emoji || GUIDE_ITEMS[id]?.emoji || '📌',
+    sortOrder: Number.isFinite(cmsMap[id]?.sortOrder) ? cmsMap[id].sortOrder : null,
     }));
 
   // Nuovi item CMS non presenti nel catalogo statico.
@@ -62,17 +75,19 @@ export default function GuideCategoryPage() {
       title:   cmsMap[id].title,
       desc:    cmsMap[id].metaDesc || null,
       emoji:   cmsMap[id].emoji || '📌',
+      sortOrder: Number.isFinite(cmsMap[id]?.sortOrder) ? cmsMap[id].sortOrder : null,
     });
   });
+  const orderedItems = orderGuideItems(mergedItems);
 
   return (
     <div className="page-content">
       <div
-        className={`page-hero${cat.heroImage ? ' page-hero--image' : ''}`}
-        style={cat.heroImage ? {} : { background: cat.color }}
+        className={`page-hero${heroImage ? ' page-hero--image' : ''}`}
+        style={heroImage ? {} : { background: cat.color }}
       >
-        {cat.heroImage && <img src={cat.heroImage} alt="" className="page-hero-img" />}
-        <div className="page-hero-overlay" style={cat.heroImage ? { background: 'rgba(10,30,58,0.08)' } : {}}>
+        {heroImage && <img src={heroImage} alt="" className="page-hero-img" />}
+        <div className="page-hero-overlay" style={heroImage ? { background: 'rgba(10,30,58,0.08)' } : {}}>
           <button className="back-btn" onClick={() => navigate('/guides')}>
             <ChevronLeft size={24} /> {t('guidesTitle')}
           </button>
@@ -101,7 +116,7 @@ export default function GuideCategoryPage() {
             <div className="skeleton-line short" />
           </div>
         </div>
-      ) : mergedItems.length === 0 ? (
+      ) : orderedItems.length === 0 ? (
         <div className="coming-soon-wrap">
           <span className="coming-soon-emoji">🛠️</span>
           <p className="coming-soon-title">{t('comingSoon')}</p>
@@ -109,7 +124,7 @@ export default function GuideCategoryPage() {
         </div>
       ) : (
         <div className="guide-items-list">
-          {mergedItems.map(({ id, title, desc, emoji }) => (
+          {orderedItems.map(({ id, title, desc, emoji }) => (
             <button
               key={id}
               className="guide-item-card"

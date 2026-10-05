@@ -20,6 +20,12 @@ function isPreviewAdminProfile(profile) {
   return isAdminProfile(profile) && profile?.adminPsw === true;
 }
 
+function isStandardProfile(profile) {
+  return !!profile && (
+    profile.type === 'standard' || profile.type === undefined || profile.type === ''
+  );
+}
+
 async function getUserByPhone(phone, documentClient = client) {
   if (!phone) return null;
 
@@ -58,8 +64,8 @@ async function getUserByPhone(phone, documentClient = client) {
 
 async function setUserRoleByPhone(phone, role, documentClient = client) {
   if (!phone) throw new Error('Phone is required');
-  if (!['admin', 'standard'].includes(role?.type)) {
-    throw new Error('Role type must be admin or standard');
+  if (!['admin', 'standard', 'fincantieri_users'].includes(role?.type)) {
+    throw new Error('Role type must be admin, standard or fincantieri_users');
   }
   if (typeof role?.adminPsw !== 'boolean') {
     throw new Error('adminPsw must be a boolean');
@@ -89,9 +95,37 @@ async function setUserRoleByPhone(phone, role, documentClient = client) {
   return result.Attributes || null;
 }
 
+// Il login con codice può promuovere SOLO standard (anche type assente/vuoto), anche in caso di una
+// modifica concorrente del ruolo da parte dell'operatore.
+async function promoteWhitelistUserByPhone(phone, documentClient = client) {
+  const profile = await getUserByPhone(phone, documentClient);
+  if (profile?.type === 'fincantieri_users') return profile;
+  if (!isStandardProfile(profile) || !profile.userId) return null;
+  try {
+    const result = await documentClient.send(new UpdateCommand({
+      TableName: TABLE_NAME,
+      Key: { userId: profile.userId },
+      UpdateExpression: 'SET #type = :type',
+      ConditionExpression: '#phone = :phone AND (attribute_not_exists(#type) OR #type = :empty OR #type = :standard)',
+      ExpressionAttributeNames: { '#phone': 'phone', '#type': 'type' },
+      ExpressionAttributeValues: {
+        ':phone': phone, ':type': 'fincantieri_users', ':standard': 'standard', ':empty': '',
+      },
+      ReturnValues: 'ALL_NEW',
+    }));
+    return result.Attributes || null;
+  } catch (err) {
+    if (err.name !== 'ConditionalCheckFailedException') throw err;
+    const current = await getUserByPhone(phone, documentClient);
+    return current?.type === 'fincantieri_users' ? current : null;
+  }
+}
+
 module.exports = {
   getUserByPhone,
   isAdminProfile,
   isPreviewAdminProfile,
+  isStandardProfile,
   setUserRoleByPhone,
+  promoteWhitelistUserByPhone,
 };

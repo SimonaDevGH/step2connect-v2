@@ -1,11 +1,13 @@
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useSiteImages } from '../context/SiteImagesContext';
 
 const WA_NUMBER = '393490645720';
 
 export default function AnalyzeDocumentPage() {
   const { t } = useLanguage();
+  const siteImages = useSiteImages();
   const navigate = useNavigate();
 
   const waLink = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(t('analyzeWaText'))}`;
@@ -15,7 +17,7 @@ export default function AnalyzeDocumentPage() {
       <div
         className="page-hero"
         style={{
-          backgroundImage: 'url(/analyze-document.jpg)',
+          backgroundImage: `url("${siteImages.analyzeDocumentHero}")`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         }}

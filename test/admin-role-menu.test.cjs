@@ -9,6 +9,7 @@ const {
   getUserByPhone,
   isAdminProfile,
   isPreviewAdminProfile,
+  isStandardProfile,
   setUserRoleByPhone,
 } = require('../server/lib/userProfiles');
 const {
@@ -50,6 +51,7 @@ function loadUsersRouter(profile, {
         },
         isAdminProfile,
         isPreviewAdminProfile,
+        isStandardProfile,
       };
     }
     if (request === '../lib/adminUsers') {
@@ -57,6 +59,9 @@ function loadUsersRouter(profile, {
         findAdminByPhone: findCsvByPhone,
         findAdminByPhoneAndOTP: findCsvByPhoneAndOTP,
       };
+    }
+    if (request === '../lib/whitelistUsers') {
+      return { findWhitelistByPhone: async () => null, matchesAccessCode: () => false };
     }
     return originalLoad.call(this, request, parent, isMain);
   };

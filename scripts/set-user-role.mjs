@@ -4,6 +4,7 @@
  * Usage:
  *   npm run user:role -- promote <phone>
  *   npm run user:role -- standard <phone>
+ *   npm run user:role -- fincantieri_users <phone>
  *
  * This command is intentionally not exposed through HTTP. It uses the backend
  * AWS identity and updates only the matching existing profile.
@@ -35,10 +36,11 @@ const phone = normalizePhone(rawPhone);
 const roles = {
   promote: { type: 'admin', adminPsw: true },
   standard: { type: 'standard', adminPsw: false },
+  fincantieri_users: { type: 'fincantieri_users', adminPsw: false },
 };
 
 if (!roles[command] || !phone) {
-  console.error('Usage: npm run user:role -- <promote|standard> <phone>');
+  console.error('Usage: npm run user:role -- <promote|standard|fincantieri_users> <phone>');
   process.exit(1);
 }
 

@@ -2,6 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Save, Send, Upload, Music, Video } from 'lucide-react';
 import { useAdminAuth } from '../../context/AdminAuthContext';
+import {
+  SITE_IMAGES_ID,
+  SITE_IMAGE_GROUPS,
+  SITE_IMAGE_SLOTS,
+} from '../../lib/siteImages';
 
 // Route admin: URL sempre relativi (proxy Vite in dev, Express stesso origin in prod).
 const API = '';
@@ -10,9 +15,11 @@ const LANGS = [
   { code: 'en', label: 'English 🇬🇧' },
   { code: 'bn', label: 'বাংলা 🇧🇩' },
 ];
-const TYPES = ['guides', 'news', 'library', 'pages'];
+const TYPES = ['guides', 'news', 'library', 'pages', 'site'];
+const MEDIA_UPLOAD_LIMIT_MB = { img: 5, audio: 25, video: 100 };
 
 const GUIDE_CATEGORIES = [
+  { value: 'guides',    label: '📖 Guide pratiche — pagina principale' },
   { value: 'documents', label: '📄 Documenti e permessi' },
   { value: 'health',    label: '❤️ Salute' },
   { value: 'homeBills', label: '🏠 Casa e bollette' },
@@ -36,19 +43,32 @@ async function apiFetch(path, token, opts = {}) {
   return data;
 }
 
-const emptyLang = () => ({
-  title: '', body: '', audioUrl: '', videoUrl: '', metaDesc: '', emoji: '📄', imageUrl: '',
+const emptyLang = (type = 'guides') => ({
+  title: type === 'site' ? 'Immagini applicazione' : '',
+  body: '',
+  audioUrl: '',
+  videoUrl: '',
+  metaDesc: '',
+  emoji: type === 'site' ? '🖼️' : '📄',
+  imageUrl: '',
+  assets: {},
 });
-const defaultForm = () => ({
-  id: '', type: 'guides', category: '', url: '',
-  it: emptyLang(), en: emptyLang(), bn: emptyLang(),
+const defaultForm = (type = 'guides') => ({
+  id: type === 'site' ? SITE_IMAGES_ID : '',
+  type,
+  category: '',
+  sortOrder: '',
+  url: '',
+  it: emptyLang(type),
+  en: emptyLang(type),
+  bn: emptyLang(type),
 });
 
 const LANGUAGE_NAMES = { it: 'italiano', en: 'inglese', bn: 'bengalese' };
 
 function validationIssueMessage(issue) {
   const path = Array.isArray(issue.path) ? issue.path : [];
-  const [section, field] = path;
+    const [section, field] = path;
   const language = LANGUAGE_NAMES[section];
 
   if (section === 'id') {
@@ -62,6 +82,9 @@ function validationIssueMessage(issue) {
   if (section === 'type') return 'Seleziona un tipo di contenuto valido.';
   if (section === 'category' && issue.code === 'too_big') {
     return 'La categoria non può superare 100 caratteri.';
+  }
+  if (section === 'sortOrder') {
+    return 'L’ordine deve essere un numero intero uguale o superiore a 1.';
   }
   if (section === 'url') {
     if (issue.message?.includes('obbligatorio')) return 'Per le pagine CMS l’URL pubblico è obbligatorio.';
@@ -86,6 +109,9 @@ function validationIssueMessage(issue) {
     if (['audioUrl', 'videoUrl', 'imageUrl'].includes(field)) {
       const labels = { audioUrl: 'audio', videoUrl: 'video', imageUrl: 'immagine' };
       return `L’URL ${labels[field]} in ${language} non è valido. Usa un indirizzo completo che inizi con http:// o https://.`;
+    }
+    if (field === 'assets') {
+      return `L’URL dell’immagine in ${language} non è valido. Usa un indirizzo completo che inizi con http:// o https://.`;
     }
     if (field === 'emoji' && issue.code === 'too_big') {
       return `L’icona in ${language} non può superare 10 caratteri.`;
@@ -124,7 +150,7 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
   const { adminToken, logout } = useAdminAuth();
   const navigate = useNavigate();
 
-  const [form,         setForm]         = useState(() => ({ ...defaultForm(), type: contentType || 'guides' }));
+  const [form,         setForm]         = useState(() => defaultForm(contentType || 'guides'));
   // Mantiene l'ID dell'ultimo draft salvato: dopo una rinomina il successivo
   // "Pubblica" deve puntare alla nuova chiave S3, non a quella precedente.
   const [savedId,      setSavedId]      = useState(contentId || '');
@@ -134,7 +160,7 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
   const [error,        setError]        = useState('');
   const [fieldErrors,  setFieldErrors]  = useState({});
   const [success,      setSuccess]      = useState('');
-  const [uploadingImg, setUploadingImg] = useState('');
+  const [uploadingMedia, setUploadingMedia] = useState('');
 
   const handleAuthError = (err) => {
     if (err.message.includes('401') || err.message.toLowerCase().includes('token')) {
@@ -176,6 +202,20 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
   const setLangField = (lang, field, value) => {
     setForm((prev) => ({ ...prev, [lang]: { ...prev[lang], [field]: value } }));
     clearFieldError(`${lang}.${field}`);
+  };
+
+  const setLangAsset = (lang, asset, value) => {
+    setForm((prev) => ({
+      ...prev,
+      [lang]: {
+        ...prev[lang],
+        assets: {
+          ...(prev[lang]?.assets || {}),
+          [asset]: value,
+        },
+      },
+    }));
+    clearFieldError(`${lang}.assets.${asset}`);
   };
 
   const showRequestError = (err, fallback) => {
@@ -235,27 +275,37 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
     }
   };
 
-  const handleImageUpload = async (lang, e) => {
+  const handleMediaUpload = async (lang, kind, e, asset = '') => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setUploadingImg(lang);
+    if (file.size > MEDIA_UPLOAD_LIMIT_MB[kind] * 1024 * 1024) {
+      setError(`File troppo grande: il limite per ${kind} è ${MEDIA_UPLOAD_LIMIT_MB[kind]} MB.`);
+      e.target.value = '';
+      return;
+    }
+    const uploadKey = asset ? `${lang}:${asset}` : `${lang}:${kind}`;
+    setUploadingMedia(uploadKey);
     setError('');
+    setSuccess('');
     try {
       const fd = new FormData();
       fd.append('file', file);
+      const uploadParams = new URLSearchParams({ lang, mediaType: kind });
+      if (asset) uploadParams.set('slot', asset);
       const data = await apiFetch(
-        `/api/admin/content/${form.type}/${form.id || 'new'}/media`,
+        `/api/admin/content/${form.type}/${form.id || 'new'}/media?${uploadParams}`,
         adminToken,
         { method: 'POST', body: fd }
       );
-      setLangField(lang, 'imageUrl', data.url);
-      setSuccess('Immagine caricata ✓');
+      if (asset) setLangAsset(lang, asset, data.url);
+      else setLangField(lang, { img: 'imageUrl', audio: 'audioUrl', video: 'videoUrl' }[kind], data.url);
+      setSuccess('File caricato. Salva la bozza o pubblica per collegarlo al contenuto.');
     } catch (err) {
       handleAuthError(err);
-      setFieldErrors({});
       setError('Upload fallito: ' + err.message);
     } finally {
-      setUploadingImg('');
+      e.target.value = '';
+      setUploadingMedia('');
     }
   };
 
@@ -263,8 +313,11 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
 
   const isPages    = form.type === 'pages';
   const isGuides   = form.type === 'guides';
+  const isSite     = form.type === 'site';
   const guidePath  = isGuides && form.category && form.id
-    ? `/guides/${form.category}/${form.id}`
+    ? (form.category === 'guides'
+      ? `/guides/${form.id}`
+      : `/guides/${form.category}/${form.id}`)
     : '';
 
   return (
@@ -293,6 +346,7 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
         {success && <div className="admin-success">✓ {success}</div>}
 
         {/* Metadati base */}
+        {!isSite ? (
         <div className="admin-section">
           <label className="admin-label">{isGuides ? 'Nome pagina / ID *' : 'ID univoco *'}</label>
           <input
@@ -345,6 +399,27 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
           )}
           <FieldError fieldErrors={fieldErrors} path="category" />
 
+          {isGuides && (
+            <>
+              <label className="admin-label">Ordine nella categoria</label>
+              <input
+                className={`admin-input${fieldErrors.sortOrder ? ' admin-input--error' : ''}`}
+                type="number"
+                min="1"
+                step="1"
+                value={form.sortOrder ?? ''}
+                onChange={(e) => setBaseField('sortOrder', e.target.value)}
+                placeholder="es. 1"
+                aria-invalid={Boolean(fieldErrors.sortOrder)}
+              />
+              <p className="admin-hint">
+                Inserisci 1 per il primo contenuto, 2 per il secondo e così via.
+                I contenuti senza numero vengono mostrati dopo quelli ordinati.
+              </p>
+              <FieldError fieldErrors={fieldErrors} path="sortOrder" />
+            </>
+          )}
+
           {/* URL libero per le pagine CMS. Per le guide viene sempre calcolato da categoria + ID. */}
           {isPages && (
             <>
@@ -364,12 +439,49 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
             </>
           )}
         </div>
+        ) : (
+          <div className="admin-section">
+            <h3 style={{ marginTop: 0 }}>Immagini generali della webApp</h3>
+            <p className="admin-hint">
+              Questa sezione controlla le immagini delle pagine che non hanno un
+              contenuto CMS dedicato. Le modifiche diventano visibili solo dopo
+              la pubblicazione.
+            </p>
+          </div>
+        )}
 
         <p className="admin-language-intro">
-          Compila ogni lingua separatamente. Titolo, testo, media, immagine e icona
-          vengono salvati solo nella rispettiva versione. I titoli contrassegnati
-          con * sono obbligatori in italiano, inglese e bengalese.
+          {isSite
+            ? 'Carica le immagini separatamente per italiano, inglese e bengalese. Se un campo resta vuoto, la webApp usa automaticamente l’immagine predefinita attuale.'
+            : 'Compila ogni lingua separatamente. Titolo, testo, media, immagine e icona vengono salvati solo nella rispettiva versione. I titoli contrassegnati con * sono obbligatori in italiano, inglese e bengalese.'}
         </p>
+
+        {isSite && (
+          <nav className="admin-site-jump-menu" aria-label="Vai alla sezione immagini">
+            <label htmlFor="site-image-section">Vai alla sezione</label>
+            <select
+              id="site-image-section"
+              defaultValue=""
+              onChange={(event) => {
+                const target = document.getElementById(event.target.value);
+                target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                event.target.value = '';
+              }}
+            >
+              <option value="" disabled>Scegli lingua e pagina…</option>
+              {LANGS.flatMap(({ code, label }) =>
+                SITE_IMAGE_GROUPS.map((group) => (
+                  <option
+                    key={`${code}-${group.key}`}
+                    value={`site-images-${code}-${group.key}`}
+                  >
+                    {label} — {group.label}
+                  </option>
+                ))
+              )}
+            </select>
+          </nav>
+        )}
 
         {LANGS.map(({ code, label }) => {
           const language = form[code];
@@ -377,6 +489,68 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
             <section className="admin-language-section" key={code}>
               <h3 className="admin-language-heading">{label}</h3>
 
+              {isSite ? (
+                <div className="admin-site-images">
+                  {SITE_IMAGE_GROUPS.map((group) => (
+                    <section
+                      id={`site-images-${code}-${group.key}`}
+                      className="admin-site-image-group"
+                      key={group.key}
+                    >
+                      <h4>{group.label}</h4>
+                      {SITE_IMAGE_SLOTS.filter((slot) => slot.group === group.key).map((slot) => {
+                    const value = language.assets?.[slot.key] || '';
+                    const uploadKey = `${code}:${slot.key}`;
+                    return (
+                      <div className="admin-site-image-field" key={slot.key}>
+                        <label className="admin-label">{slot.label}</label>
+                        {value && (
+                          <img
+                            src={value}
+                            alt={`Anteprima ${slot.label} — ${label}`}
+                            className="admin-img-preview"
+                          />
+                        )}
+                        <div className="admin-site-image-actions">
+                          <label className="admin-upload-btn">
+                            {uploadingMedia === uploadKey
+                              ? 'Caricamento…'
+                              : <><Upload size={16} /> Carica / sostituisci</>}
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp,image/gif"
+                              onChange={(e) => handleMediaUpload(code, 'img', e, slot.key)}
+                              style={{ display: 'none' }}
+                              disabled={Boolean(uploadingMedia)}
+                            />
+                          </label>
+                          {value && (
+                            <button
+                              type="button"
+                              className="admin-refresh-btn"
+                              onClick={() => setLangAsset(code, slot.key, '')}
+                            >
+                              Rimuovi
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          className={`admin-input${fieldErrors[`${code}.assets.${slot.key}`] ? ' admin-input--error' : ''}`}
+                          type="url"
+                          value={value}
+                          onChange={(e) => setLangAsset(code, slot.key, e.target.value)}
+                          placeholder={`URL immagine; fallback: ${slot.fallback}`}
+                          aria-invalid={Boolean(fieldErrors[`${code}.assets.${slot.key}`])}
+                        />
+                        <FieldError fieldErrors={fieldErrors} path={`${code}.assets.${slot.key}`} />
+                      </div>
+                    );
+                      })}
+                    </section>
+                  ))}
+                </div>
+              ) : (
+                <>
               <label className="admin-label">Titolo ({code.toUpperCase()}) *</label>
               <input
                 className={`admin-input${fieldErrors[`${code}.title`] ? ' admin-input--error' : ''}`}
@@ -450,28 +624,50 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
 
               <label className="admin-label">
                 <Music size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} />
-                Audio MP3 ({code.toUpperCase()}) — opzionale
+                Audio ({code.toUpperCase()}) — opzionale
               </label>
+              <label className="admin-upload-btn">
+                {uploadingMedia === `${code}:audio` ? 'Caricamento audio…' : <><Upload size={16} /> Carica audio {code.toUpperCase()}</>}
+                <input
+                  type="file"
+                  accept=".mp3,.m4a,.wav,.ogg,audio/mpeg,audio/mp4,audio/wav,audio/ogg"
+                  onChange={(e) => handleMediaUpload(code, 'audio', e)}
+                  style={{ display: 'none' }}
+                  disabled={Boolean(uploadingMedia) || !form.id}
+                />
+              </label>
+              {language.audioUrl && <audio controls preload="none" src={language.audioUrl} className="admin-media-preview" />}
               <input
                 className={`admin-input${fieldErrors[`${code}.audioUrl`] ? ' admin-input--error' : ''}`}
                 type="url"
                 value={language.audioUrl}
                 onChange={(e) => setLangField(code, 'audioUrl', e.target.value)}
-                placeholder="https://…/audio.mp3"
+                placeholder="URL audio (oppure carica un file, max 25 MB)"
                 aria-invalid={Boolean(fieldErrors[`${code}.audioUrl`])}
               />
               <FieldError fieldErrors={fieldErrors} path={`${code}.audioUrl`} />
 
               <label className="admin-label">
                 <Video size={14} style={{ marginRight: 4, verticalAlign: 'middle' }} />
-                URL video ({code.toUpperCase()}) — opzionale
+                Video ({code.toUpperCase()}) — opzionale
               </label>
+              <label className="admin-upload-btn">
+                {uploadingMedia === `${code}:video` ? 'Caricamento video…' : <><Upload size={16} /> Carica video {code.toUpperCase()}</>}
+                <input
+                  type="file"
+                  accept=".mp4,.webm,.mov,video/mp4,video/webm,video/quicktime"
+                  onChange={(e) => handleMediaUpload(code, 'video', e)}
+                  style={{ display: 'none' }}
+                  disabled={Boolean(uploadingMedia) || !form.id}
+                />
+              </label>
+              {language.videoUrl && <video controls preload="none" src={language.videoUrl} className="admin-media-preview" />}
               <input
                 className={`admin-input${fieldErrors[`${code}.videoUrl`] ? ' admin-input--error' : ''}`}
                 type="url"
                 value={language.videoUrl}
                 onChange={(e) => setLangField(code, 'videoUrl', e.target.value)}
-                placeholder="https://…/video.mp4"
+                placeholder="URL video (oppure carica un file, max 100 MB)"
                 aria-invalid={Boolean(fieldErrors[`${code}.videoUrl`])}
               />
               <FieldError fieldErrors={fieldErrors} path={`${code}.videoUrl`} />
@@ -492,17 +688,17 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
                 <img src={language.imageUrl} alt={`Anteprima ${label}`} className="admin-img-preview" />
               )}
               <label className="admin-upload-btn">
-                {uploadingImg === code ? 'Caricamento…' : <><Upload size={16} /> Carica immagine {code.toUpperCase()}</>}
+                {uploadingMedia === `${code}:img` ? 'Caricamento…' : <><Upload size={16} /> Carica immagine {code.toUpperCase()}</>}
                 <input
                   type="file"
-                  accept="image/*"
-                  onChange={(e) => handleImageUpload(code, e)}
+                  accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif"
+                  onChange={(e) => handleMediaUpload(code, 'img', e)}
                   style={{ display: 'none' }}
-                  disabled={Boolean(uploadingImg) || !form.id}
+                  disabled={Boolean(uploadingMedia) || !form.id}
                 />
               </label>
               {!form.id && (
-                <p className="admin-hint">Inserisci prima un ID per caricare l'immagine</p>
+                <p className="admin-hint">Inserisci prima un ID per caricare immagini, audio e video</p>
               )}
               <input
                 className={`admin-input${fieldErrors[`${code}.imageUrl`] ? ' admin-input--error' : ''}`}
@@ -513,6 +709,8 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
                 aria-invalid={Boolean(fieldErrors[`${code}.imageUrl`])}
               />
               <FieldError fieldErrors={fieldErrors} path={`${code}.imageUrl`} />
+                </>
+              )}
             </section>
           );
         })}
@@ -522,14 +720,14 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
           <button
             className="admin-btn-draft"
             onClick={handleSaveDraft}
-            disabled={saving || !form.id}
+            disabled={saving || publishing || Boolean(uploadingMedia) || !form.id}
           >
             {saving ? 'Salvataggio…' : <><Save size={16} /> Salva bozza</>}
           </button>
           <button
             className="admin-btn-publish"
             onClick={handlePublish}
-            disabled={publishing || !form.id}
+            disabled={publishing || saving || Boolean(uploadingMedia) || !form.id}
           >
             {publishing ? 'Pubblicazione…' : <><Send size={16} /> Pubblica</>}
           </button>

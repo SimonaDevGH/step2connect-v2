@@ -19,7 +19,6 @@ Il backend vive in `server/` con `server/package.json: { "type": "commonjs" }` p
 - Le route `/api/admin/auth/*` (login/me) sono pubbliche.
 
 ## Gestione utenti admin CMS
-- CSV su S3: `admin-users/users.csv` — colonne `email,name,passwordHash`
 - Hash: `crypto.scryptSync(password, salt, 64)` → formato `salt:hash` (hex)
 - Gestione da riga di comando: `node scripts/manage-admin-users.mjs add|remove|list`
 - JWT firmato con `SESSION_SECRET`, scadenza 8 ore, memorizzato in `localStorage('adminToken')`

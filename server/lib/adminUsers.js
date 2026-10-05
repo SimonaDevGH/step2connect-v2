@@ -91,7 +91,7 @@ async function getAdminUsers() {
   }
 }
 
-/** Sovrascrive il CSV su S3 con la lista aggiornata. */
+/** Sovrascrive admin-users/users.csv su S3 con la lista aggiornata. */
 async function saveAdminUsers(users) {
   const body = HEADER + users
     .map((u) => [

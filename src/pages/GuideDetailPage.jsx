@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { getCategoryById, GUIDE_ITEMS } from '../data/guides';
+import { FEATURED_SERVICE_GUIDE_ID } from '../lib/guideOrdering';
 
 // L'API pubblica è sullo stesso origin dell'app: in sviluppo Vite inoltra
 // /api a Express e in produzione Express serve entrambe le parti.
@@ -46,6 +47,9 @@ export default function GuideDetailPage({ directCategory, directItem }) {
   const hasBody      = cmsContent?.body && cmsContent.body.trim().length > 0;
   const hasPublishedContent = cmsContent !== undefined && cmsContent !== null;
   const hasCoverImage = Boolean(cmsContent?.imageUrl);
+  const isFeaturedServiceGuide = item === FEATURED_SERVICE_GUIDE_ID;
+  const backPath = isFeaturedServiceGuide ? '/guides' : `/guides/${category}`;
+  const backLabel = isFeaturedServiceGuide ? t('guidesTitle') : t(`guideCat_${category}`);
   const isResidencePermitGuide =
     item === 'permitRequest' ||
     /permesso di soggiorno|residence permit|বাসস্থান পারমিট/i.test(displayTitle);
@@ -73,8 +77,8 @@ export default function GuideDetailPage({ directCategory, directItem }) {
         <div
           className={hasCoverImage ? 'page-hero-overlay guide-detail-hero-overlay' : undefined}
         >
-          <button className="back-btn" onClick={() => navigate(`/guides/${category}`)}>
-            <ChevronLeft size={24} /> {t(`guideCat_${category}`)}
+          <button className="back-btn" onClick={() => navigate(backPath)}>
+            <ChevronLeft size={24} /> {backLabel}
           </button>
           <div className="page-hero-icon">{cmsContent?.emoji || meta?.emoji || '📌'}</div>
           <h2 className="page-hero-title">{displayTitle}</h2>

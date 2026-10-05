@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { X, Home, BookOpen, HelpCircle, FileSearch, MapPin, Bell, ShieldCheck, Languages, LogOut, Settings } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { useSiteImages } from '../context/SiteImagesContext';
 import { isCmsAdmin } from '../lib/userRoles';
 
 const LANGS = [
@@ -13,6 +14,7 @@ const LANGS = [
 export default function SideMenu({ open, onClose }) {
   const { t, lang, changeLang } = useLanguage();
   const { user, logout } = useAuth();
+  const siteImages = useSiteImages();
   const navigate = useNavigate();
 
   const go = (path) => { navigate(path); onClose(); };
@@ -97,7 +99,7 @@ export default function SideMenu({ open, onClose }) {
 
           {/* Logo Fincantieri bianco */}
           <div className="side-menu-partner">
-            <img src="/logo-fincantieri-white.png" alt="Fincantieri everyDEI" className="fincantieri-logo" />
+            <img src={siteImages.partnerLogo} alt="Fincantieri everyDEI" className="fincantieri-logo" />
           </div>
         </div>
       </aside>

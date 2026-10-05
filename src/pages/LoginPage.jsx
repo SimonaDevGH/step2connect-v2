@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Phone, Hash, User, Mail, Building2, HardHat } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { useSiteImages } from '../context/SiteImagesContext';
 import {
   checkPreviewAdmin,
   getPhoneAccountStatus,
@@ -21,6 +22,7 @@ const LANGS = [
 export default function LoginPage() {
   const { t, lang, changeLang } = useLanguage();
   const { login, requestOTP, loginPreviewSession } = useAuth();
+  const siteImages = useSiteImages();
   const navigate = useNavigate();
 
   const [mode, setMode] = useState('login'); // 'login' | 'register'
@@ -137,12 +139,13 @@ export default function LoginPage() {
       return;
     }
 
-    if (flow.kind === 'admin-preview-code') {
+    if (['admin-preview-code', 'personal-access-code'].includes(flow.kind)) {
       setOtpMeta({
         phoneE164: phone,
         isRegister: false,
         userData: {},
-        isPreviewAdmin: true,
+        isPreviewAdmin: flow.kind === 'admin-preview-code',
+        isPersonalCode: flow.kind === 'personal-access-code',
         previewChallenge: flow.challenge,
       });
       setStep('otp');
@@ -168,7 +171,7 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
 
-    if (otpMeta.isPreviewAdmin) {
+    if (otpMeta.isPreviewAdmin || otpMeta.isPersonalCode) {
       const previewSession = await verifyPreviewAdmin(
         phone,
         otp,
@@ -176,7 +179,7 @@ export default function LoginPage() {
       );
       if (!previewSession) {
         setLoading(false);
-        setError('Codice preview non valido');
+        setError(t('accessCodeInvalid'));
         return;
       }
       loginPreviewSession(previewSession);
@@ -201,6 +204,7 @@ export default function LoginPage() {
   };
 
   const handleRequestSmsOTP = async () => {
+    if (otpMeta.isPersonalCode) return;
     setLoading(true);
     setError('');
     const result = await requestOTP(phone, {});
@@ -222,7 +226,7 @@ export default function LoginPage() {
     <div className="login-page">
       {/* Header */}
       <div className="login-header">
-        <img src="/logo-white.png" alt="Step2Connect" className="login-logo-img" />
+        <img src={siteImages.appLogo} alt="Step2Connect" className="login-logo-img" />
         <p className="login-tagline">{t('tagline')}</p>
 
         {/* Language selector */}
@@ -416,7 +420,8 @@ export default function LoginPage() {
         ) : (
           <>
             <p className="otp-hint">
-              {otpMeta.isPreviewAdmin ? t('accessCodePrompt') : t('otpSent')}:{' '}
+              {otpMeta.isPersonalCode ? t('personalAccessCodePrompt')
+                : otpMeta.isPreviewAdmin ? t('accessCodePrompt') : t('otpSent')}:{' '}
               <strong>{otpMeta.phoneE164 || phone}</strong>
             </p>
             <div className="input-group">
@@ -426,7 +431,8 @@ export default function LoginPage() {
                 type="text"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
-                placeholder={t('otpPlaceholder')}
+                placeholder={t(otpMeta.isPersonalCode ? 'personalAccessCodePlaceholder' : 'otpPlaceholder')}
+                aria-label={t(otpMeta.isPersonalCode ? 'personalAccessCodePlaceholder' : 'otpPlaceholder')}
                 inputMode="numeric"
               />
             </div>
@@ -438,7 +444,7 @@ export default function LoginPage() {
             >
               {loading ? '...' : t('verifyOtp')}
             </button>
-            {!otpMeta.isRegister && (
+            {!otpMeta.isRegister && !otpMeta.isPersonalCode && (
               <>
                 <p className="otp-resend-hint">{t('otpResendHint')}</p>
                 <button
