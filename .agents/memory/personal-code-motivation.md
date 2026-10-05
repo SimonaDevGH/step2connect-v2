@@ -26,3 +26,15 @@ dall'autenticazione amministrativa.
 **How to apply:** non rinominare il CSV admin né introdurre percorsi alternativi
 come parte di modifiche alla whitelist. I percorsi effettivi sono documentati
 in replit.md.
+
+## Profili registrati senza ruolo
+
+L'utente segnala che i profili DynamoDB creati dalla registrazione spesso non
+hanno proprio l'attributo `type`, non soltanto un valore vuoto.
+
+**Why:** il flusso con codice personale deve funzionare anche per questi
+profili già registrati, evitando SMS quando sono nella whitelist attiva.
+
+**How to apply:** non presumere che la registrazione abbia assegnato un ruolo
+esplicito. Non effettuare promozioni generalizzate dei profili senza ruolo:
+fuori dalla whitelist attiva devono conservare il flusso Cognito.

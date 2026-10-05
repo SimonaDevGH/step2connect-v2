@@ -68,7 +68,8 @@ Utenti Fincantieri/ELIS con codice personale:
 - profilo DynamoDB già registrato; altrimenti registrazione Cognito invariata;
 - login e ripristino riusano le route preview e il tipo server `fincantieri_users`;
 - durata 30 giorni; revoca alla rivalidazione per rimozione, disabilitazione o cambio codice;
-- promozione automatica condizionale solo da `standard`, mai da `admin`;
+- `type` assente o stringa vuota equivale a `standard` per il codice personale;
+- promozione automatica condizionale solo da `standard` o `type` assente/vuoto, mai da `admin` o altri valori;
 - nessun link CMS e nessuna autorizzazione CMS; admin preview e login CMS invariati;
 - nessun nuovo Secret; occorrono lettura S3 della chiave e lettura/UpdateItem DynamoDB.
 

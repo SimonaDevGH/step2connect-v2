@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const jwt = require('jsonwebtoken');
 const express = require('express');
 const { parseWhitelistUsers, findWhitelistByPhone, matchesAccessCode } = require('../server/lib/whitelistUsers');
-const { isAdminProfile, isPreviewAdminProfile, promoteWhitelistUserByPhone, setUserRoleByPhone } = require('../server/lib/userProfiles');
+const { isAdminProfile, isPreviewAdminProfile, isStandardProfile, promoteWhitelistUserByPhone, setUserRoleByPhone } = require('../server/lib/userProfiles');
 const { findAdminByPhone, findAdminByPhoneAndOTP } = require('../server/lib/adminUsers');
 const { requireAdminJWT } = require('../server/middleware/adminAuth');
 
@@ -16,18 +16,29 @@ const ENTRY = { phone: PHONE, accessCode: CODE, firstName: 'Test', lastName: 'Us
 // Real HTTP, JWT, rate middleware and CSV/code checks; no requests to live AWS.
 async function harness(t, profile) {
   const state = { profile, users: [{ ...ENTRY }], admins: [], promotions: 0 };
+  const documentClient = { async send(command) {
+    if (command.constructor.name === 'ScanCommand') return { Items: state.profile ? [state.profile] : [] };
+    assert.equal(command.constructor.name, 'UpdateCommand');
+    assert.equal(command.input.ConditionExpression,
+      '#phone = :phone AND (attribute_not_exists(#type) OR #type = :empty OR #type = :standard)');
+    assert.equal(command.input.ExpressionAttributeValues[':empty'], '');
+    assert.equal(command.input.ExpressionAttributeValues[':standard'], 'standard');
+    if (state.profile?.phone !== command.input.ExpressionAttributeValues[':phone']
+      || !isStandardProfile(state.profile)) {
+      const err = new Error('Condition failed');
+      err.name = 'ConditionalCheckFailedException';
+      throw err;
+    }
+    state.profile = { ...state.profile, type: command.input.ExpressionAttributeValues[':type'] };
+    state.promotions++;
+    return { Attributes: state.profile };
+  } };
   const originalLoad = Module._load;
   Module._load = function(request, parent, isMain) {
     if (request === '../lib/userProfiles') return {
       getUserByPhone: async () => state.profile,
-      isAdminProfile, isPreviewAdminProfile,
-      promoteWhitelistUserByPhone: async () => {
-        if (state.profile?.type === 'standard') {
-          state.profile = { ...state.profile, type: 'fincantieri_users' };
-          state.promotions++;
-        }
-        return state.profile?.type === 'fincantieri_users' ? state.profile : null;
-      },
+      isAdminProfile, isPreviewAdminProfile, isStandardProfile,
+      promoteWhitelistUserByPhone: () => promoteWhitelistUserByPhone(PHONE, documentClient),
     };
     if (request === '../lib/whitelistUsers') return {
       findWhitelistByPhone: (phone) => findWhitelistByPhone(phone, async () => {
@@ -172,6 +183,74 @@ test('removed, disabled or changed codes revoke sessions and disabled whitelist 
   assert.equal((await api('/preview-admin/session', null, result.body.token)).status, 401);
 });
 
+for (const initialType of [undefined, '']) {
+  test(`profile with ${initialType === undefined ? 'absent' : 'empty'} type logs in without SMS and is promoted through DynamoDB adapter`, async (t) => {
+    const profile = { userId: 'test', phone: PHONE };
+    if (initialType !== undefined) profile.type = initialType;
+    const { state, api, verify } = await harness(t, profile);
+    const { beginPhoneLogin } = await import('../src/lib/loginFlow.js');
+    let smsCalls = 0;
+    const flow = await beginPhoneLogin({
+      mode: 'login', phone: PHONE,
+      getPhoneAccountStatus: async () => (await api('/account-status', { phone: PHONE })).body,
+      checkPreviewAdmin: async () => (await api('/preview-admin', { phone: PHONE })).body,
+      requestOTP: async () => { smsCalls++; return { success: true }; },
+    });
+    assert.equal(flow.kind, 'personal-access-code');
+    assert.equal(smsCalls, 0);
+    assert.equal((await verify('999999')).status, 401);
+    assert.equal(state.profile.type, initialType);
+    assert.equal(state.promotions, 0);
+    const result = await verify();
+    assert.equal(result.status, 200);
+    assert.equal(result.body.type, 'fincantieri_users');
+    assert.equal(result.body.isAdmin, false);
+    assert.equal(state.profile.type, 'fincantieri_users');
+    assert.equal(state.promotions, 1);
+    assert.equal((await api('/preview-admin/session', null, result.body.token)).status, 200);
+  });
+
+  test(`profile with ${initialType === undefined ? 'absent' : 'empty'} type outside enabled whitelist stays on Cognito`, async (t) => {
+    const profile = { userId: 'test', phone: PHONE };
+    if (initialType !== undefined) profile.type = initialType;
+    const { state, api, verify } = await harness(t, profile);
+    const { beginPhoneLogin } = await import('../src/lib/loginFlow.js');
+    for (const users of [[], [{ ...ENTRY, enabled: 'false' }]]) {
+      state.users = users;
+      const status = (await api('/account-status', { phone: PHONE })).body;
+      assert.deepEqual(status, { exists: true, flow: 'cognito' });
+      let smsCalls = 0;
+      const flow = await beginPhoneLogin({
+        mode: 'login', phone: PHONE, getPhoneAccountStatus: async () => status,
+        checkPreviewAdmin: async () => { throw new Error('Must not call preview'); },
+        requestOTP: async () => { smsCalls++; return { success: true }; },
+      });
+      assert.equal(flow.kind, 'otp');
+      assert.equal(smsCalls, 1);
+      assert.equal((await verify()).status, 401);
+      assert.equal(state.promotions, 0);
+      assert.equal(state.profile.type, initialType);
+    }
+  });
+}
+
+test('other explicit role values are not standard and cannot use personal codes or be promoted', async (t) => {
+  for (const type of ['manager', null, false, ' standard ']) {
+    await t.test(String(type), async (t) => {
+      const { state, api, verify } = await harness(t, { userId: 'test', phone: PHONE, type });
+      assert.deepEqual((await api('/account-status', { phone: PHONE })).body, { exists: true, flow: 'cognito' });
+      assert.equal((await verify()).status, 401);
+      assert.equal(state.profile.type, type);
+      assert.equal(await promoteWhitelistUserByPhone(PHONE, {
+        async send(command) {
+          assert.equal(command.constructor.name, 'ScanCommand');
+          return { Items: [state.profile] };
+        },
+      }), null);
+    });
+  }
+});
+
 test('unregistered whitelist stays on registration; normal standard login remains Cognito', async (t) => {
   const { state, api, verify } = await harness(t, null);
   const status = (await api('/account-status', { phone: PHONE })).body;
@@ -241,16 +320,24 @@ test('automatic role promotion cannot overwrite admin, including concurrent chan
     return { Attributes: { ...standard, type: 'fincantieri_users' } };
   } };
   assert.equal((await promoteWhitelistUserByPhone(PHONE, client)).type, 'fincantieri_users');
-  let reads = 0;
-  const raced = { async send(command) {
-    if (command.constructor.name === 'ScanCommand') {
-      return { Items: [reads++ ? { ...standard, type: 'admin' } : standard] };
+  for (const initialType of ['standard', undefined, '']) {
+    for (const concurrentType of ['admin', 'manager']) {
+      let reads = 0;
+      const initial = { phone: PHONE, userId: 'test' };
+      if (initialType !== undefined) initial.type = initialType;
+      const raced = { async send(command) {
+        if (command.constructor.name === 'ScanCommand') {
+          return { Items: [reads++ ? { ...initial, type: concurrentType } : initial] };
+        }
+        assert.equal(command.input.ConditionExpression,
+          '#phone = :phone AND (attribute_not_exists(#type) OR #type = :empty OR #type = :standard)');
+        const err = new Error('Changed');
+        err.name = 'ConditionalCheckFailedException';
+        throw err;
+      } };
+      assert.equal(await promoteWhitelistUserByPhone(PHONE, raced), null);
     }
-    const err = new Error('Changed');
-    err.name = 'ConditionalCheckFailedException';
-    throw err;
-  } };
-  assert.equal(await promoteWhitelistUserByPhone(PHONE, raced), null);
+  }
   const adminOnly = { async send(command) {
     assert.equal(command.constructor.name, 'ScanCommand');
     return { Items: [{ ...standard, type: 'admin' }] };

@@ -212,6 +212,7 @@ Entrambi i form chiamano `POST /api/users/account-status`.
 - Profilo admin con preview abilitata: viene avviata la challenge preview.
 - Profilo standard o `fincantieri_users` registrato e attivo nella whitelist:
   viene avviata la challenge con codice personale, senza chiamare Cognito.
+  Un attributo `type` assente o stringa vuota equivale a `standard`.
 - Errore o timeout DynamoDB: il flusso si blocca in modalità fail-closed.
 
 La route restituisce solo `exists` e il tipo minimo di flusso richiesto
@@ -282,7 +283,8 @@ phone,accessCode,firstName,lastName,company,enabled,notes
 - Gli admin continuano a usare `adminPsw` e il CSV admin; non possono usare
   il codice della whitelist neppure se il loro telefono compare nei due CSV.
 - Al primo codice valido, un aggiornamento DynamoDB condizionale cambia solo
-  il ruolo `standard` in `fincantieri_users`, senza sovrascrivere un admin.
+  il ruolo `standard` (anche `type` assente o stringa vuota) in
+  `fincantieri_users`, senza sovrascrivere un admin o altri valori.
 - La sessione firmata dura **30 giorni**, usa il tipo `fincantieri_users`
   e viene rifiutata al ripristino se la riga sparisce, è disabilitata o il
   codice cambia. La durata admin resta 8 ore.

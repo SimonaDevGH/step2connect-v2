@@ -9,6 +9,7 @@ const {
   getUserByPhone,
   isAdminProfile,
   isPreviewAdminProfile,
+  isStandardProfile,
   setUserRoleByPhone,
 } = require('../server/lib/userProfiles');
 const {
@@ -50,6 +51,7 @@ function loadUsersRouter(profile, {
         },
         isAdminProfile,
         isPreviewAdminProfile,
+        isStandardProfile,
       };
     }
     if (request === '../lib/adminUsers') {

@@ -6,6 +6,7 @@ const {
   getUserByPhone,
   isAdminProfile,
   isPreviewAdminProfile,
+  isStandardProfile,
   promoteWhitelistUserByPhone,
 } = require('../lib/userProfiles');
 const {
@@ -140,7 +141,7 @@ router.post('/account-status', limitAccountStatusAttempts, async (req, res) => {
     if (!profile) return res.json({ exists: false });
 
     const whitelisted = !isAdminProfile(profile)
-      && ['standard', 'fincantieri_users'].includes(profile.type)
+      && (isStandardProfile(profile) || profile.type === 'fincantieri_users')
       ? await findWhitelistByPhone(phone) : null;
     res.json({
       exists: true,
@@ -207,7 +208,7 @@ router.post('/preview-admin/verify', limitPreviewAttempts, async (req, res) => {
     // Gli admin non possono mai passare dalla whitelist utenti.
     if (!isAdminProfile(profile)) {
       const entry = await findWhitelistByPhone(phone);
-      if (!['standard', 'fincantieri_users'].includes(profile.type)
+      if (!(isStandardProfile(profile) || profile.type === 'fincantieri_users')
         || !matchesAccessCode(entry, code)) {
         return res.status(401).json({ isAdmin: false });
       }

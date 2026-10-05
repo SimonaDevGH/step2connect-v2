@@ -20,6 +20,12 @@ function isPreviewAdminProfile(profile) {
   return isAdminProfile(profile) && profile?.adminPsw === true;
 }
 
+function isStandardProfile(profile) {
+  return !!profile && (
+    profile.type === 'standard' || profile.type === undefined || profile.type === ''
+  );
+}
+
 async function getUserByPhone(phone, documentClient = client) {
   if (!phone) return null;
 
@@ -89,21 +95,21 @@ async function setUserRoleByPhone(phone, role, documentClient = client) {
   return result.Attributes || null;
 }
 
-// Il login con codice può promuovere SOLO standard, anche in caso di una
+// Il login con codice può promuovere SOLO standard (anche type assente/vuoto), anche in caso di una
 // modifica concorrente del ruolo da parte dell'operatore.
 async function promoteWhitelistUserByPhone(phone, documentClient = client) {
   const profile = await getUserByPhone(phone, documentClient);
   if (profile?.type === 'fincantieri_users') return profile;
-  if (profile?.type !== 'standard' || !profile.userId) return null;
+  if (!isStandardProfile(profile) || !profile.userId) return null;
   try {
     const result = await documentClient.send(new UpdateCommand({
       TableName: TABLE_NAME,
       Key: { userId: profile.userId },
       UpdateExpression: 'SET #type = :type',
-      ConditionExpression: '#phone = :phone AND #type = :standard',
+      ConditionExpression: '#phone = :phone AND (attribute_not_exists(#type) OR #type = :empty OR #type = :standard)',
       ExpressionAttributeNames: { '#phone': 'phone', '#type': 'type' },
       ExpressionAttributeValues: {
-        ':phone': phone, ':type': 'fincantieri_users', ':standard': 'standard',
+        ':phone': phone, ':type': 'fincantieri_users', ':standard': 'standard', ':empty': '',
       },
       ReturnValues: 'ALL_NEW',
     }));
@@ -119,6 +125,7 @@ module.exports = {
   getUserByPhone,
   isAdminProfile,
   isPreviewAdminProfile,
+  isStandardProfile,
   setUserRoleByPhone,
   promoteWhitelistUserByPhone,
 };
