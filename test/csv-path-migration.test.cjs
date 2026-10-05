@@ -3,9 +3,9 @@ const test = require('node:test');
 const Module = require('node:module');
 const { Readable } = require('node:stream');
 
-const NEW_ADMIN = 'admin-users/admin-users.csv';
-const OLD_ADMIN = 'admin-users/users.csv';
-const NEW_WHITELIST = 'whitelist-users/whitelist-users.csv';
+const ADMIN_KEY = 'admin-users/users.csv';
+const UNUSED_ADMIN_KEY = 'admin-users/admin-users.csv';
+const WHITELIST_KEY = 'whitelist-users/fincantieri-users.csv';
 const ADMIN_CSV = 'email,name,passwordHash,adminOTP,adminPhoneNumber,resetToken,resetExpiry\n'
   + 'test@example.invalid,Test,test-hash,001234,+393123456789,,\n';
 
@@ -56,30 +56,28 @@ async function captureWarnings(callback) {
   }
 }
 
-test('admin new CSV wins even when the legacy file exists', async () => {
-  const objects = new Map([[NEW_ADMIN, ADMIN_CSV], [OLD_ADMIN, ADMIN_CSV.replace('Test', 'Legacy')]]);
+test('admin reads only the original users.csv even when another CSV exists', async () => {
+  const objects = new Map([[ADMIN_KEY, ADMIN_CSV], [UNUSED_ADMIN_KEY, ADMIN_CSV.replace('Test', 'Unused')]]);
   const { store, commands } = loadAdminStore(objects);
   const result = await captureWarnings(() => store.getAdminUsers());
   assert.equal(result.value[0].name, 'Test');
-  assert.deepEqual(commands.map((cmd) => cmd.input.Key), [NEW_ADMIN]);
+  assert.deepEqual(commands.map((cmd) => cmd.input.Key), [ADMIN_KEY]);
   assert.equal(result.warnings.length, 0);
 });
 
-test('missing new admin CSV reads legacy with warning and preserves preview credentials', async () => {
-  const { store, commands } = loadAdminStore(new Map([[OLD_ADMIN, ADMIN_CSV]]));
+test('preview credentials are read from original admin CSV without warnings', async () => {
+  const { store, commands } = loadAdminStore(new Map([[ADMIN_KEY, ADMIN_CSV]]));
   const result = await captureWarnings(() => store.findAdminByPhoneAndOTP('+393123456789', '001234'));
   assert.equal(result.value.adminOTP, '001234');
-  assert.equal(result.warnings.length, 1);
-  assert.match(result.warnings[0], /sola lettura/);
-  assert.match(result.warnings[0], /admin-users\/admin-users\.csv/);
-  assert.deepEqual(commands.map((cmd) => cmd.input.Key), [NEW_ADMIN, OLD_ADMIN]);
+  assert.equal(result.warnings.length, 0);
+  assert.deepEqual(commands.map((cmd) => cmd.input.Key), [ADMIN_KEY]);
 });
 
-test('password change and reset write only the new admin name after a legacy read', async () => {
+test('password change and reset read and write only original admin users.csv', async () => {
   for (const operation of ['password', 'reset']) {
-    const objects = new Map([[OLD_ADMIN, ADMIN_CSV]]);
+    const objects = new Map([[ADMIN_KEY, ADMIN_CSV], [UNUSED_ADMIN_KEY, ADMIN_CSV]]);
     const { store, commands } = loadAdminStore(objects);
-    await captureWarnings(async () => {
+    const result = await captureWarnings(async () => {
       if (operation === 'password') {
         assert.equal(await store.setUserPassword('test@example.invalid', 'new-test-hash'), true);
       } else {
@@ -87,8 +85,9 @@ test('password change and reset write only the new admin name after a legacy rea
       }
     });
     const writes = commands.filter((cmd) => cmd.constructor.name === 'PutObjectCommand');
-    assert.deepEqual(writes.map((cmd) => cmd.input.Key), [NEW_ADMIN]);
-    assert.equal(objects.get(OLD_ADMIN), ADMIN_CSV);
+    assert.equal(result.warnings.length, 0);
+    assert.deepEqual(writes.map((cmd) => cmd.input.Key), [ADMIN_KEY]);
+    assert.equal(objects.get(UNUSED_ADMIN_KEY), ADMIN_CSV);
     const users = await store.getAdminUsers();
     assert.equal(users[0].adminOTP, '001234');
     assert.equal(users[0].adminPhoneNumber, '+393123456789');
@@ -97,26 +96,29 @@ test('password change and reset write only the new admin name after a legacy rea
   }
 });
 
-test('admin IAM errors never fall back; absent files still return an empty list', async () => {
+test('admin IAM errors propagate; absent original file has no fallback or warnings', async () => {
   const denied = new Error('Denied');
   denied.name = 'AccessDenied';
-  const { store, commands } = loadAdminStore(new Map([[OLD_ADMIN, ADMIN_CSV]]), new Map([[NEW_ADMIN, denied]]));
+  const { store, commands } = loadAdminStore(new Map([[UNUSED_ADMIN_KEY, ADMIN_CSV]]), new Map([[ADMIN_KEY, denied]]));
   const result = await captureWarnings(async () => {
     await assert.rejects(store.getAdminUsers, /Denied/);
   });
   assert.equal(result.warnings.length, 0);
-  assert.deepEqual(commands.map((cmd) => cmd.input.Key), [NEW_ADMIN]);
-  const missing = loadAdminStore(new Map());
-  assert.deepEqual((await captureWarnings(() => missing.store.getAdminUsers())).value, []);
+  assert.deepEqual(commands.map((cmd) => cmd.input.Key), [ADMIN_KEY]);
+  const missing = loadAdminStore(new Map([[UNUSED_ADMIN_KEY, ADMIN_CSV]]));
+  const absent = await captureWarnings(() => missing.store.getAdminUsers());
+  assert.deepEqual(absent.value, []);
+  assert.equal(absent.warnings.length, 0);
+  assert.deepEqual(missing.commands.map((cmd) => cmd.input.Key), [ADMIN_KEY]);
 });
 
-test('empty new admin file does not resurrect legacy accounts', async () => {
-  const { store, commands } = loadAdminStore(new Map([[NEW_ADMIN, 'email,name,passwordHash\n'], [OLD_ADMIN, ADMIN_CSV]]));
+test('empty original admin file does not read other CSVs', async () => {
+  const { store, commands } = loadAdminStore(new Map([[ADMIN_KEY, 'email,name,passwordHash\n'], [UNUSED_ADMIN_KEY, ADMIN_CSV]]));
   assert.deepEqual(await store.getAdminUsers(), []);
-  assert.deepEqual(commands.map((cmd) => cmd.input.Key), [NEW_ADMIN]);
+  assert.deepEqual(commands.map((cmd) => cmd.input.Key), [ADMIN_KEY]);
 });
 
-test('whitelist uses only the new key, including when it is missing', async () => {
+test('whitelist uses only fincantieri-users.csv, including when it is missing', async () => {
   const keys = [];
   let missing = false;
   const originalLoad = Module._load;
@@ -137,9 +139,9 @@ test('whitelist uses only the new key, including when it is missing', async () =
   } finally {
     Module._load = originalLoad;
   }
-  assert.equal(store.WHITELIST_KEY, NEW_WHITELIST);
+  assert.equal(store.WHITELIST_KEY, WHITELIST_KEY);
   assert.equal((await store.getWhitelistUsers())[0].accessCode, '001234');
   missing = true;
   assert.deepEqual(await store.getWhitelistUsers(), []);
-  assert.deepEqual(keys, [NEW_WHITELIST, NEW_WHITELIST]);
+  assert.deepEqual(keys, [WHITELIST_KEY, WHITELIST_KEY]);
 });

@@ -3,7 +3,7 @@ const { getText } = require('./s3');
 const { parseCsv } = require('./registrationOptions');
 const { normalizePhone } = require('./adminUsers');
 
-const WHITELIST_KEY = 'whitelist-users/whitelist-users.csv';
+const WHITELIST_KEY = 'whitelist-users/fincantieri-users.csv';
 const FIELDS = ['phone', 'accessCode', 'firstName', 'lastName', 'company', 'enabled', 'notes'];
 
 function parseWhitelistUsers(text) {

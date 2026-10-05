@@ -247,7 +247,7 @@ adminPsw = true
 ```
 
 Il numero deve inoltre corrispondere alla stessa riga del codice `adminOTP` nel
-CSV `admin-users/admin-users.csv` su S3.
+CSV `admin-users/users.csv` su S3.
 
 Il server:
 
@@ -262,7 +262,7 @@ non autorizza le API del CMS. Il CMS richiede sempre il proprio JWT.
 ### Codici personali Fincantieri / ELIS
 
 La whitelist privata è separata dal CSV admin e risiede nello stesso bucket:
-`whitelist-users/whitelist-users.csv`. Il modello senza credenziali è
+`whitelist-users/fincantieri-users.csv`. Il modello senza credenziali è
 `infra/whitelist-users.template.csv`. Le colonne richieste sono:
 
 ```csv
@@ -362,7 +362,7 @@ Il CMS è disponibile sotto `/admin/*` ed è separato dall’autenticazione Cogn
 ### Autenticazione CMS
 
 - login email/password;
-- utenti nel file S3 `admin-users/admin-users.csv`;
+- utenti nel file S3 `admin-users/users.csv`;
 - password con scrypt nel formato `salt:hash`;
 - JWT firmato con `SESSION_SECRET`;
 - durata sessione: 8 ore;
@@ -370,20 +370,12 @@ Il CMS è disponibile sotto `/admin/*` ed è separato dall’autenticazione Cogn
 - reset password con token monouso valido un’ora;
 - invio email tramite AWS SES.
 
-Durante il passaggio, se `admin-users/admin-users.csv` non esiste, le letture
-(login CMS e preview admin inclusi) ripiegano su `admin-users/users.csv` e
-scrivono un avviso nei log. Il ripiego non viene usato per errori IAM/S3 diversi
-da file assente. Tutte le scritture, inclusi cambio password e reset, usano
-**sempre** `admin-users/admin-users.csv`. La whitelist legge esclusivamente
-`whitelist-users/whitelist-users.csv`, senza ripiego sul vecchio nome.
-
-Per migrare su S3, copiare i due file sui nuovi nomi mantenendo inalterato il
-contenuto e la riservatezza. Non sovrascrivere un nuovo file già presente.
-Conservare gli originali durante il passaggio; dopo la pubblicazione della
-nuova versione e la verifica dei login possono essere rimossi. Aggiornare
-eventuali policy IAM che concedono accesso solo ai vecchi nomi: lettura e
-scrittura sul nuovo CSV admin, lettura legacy per il ripiego, lettura sul nuovo
-CSV whitelist.
+Il CSV admin conserva il percorso originale `admin-users/users.csv` sia per
+le letture (login CMS e preview admin) sia per le scritture (cambio password,
+reset e comandi operatore), senza ripieghi né avvisi di migrazione.
+La whitelist usa esclusivamente `whitelist-users/fincantieri-users.csv`,
+senza ripieghi. Le policy IAM devono consentire lettura/scrittura sul CSV admin
+originale e lettura sul CSV whitelist; entrambi i file devono restare privati.
 
 Il reset risponde sempre con successo quando la richiesta è formalmente valida,
 anche se l’email non esiste, per evitare enumerazione degli account CMS.
@@ -475,8 +467,8 @@ content/published/site/{lang}/app-images.json
 ### Altri oggetti
 
 ```text
-admin-users/admin-users.csv
-whitelist-users/whitelist-users.csv
+admin-users/users.csv
+whitelist-users/fincantieri-users.csv
 content/registration-login/form_registrazione_lista_aziende_cantieri.csv
 step2connect/img/{type}/{id}/{id}_{LANG}_{img|audio|video}.{ext}
 ```

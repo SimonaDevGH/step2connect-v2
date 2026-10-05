@@ -1,6 +1,5 @@
 /**
- * Gestione utenti admin CMS — legge/scrive admin-users/admin-users.csv su S3.
- * Solo in lettura, se assente, ripiega su admin-users/users.csv con un avviso.
+ * Gestione utenti admin CMS — legge/scrive admin-users/users.csv su S3.
  *
  * Comandi:
  *   node scripts/manage-admin-users.mjs list
