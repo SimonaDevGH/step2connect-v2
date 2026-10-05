@@ -39,6 +39,8 @@ backend.
 ## Convenzioni importanti
 
 - Le API interne e i contenuti pubblici usano URL relativi `/api/...`.
+- Aggiornare sempre anche README.md quando cambiano le funzionalità: deve essere
+  chiaro e dettagliare ogni funzionalità o area della webapp, inclusi i limiti reali.
 - Le nuove letture CMS devono usare lo stesso origin. `VITE_API_BASE_URL` resta
   usato dalla sincronizzazione estesa del profilo e come override legacy in
   `PageResolver`.

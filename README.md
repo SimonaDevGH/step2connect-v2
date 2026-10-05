@@ -33,6 +33,7 @@ supportate sono:
 18. [Sicurezza](#sicurezza)
 19. [Limiti attuali](#limiti-attuali)
 20. [Deploy e repository](#deploy-e-repository)
+21. [Mappa delle aree della webapp](#mappa-delle-aree-della-webapp)
 
 ## Funzionalità principali
 
@@ -42,6 +43,8 @@ supportate sono:
 - Validazione dei numeri italiani e bangladesi prima di contattare Cognito o il
   backend.
 - Percorso preview dedicato agli amministratori autorizzati.
+- Accesso con codice personale per utenti registrati Fincantieri/ELIS nella
+  whitelist attiva, senza SMS, con promozione condizionale del ruolo.
 - Interfaccia utente in italiano, inglese e bengalese.
 - PWA installabile con manifest e service worker.
 - Guide pratiche, notizie, libreria, quiz, uffici, notifiche, traduttore e
@@ -49,6 +52,8 @@ supportate sono:
 - Pannello CMS separato con autenticazione email/password.
 - Contenuti multilingua con bozze, pubblicazione e archiviazione su AWS S3.
 - Immagini, audio e video localizzati per lingua.
+- Immagini delle pagine principali configurabili dal CMS e ordinamento delle
+  guide per categoria.
 - Gestione dei ruoli applicativi tramite comando operatore, senza endpoint HTTP
   di promozione pubblici.
 - Integrazione LivePerson e collegamenti WhatsApp.
@@ -321,7 +326,7 @@ Cognito verificato. Il client non può scegliere il numero usato da
 Se `DYNAMODB_PHONE_INDEX` è configurato viene usata una query sull’indice;
 altrimenti il server esegue una scansione paginata filtrata per `phone`.
 
-I ruoli possono essere modificati solo da un operatore:
+Gli aggiornamenti manuali dei ruoli sono riservati a un operatore:
 
 ```bash
 npm run user:role -- promote <telefono>
@@ -332,6 +337,8 @@ npm run user:role -- fincantieri_users <telefono>
 Il comando aggiorna soltanto un profilo esistente e verifica il risultato.
 Il template IAM a privilegio minimo è in
 `infra/step2connect-users-iam.yaml`.
+L'unica promozione automatica è quella del login con codice personale già
+descritto: richiede whitelist attiva e codice valido e non sovrascrive altri ruoli.
 
 ## Opzioni di registrazione da S3
 
@@ -441,8 +448,8 @@ HTML controllati, inclusi paragrafi, liste, link, titoli e immagini HTTP/HTTPS.
 - Le immagini possono essere caricate dal form CMS.
 - Formati immagine: JPEG, PNG, WebP e GIF.
 - Dimensione massima: 5 MB.
-- Audio e video sono localizzati per lingua e attualmente vengono inseriti come
-  URL.
+- Audio e video sono localizzati per lingua e possono essere caricati come file
+  oppure inseriti come URL. Limiti: audio 25 MB e video 100 MB.
 - Un valore vuoto inviato intenzionalmente per una lingua non viene sostituito
   dal media di un’altra lingua.
 
@@ -564,7 +571,11 @@ Tutte le route richiedono JWT CMS:
 | `PUT` | `/api/admin/content/{type}/{id}` | Crea o aggiorna bozza |
 | `POST` | `/api/admin/content/{type}/{id}/publish` | Pubblica |
 | `DELETE` | `/api/admin/content/{type}/{id}` | Archivia e rimuove |
-| `POST` | `/api/admin/content/{type}/{id}/media` | Carica immagine |
+| `POST` | `/api/admin/content/{type}/{id}/media` | Carica immagine, audio o video localizzato |
+
+L'upload usa `multipart/form-data`, campo `file`, e i parametri query
+`lang=it|en|bn` e `mediaType=img|audio|video`. `slot` identifica una singola
+immagine della configurazione `site`; per `site` sono ammessi solo upload immagine.
 
 ## Route frontend
 
@@ -730,6 +741,11 @@ hardcoded nel bucket. Non eseguirlo automaticamente in produzione.
 - L’invio email di reset richiede `SES_FROM_EMAIL` configurato e verificato in
   AWS SES.
 - Le notifiche push sono ancora dimostrative.
+- Quiz, elenco uffici e schede legacy dei servizi usano dati locali, non un CMS
+  o un servizio aggiornato in tempo reale.
+- Il traduttore apre WhatsApp: non traduce automaticamente il testo nell'app
+  e il numero di destinazione nel codice è ancora un segnaposto.
+- L'analisi documenti apre il canale WhatsApp, non esegue OCR o analisi automatica.
 
 ## Deploy e repository
 
@@ -754,3 +770,119 @@ Prima di pubblicare:
 3. controllare che i Secrets richiesti siano disponibili;
 4. verificare `/api/health`;
 5. pubblicare tramite il flusso Replit Publish.
+
+GitHub, workspace e sito pubblicato sono tre stati distinti: aggiornare il
+repository non pubblica automaticamente il codice su Replit. I CSV privati su
+S3 e i profili DynamoDB sono dati esterni e non fanno parte del commit Git.
+Per confermare un aggiornamento live controllare health check, asset serviti
+e comportamento delle API interessate; asset frontend uguali non provano che
+il backend abbia lo stesso codice.
+
+## Mappa delle aree della webapp
+
+Questa sezione descrive ciò che è implementato, distinguendo contenuti
+gestiti dal CMS, dati dimostrativi e integrazioni esterne.
+
+### Accesso, registrazione e profilo
+
+- `/`: form Accedi/Registrati con scelta IT/EN/BN e validazione del telefono.
+- Il controllo account distingue utenti registrati e nuovi prima dell'OTP.
+- Cognito gestisce SMS e registrazione; nome, cognome, email, azienda e cantiere
+  sono sincronizzati dopo l'accesso. Aziende e cantieri provengono dal CSV S3.
+- I profili autorizzati alla whitelist usano il codice personale a 6 cifre,
+  senza SMS; un `type` assente o `""` è equiparato a `standard` per questo flusso.
+- Gli admin hanno un percorso preview separato; il CMS mantiene il proprio login.
+- Le sessioni vengono ripristinate con controlli server; il menu CMS è riservato
+  agli utenti admin e non è abilitato per il ruolo `fincantieri_users`.
+
+### Home e navigazione
+
+- `/home`: saluto, accesso rapido ai servizi, guide e strumenti.
+- Barra inferiore e menu laterale collegano le aree della webapp e il logout.
+- Logo e immagini principali hanno configurazioni localizzate nel CMS, con
+  asset locali quando non esiste un URL pubblicato per la lingua.
+
+### Guide
+
+- `/guides`: introduzione al servizio e categorie salute, lavoro, scuola,
+  documenti, casa/bollette e vita in città.
+- `/guides/:category`: elenco della categoria ordinato secondo i valori CMS.
+- `/guides/:category/:item` e route dirette: dettaglio con testo CMS pubblicato
+  e audio quando disponibile. Metadati e struttura delle categorie sono locali.
+- La guida introduttiva resta nella pagina principale, non nelle categorie
+  intermedie. I contenuti vengono richiesti nella lingua selezionata.
+
+### Servizi legacy
+
+- `/service/:service`: schede informative locali per salute, lavoro, scuola
+  e documenti. Questa pagina non è collegata alla gestione contenuti del CMS.
+- La sezione è distinta dalle guide pubblicate: non considerarla un editor
+  dinamico né un catalogo aggiornato automaticamente.
+
+### News
+
+- `/news`: elenco delle notizie pubblicate dal CMS nella lingua selezionata,
+  con un elenco locale di fallback.
+- `/news/:id`: dettaglio CMS con titolo, immagine, corpo e audio se presenti.
+  I campi mancanti non vengono generati automaticamente.
+
+### Libreria
+
+- `/library`: elenco per categorie di materiali pubblicati nel CMS, con dati
+  locali di fallback.
+- `/library/:id`: dettaglio del materiale CMS; l'upload diretto di PDF come
+  allegati non è ancora implementato.
+- Il CMS consente di gestire testi e URL dei materiali, oltre ai media supportati.
+
+### Quiz
+
+- `/quiz`: domande a scelta multipla in tre lingue, risposta corretta,
+  avanzamento, punteggio finale e possibilità di ricominciare.
+- Domande e risposte sono locali; non esistono gestione quiz nel CMS o
+  salvataggio server dei risultati.
+
+### Cerca uffici
+
+- `/offices`: ricerca per nome, città o indirizzo e filtro per ospedali,
+  patronati, comuni e polizia, con collegamenti telefonici.
+- L'elenco è locale e dimostrativo, centrato sull'area veneziana; non usa
+  geolocalizzazione, mappe o un servizio di ricerca in tempo reale.
+
+### Notifiche
+
+- `/notifications`: elenco dimostrativo con titolo, testo, data e indicatore
+  letto/non letto. Non è un sistema push né una casella personale persistente.
+
+### Traduttore e analisi documenti
+
+- `/translator`: inserimento testo e apertura di WhatsApp con messaggio
+  precompilato. Il contatto è ancora un segnaposto da configurare.
+- `/analyze-document`: apertura del contatto WhatsApp configurato per assistenza
+  sui documenti; l'immagine della pagina è personalizzabile dal CMS.
+- Nessuna delle due pagine implementa traduzione automatica, upload di documenti
+  al backend o analisi AI interna.
+
+### Privacy, pagine generiche e assistenza
+
+- `/privacy`: informativa nell'interfaccia multilingue.
+- Le route non riconosciute passano al resolver delle pagine CMS per URL, poi
+  al fallback. Il resolver conserva l'override legacy del backend documentato.
+- LivePerson è un'integrazione esterna: le disponibilità dell'assistenza
+  dipendono dalla sua configurazione, non da un servizio di chat interno.
+
+### CMS amministrativo
+
+- `/admin/login`, recupero/reset password e `/admin/account`: credenziali CMS
+  separate, reset via email e modifica password.
+- `/admin/content`: riepilogo Pages di guide, news e libreria, filtri e gestione
+  bozze/pubblicati/archivio; Pages è una vista riepilogativa, non un tipo separato.
+- Editor con testi IT/EN/BN, metadati, immagini, audio e video per lingua,
+  ordinamento delle guide e caricamento dei file supportati.
+- Salvataggio bozze, pubblicazione, archiviazione/eliminazione e rinomina dei
+  contenuti; soltanto i contenuti pubblicati sono disponibili alle API pubbliche.
+- Scheda Immagini app: immagini principali, categorie guide, loghi e pagina
+  Analizza documento, separati per lingua.
+- Le credenziali admin, la whitelist e i ruoli DynamoDB restano gestiti dai
+  file privati o dagli strumenti operatore: non esiste un editor whitelist nel CMS.
+- I video possono essere gestiti e caricati nel CMS; la presenza del campo
+  non garantisce un player video in ogni pagina pubblica.
