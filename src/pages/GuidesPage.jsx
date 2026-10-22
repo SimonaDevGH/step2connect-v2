@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useSiteImages } from '../context/SiteImagesContext';
 import { GUIDE_CATEGORIES } from '../data/guides';
+import { useAuth } from '../context/AuthContext';
+import { canSeeVisibility } from '../lib/sectionAccess';
 
 const API = '';
 const FEATURED_GUIDE_ID = 'guida-al-servizio';
@@ -11,6 +13,7 @@ export default function GuidesPage() {
   const { t, lang } = useLanguage();
   const navigate = useNavigate();
   const siteImages = useSiteImages();
+  const { user } = useAuth();
   // Track which categories have published content available via the API.
   // Falls back gracefully: if the API is unreachable every category stays enabled.
   const [publishedIds, setPublishedIds] = useState(null);
@@ -25,7 +28,8 @@ export default function GuidesPage() {
       .then((data) => {
         if (Array.isArray(data)) {
           // Collect the set of category ids that have at least one published guide
-          const ids = new Set(data.map((item) => item.category).filter(Boolean));
+          const ids = new Set(data.filter((item) => canSeeVisibility(item.visibility, user))
+            .map((item) => item.category).filter(Boolean));
           setPublishedIds(ids);
           setFeaturedGuide(data.find((item) => item.id === FEATURED_GUIDE_ID) || null);
         }
@@ -33,7 +37,7 @@ export default function GuidesPage() {
       .catch(() => {
         // API unavailable — keep publishedIds null (no restriction applied)
       });
-  }, [lang]);
+  }, [lang, user?.type]);
 
   return (
     <div className="page-content">
@@ -46,7 +50,7 @@ export default function GuidesPage() {
         </div>
       </div>
 
-      <div className="guides-featured-wrap">
+      {canSeeVisibility(featuredGuide?.visibility, user) && <div className="guides-featured-wrap">
         <button
           type="button"
           className="guide-featured-card"
@@ -63,7 +67,7 @@ export default function GuidesPage() {
           </span>
           <span className="guide-featured-arrow">›</span>
         </button>
-      </div>
+      </div>}
 
       <div className="guides-grid">
         {GUIDE_CATEGORIES.map(({ id, icon: Icon, color, emoji }) => {

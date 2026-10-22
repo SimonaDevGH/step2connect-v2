@@ -4,6 +4,8 @@ import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useSiteImages } from '../context/SiteImagesContext';
 import { GUIDE_CATEGORIES } from '../data/guides';
+import { useSections } from '../context/SectionsContext';
+import { canSeeSection } from '../lib/sectionAccess';
 
 // Single source of truth: pull the 4 featured categories directly from
 // GUIDE_CATEGORIES so labels, colors and paths are never duplicated.
@@ -14,16 +16,19 @@ const SERVICES = GUIDE_CATEGORIES.filter((c) => FEATURED_IDS.includes(c.id))
 const TOOLS = [
   { key: 'news',          icon: Newspaper,  color: '#1D3557', path: '/news' },
   { key: 'quiz',          icon: HelpCircle, color: '#E9C46A', path: '/quiz' },
-  { key: 'guidesTitle',   icon: BookOpen,   color: '#06A77D', path: '/guides' },
+  { key: 'guidesTitle', section: 'guides', icon: BookOpen, color: '#06A77D', path: '/guides' },
   { key: 'notifications', icon: Bell,       color: '#E76F51', path: '/notifications' },
   { key: 'translator',    icon: Languages,  color: '#118AB2', path: '/translator' },
 ];
 
 export default function HomePage() {
   const { t, lang } = useLanguage();
-  const { user } = useAuth();
+  const { user, profileReady } = useAuth();
+  const { sections, sectionsReady } = useSections();
   const siteImages = useSiteImages();
   const navigate = useNavigate();
+  const visibleSection = (key) => profileReady && sectionsReady && canSeeSection(key, user, sections);
+  const tools = TOOLS.filter((tool) => visibleSection(tool.section || tool.key));
 
   return (
     <div className="page-content home-page">
@@ -53,7 +58,7 @@ export default function HomePage() {
       </section>
 
       {/* Services grid */}
-      <section className="services-section">
+      {visibleSection('guides') && <section className="services-section">
         <h3 className="section-title">{t('servicesTitle')}</h3>
         <div className="services-grid">
           {SERVICES.map(({ id, icon: Icon, color }) => (
@@ -70,10 +75,10 @@ export default function HomePage() {
             </button>
           ))}
         </div>
-      </section>
+      </section>}
 
       {/* Offices card */}
-      <section className="offices-section">
+      {visibleSection('offices') && <section className="offices-section">
         <button className="offices-card" onClick={() => navigate('/offices')}>
           <MapPin size={28} color="#6A4C93" />
           <div>
@@ -81,13 +86,13 @@ export default function HomePage() {
             <p className="offices-desc">{t('officesDesc')}</p>
           </div>
         </button>
-      </section>
+      </section>}
 
       {/* Tools list */}
-      <section className="tools-section">
+      {tools.length > 0 && <section className="tools-section">
         <h3 className="section-title">{t('toolsTitle')}</h3>
         <div className="tools-list">
-          {TOOLS.map(({ key, icon: Icon, color, path }) => (
+          {tools.map(({ key, icon: Icon, color, path }) => (
             <button key={key} className="tool-item" onClick={() => navigate(path)}>
               <div className="tool-icon" style={{ background: color + '20', color }}>
                 <Icon size={22} />
@@ -97,7 +102,7 @@ export default function HomePage() {
             </button>
           ))}
         </div>
-      </section>
+      </section>}
 
     </div>
   );

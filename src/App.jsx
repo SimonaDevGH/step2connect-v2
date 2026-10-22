@@ -4,6 +4,8 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { AdminAuthProvider, useAdminAuth } from './context/AdminAuthContext';
 import { SiteImagesProvider, useSiteImages } from './context/SiteImagesContext';
+import { SectionsProvider } from './context/SectionsContext';
+import SectionRoute from './components/SectionRoute';
 
 import LoginPage          from './pages/LoginPage';
 import HomePage           from './pages/HomePage';
@@ -60,7 +62,8 @@ function AdminShell() {
       <Route path="login"            element={<AdminLoginPage />} />
       <Route path="forgot-password"  element={<AdminForgotPasswordPage />} />
       <Route path="reset-password"   element={<AdminResetPasswordPage />} />
-      <Route path="content"          element={<AdminProtectedRoute><AdminContentPage /></AdminProtectedRoute>} />
+      <Route path="content"          element={<AdminProtectedRoute><Navigate to="/admin/content/guide-pratiche" replace /></AdminProtectedRoute>} />
+      <Route path="content/:section" element={<AdminProtectedRoute><AdminContentPage /></AdminProtectedRoute>} />
       <Route path="account"          element={<AdminProtectedRoute><AdminAccountPage /></AdminProtectedRoute>} />
       <Route path="*"                element={<Navigate to="/admin/login" replace />} />
     </Routes>
@@ -155,19 +158,19 @@ function AppShell() {
           <Route path="/"                    element={<Navigate to="/home" replace />} />
           <Route path="/home"                element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
           <Route path="/service/:service"    element={<ProtectedRoute><ServiceDetailPage /></ProtectedRoute>} />
-          <Route path="/offices"             element={<ProtectedRoute><FindOfficesPage /></ProtectedRoute>} />
-          <Route path="/news"                element={<ProtectedRoute><NewsPage /></ProtectedRoute>} />
-          <Route path="/news/:id"            element={<ProtectedRoute><ContentDetailPage contentType="news" /></ProtectedRoute>} />
-          <Route path="/quiz"                element={<ProtectedRoute><QuizPage /></ProtectedRoute>} />
-          <Route path="/library"             element={<ProtectedRoute><LibraryPage /></ProtectedRoute>} />
-          <Route path="/library/:id"         element={<ProtectedRoute><ContentDetailPage contentType="library" /></ProtectedRoute>} />
-          <Route path="/guides"              element={<ProtectedRoute><GuidesPage /></ProtectedRoute>} />
-          <Route path="/guides/:category"    element={<ProtectedRoute><GuideSingleSegmentPage /></ProtectedRoute>} />
-          <Route path="/guides/:category/:item" element={<ProtectedRoute><GuideDetailPage /></ProtectedRoute>} />
-          <Route path="/notifications"       element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
-          <Route path="/translator"          element={<ProtectedRoute><TranslatorPage /></ProtectedRoute>} />
-          <Route path="/privacy"             element={<ProtectedRoute><PrivacyPage /></ProtectedRoute>} />
-          <Route path="/analyze-document"    element={<ProtectedRoute><AnalyzeDocumentPage /></ProtectedRoute>} />
+          <Route path="/offices"             element={<SectionRoute section="offices"><FindOfficesPage /></SectionRoute>} />
+          <Route path="/news"                element={<SectionRoute section="news"><NewsPage /></SectionRoute>} />
+          <Route path="/news/:id"            element={<SectionRoute section="news"><ContentDetailPage contentType="news" /></SectionRoute>} />
+          <Route path="/quiz"                element={<SectionRoute section="quiz"><QuizPage /></SectionRoute>} />
+          <Route path="/library"             element={<SectionRoute section="library"><LibraryPage /></SectionRoute>} />
+          <Route path="/library/:id"         element={<SectionRoute section="library"><ContentDetailPage contentType="library" /></SectionRoute>} />
+          <Route path="/guides"              element={<SectionRoute section="guides"><GuidesPage /></SectionRoute>} />
+          <Route path="/guides/:category"    element={<SectionRoute section="guides"><GuideSingleSegmentPage /></SectionRoute>} />
+          <Route path="/guides/:category/:item" element={<SectionRoute section="guides"><GuideDetailPage /></SectionRoute>} />
+          <Route path="/notifications"       element={<SectionRoute section="notifications"><NotificationsPage /></SectionRoute>} />
+          <Route path="/translator"          element={<SectionRoute section="translator"><TranslatorPage /></SectionRoute>} />
+          <Route path="/privacy"             element={<SectionRoute section="privacy"><PrivacyPage /></SectionRoute>} />
+          <Route path="/analyze-document"    element={<SectionRoute section="analyze-document"><AnalyzeDocumentPage /></SectionRoute>} />
           {/* Catch-all: prima prova a risolvere come pagina CMS, poi redirect */}
           <Route path="*"                    element={<ProtectedRoute><PageResolver /></ProtectedRoute>} />
         </Routes>
@@ -186,6 +189,7 @@ export default function App() {
       <LanguageProvider>
         <SiteImagesProvider>
           <AuthProvider>
+            <SectionsProvider>
             <AdminAuthProvider>
               <Routes>
                 {/* Area admin — routing completamente separato, senza Cognito */}
@@ -194,6 +198,7 @@ export default function App() {
                 <Route path="/*"       element={<AppShell />} />
               </Routes>
             </AdminAuthProvider>
+            </SectionsProvider>
           </AuthProvider>
         </SiteImagesProvider>
       </LanguageProvider>

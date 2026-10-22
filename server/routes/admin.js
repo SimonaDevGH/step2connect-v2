@@ -7,6 +7,7 @@ const multer  = require('multer');
 const { requireAdminJWT, adminUserId } = require('../middleware/adminAuth');
 const { getJson, putJson, putBuffer, listKeys, copyObject, deleteObject } = require('../lib/s3');
 const { validateContent } = require('../lib/validate');
+const { VISIBILITIES } = require('../lib/sections');
 
 const router = express.Router();
 const CONTENT_TYPES = ['guides', 'news', 'library', 'pages', 'site'];
@@ -81,17 +82,23 @@ router.get('/', async (req, res) => {
     ]);
     const publishedKeys = new Set(publishedKeyGroups.flat());
     const draftRecords = draftKeyGroups.flatMap((keys, index) =>
-      keys
+      [...keys, ...publishedKeyGroups[index].filter((key) =>
+        !keys.includes(key.replace('content/published/', 'content/draft/'))
+      )]
         .filter((key) => key.endsWith('.json'))
         .map((key) => ({ key, type: typesToList[index] }))
     );
     const items = await Promise.all(draftRecords.map(async ({ key, type: contentType }) => {
       const item = await getJson(key);
       if (!item) return null;
+      const publishedKey = key.replace('content/draft/', 'content/published/');
+      const online = publishedKeys.has(publishedKey) ? await getJson(publishedKey) : null;
 
       return {
         ...item,
         type: item.type || contentType,
+        visibility: item.visibility ?? (online ? 'published' : 'internal'),
+        hasUnpublishedChanges: !online || JSON.stringify(item) !== JSON.stringify(online),
         status: publishedKeys.has(key.replace('content/draft/', 'content/published/'))
           ? 'published'
           : 'draft',
@@ -114,9 +121,12 @@ router.get('/:type/:id', async (req, res) => {
   const { type, id } = req.params;
   try {
     const [it, en, bn] = await Promise.all([
-      getJson(`content/draft/${type}/it/${id}.json`),
-      getJson(`content/draft/${type}/en/${id}.json`),
-      getJson(`content/draft/${type}/bn/${id}.json`),
+      getJson(`content/draft/${type}/it/${id}.json`).then((draft) =>
+        draft || getJson(`content/published/${type}/it/${id}.json`)),
+      getJson(`content/draft/${type}/en/${id}.json`).then((draft) =>
+        draft || getJson(`content/published/${type}/en/${id}.json`)),
+      getJson(`content/draft/${type}/bn/${id}.json`).then((draft) =>
+        draft || getJson(`content/published/${type}/bn/${id}.json`)),
     ]);
     if (!it && !en && !bn) return res.status(404).json({ error: 'Not found' });
     const base = it || en || bn;
@@ -149,6 +159,7 @@ router.get('/:type/:id', async (req, res) => {
       bn: translation(bn),
       updatedBy: base.updatedBy || '',
       updatedAt: base.updatedAt || '',
+      visibility: base.visibility ?? 'published',
     });
   } catch (err) {
     console.error('[admin] get error', err);
@@ -170,6 +181,12 @@ router.put('/:type/:id', async (req, res) => {
     const category = type === 'guides' && id === FEATURED_SERVICE_GUIDE_ID
       ? 'guides'
       : payload.category;
+    const previousDrafts = await Promise.all(LIST_LANGUAGES.map((lang) =>
+      getJson(`content/draft/${type}/${lang}/${previousId}.json`)
+    ));
+    const previousPublished = await Promise.all(LIST_LANGUAGES.map((lang) =>
+      getJson(`content/published/${type}/${lang}/${previousId}.json`)
+    ));
 
     // Una rinomina non deve sovrascrivere per errore un contenuto esistente.
     if (isRename) {
@@ -189,7 +206,7 @@ router.put('/:type/:id', async (req, res) => {
       ? (category === 'guides' ? `/guides/${id}` : `/guides/${category}/${id}`)
       : (payload.url || '');
 
-    for (const lang of ['it', 'en', 'bn']) {
+    for (const [index, lang] of LIST_LANGUAGES.entries()) {
       const key = `content/draft/${type}/${lang}/${id}.json`;
       await putJson(key, {
         id,
@@ -206,7 +223,11 @@ router.put('/:type/:id', async (req, res) => {
         title:     payload[lang].title,
         body:      payload[lang].body,
         metaDesc:  payload[lang].metaDesc || '',
-        renamedFrom: isRename ? previousId : '',
+        ...(type !== 'site' ? {
+          visibility: previousDrafts[index]?.visibility
+            ?? (previousDrafts.some(Boolean) || previousPublished.some(Boolean) ? 'published' : 'internal'),
+        } : {}),
+        renamedFrom: isRename ? previousId : (previousDrafts[index]?.renamedFrom || ''),
         updatedBy: author,
         updatedAt: now,
       });
@@ -243,27 +264,60 @@ router.put('/:type/:id', async (req, res) => {
   }
 });
 
+// Scegliere la visibilità rende subito online l'ultima versione salvata.
+router.put('/:type/:id/visibility', async (req, res) => {
+  const { type, id } = req.params;
+  const visibility = req.body?.visibility;
+  if (!['guides', 'news', 'library', 'pages'].includes(type)
+    || !/^[a-zA-Z0-9_-]{1,100}$/.test(id) || !VISIBILITIES.includes(visibility)) {
+    return res.status(400).json({ error: 'Invalid content or visibility' });
+  }
+  try {
+    const drafts = await Promise.all(LIST_LANGUAGES.map(async (lang) =>
+      await getJson(`content/draft/${type}/${lang}/${id}.json`)
+        || await getJson(`content/published/${type}/${lang}/${id}.json`)
+    ));
+    if (!drafts.some(Boolean)) return res.status(404).json({ error: 'Not found' });
+    // Non pubblicare copie di una lingua al posto di traduzioni mancanti.
+    if (drafts.some((draft) => !draft)) {
+      return res.status(409).json({ error: 'Salvare prima il contenuto in tutte le lingue' });
+    }
+    const now = new Date().toISOString();
+    for (const [index, lang] of LIST_LANGUAGES.entries()) {
+      await putJson(`content/draft/${type}/${lang}/${id}.json`, {
+        ...drafts[index], visibility, updatedAt: now, updatedBy: adminUserId(req),
+      });
+    }
+    await publishDraft(type, id);
+    res.json({ ok: true, visibility, updatedAt: now });
+  } catch (err) {
+    console.error('[admin] visibility update error', err);
+    res.status(500).json({ error: 'Unable to update visibility' });
+  }
+});
+
+async function publishDraft(type, id) {
+  let renamedFrom = '';
+  for (const lang of LIST_LANGUAGES) {
+    const draft = `content/draft/${type}/${lang}/${id}.json`;
+    const data = await getJson(draft);
+    if (!data) continue;
+    renamedFrom = renamedFrom || data.renamedFrom || '';
+    await copyObject(draft, `content/published/${type}/${lang}/${id}.json`);
+  }
+  if (renamedFrom && renamedFrom !== id) {
+    await Promise.all(LIST_LANGUAGES.map((lang) =>
+      deleteObject(`content/published/${type}/${lang}/${renamedFrom}.json`)
+    ));
+  }
+}
+
 // ── PUBLISH ───────────────────────────────────────────────────────────────────
 // POST /api/admin/content/:type/:id/publish
 router.post('/:type/:id/publish', async (req, res) => {
   const { type, id } = req.params;
   try {
-    let renamedFrom = '';
-    for (const lang of ['it', 'en', 'bn']) {
-      const draft     = `content/draft/${type}/${lang}/${id}.json`;
-      const published = `content/published/${type}/${lang}/${id}.json`;
-      const data = await getJson(draft);
-      if (!data) continue;
-      renamedFrom = renamedFrom || data.renamedFrom || '';
-      await copyObject(draft, published);
-    }
-
-    // Dopo avere pubblicato tutte le nuove lingue, disattiva il vecchio URL.
-    if (renamedFrom && renamedFrom !== id) {
-      await Promise.all(['it', 'en', 'bn'].map((lang) =>
-        deleteObject(`content/published/${type}/${lang}/${renamedFrom}.json`)
-      ));
-    }
+    await publishDraft(type, id);
 
     res.json({ ok: true, publishedAt: new Date().toISOString() });
   } catch (err) {

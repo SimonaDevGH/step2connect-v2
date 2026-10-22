@@ -143,5 +143,21 @@ Non inserire segreti nel repository. Le principali variabili sono:
 Variabili opzionali includono `DYNAMODB_USERS_TABLE`,
 `DYNAMODB_PHONE_INDEX`, `DYNAMODB_REGION` e `SES_FROM_EMAIL`.
 
+## Visibilità sezioni e pagine
+
+Lo stato si cambia dal CMS: il server gestisce `config/sections.json` senza
+interventi manuali su S3. La Home non è configurabile. Admin vede tutto;
+Fincantieri/ELIS vede anteprima e pubblicato; standard solo pubblicato.
+Devono essere visibili sia sezione sia pagina.
+
+L'utente ha confermato l'attivazione immediata dei default: Quiz, Notifiche,
+News, Uffici e Libreria Interne; Guide, Analizza documento, Traduttore e Privacy
+Pubblicate. Le pagine legacy senza visibility sono pubblicate, ma non superano
+una sezione Interna. Il CMS separa le sezioni; Altro conserva Libreria e Pages
+e permette di regolare anche Libreria/Privacy.
+
+I filtri richiesti sono nell'interfaccia: le API pubbliche e gli URL dei media
+non sono un archivio riservato. Non confondere visibilità con autorizzazione.
+
 Per la documentazione completa, le route e gli script operativi consultare
 `README.md`.

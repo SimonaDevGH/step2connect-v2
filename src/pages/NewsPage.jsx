@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
+import { canSeeVisibility } from '../lib/sectionAccess';
 
 // ─── FALLBACK (static data shown if API is unavailable) ──────────────────────
 const NEWS_FALLBACK = [
@@ -40,6 +42,7 @@ const API = '';
 export default function NewsPage() {
   const { t, lang } = useLanguage();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [news, setNews] = useState(NEWS_FALLBACK);
 
   useEffect(() => {
@@ -67,7 +70,7 @@ export default function NewsPage() {
       </div>
 
       <div className="news-list">
-        {news.map((item) => (
+        {news.filter((item) => canSeeVisibility(item.visibility, user)).map((item) => (
           <button
             key={item.id}
             type="button"

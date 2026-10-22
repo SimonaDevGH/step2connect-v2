@@ -5,6 +5,8 @@ import { useLanguage } from '../context/LanguageContext';
 import { useSiteImages } from '../context/SiteImagesContext';
 import { getCategoryById, GUIDE_ITEMS } from '../data/guides';
 import { belongsToGuideCategory, orderGuideItems } from '../lib/guideOrdering';
+import { useAuth } from '../context/AuthContext';
+import { canSeeVisibility } from '../lib/sectionAccess';
 
 const API = '';
 const CATEGORY_IMAGE_KEYS = {
@@ -21,6 +23,7 @@ export default function GuideCategoryPage() {
   const { t, lang }  = useLanguage();
   const navigate     = useNavigate();
   const siteImages   = useSiteImages();
+  const { user } = useAuth();
 
   const cat = getCategoryById(category);
   const [cmsItems, setCmsItems] = useState(null); // null = loading
@@ -54,7 +57,8 @@ export default function GuideCategoryPage() {
   // statico serve solo a conservare l'ordine e le icone delle guide esistenti.
   const staticIds = cat.items || [];
   const cmsMap    = {};
-  (cmsItems || []).forEach((item) => { cmsMap[item.id] = item; });
+  (cmsItems || []).filter((item) => canSeeVisibility(item.visibility, user))
+    .forEach((item) => { cmsMap[item.id] = item; });
 
   // Mostra un item statico soltanto se il relativo JSON è ancora pubblicato.
   const mergedItems = staticIds

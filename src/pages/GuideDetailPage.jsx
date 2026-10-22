@@ -4,6 +4,8 @@ import { ChevronLeft } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { getCategoryById, GUIDE_ITEMS } from '../data/guides';
 import { FEATURED_SERVICE_GUIDE_ID } from '../lib/guideOrdering';
+import { useAuth } from '../context/AuthContext';
+import { canSeeVisibility } from '../lib/sectionAccess';
 
 // L'API pubblica è sullo stesso origin dell'app: in sviluppo Vite inoltra
 // /api a Express e in produzione Express serve entrambe le parti.
@@ -15,11 +17,14 @@ export default function GuideDetailPage({ directCategory, directItem }) {
   const item = directItem || params.item;
   const { t, lang }        = useLanguage();
   const navigate           = useNavigate();
+  const { user } = useAuth();
 
   const cat  = getCategoryById(category);
   const meta = GUIDE_ITEMS[item];
 
-  const [cmsContent, setCmsContent] = useState(undefined); // undefined = loading, null = not found
+  const [loadedContent, setCmsContent] = useState(undefined); // undefined = loading, null = not found
+  const cmsContent = loadedContent && !canSeeVisibility(loadedContent.visibility, user)
+    ? null : loadedContent;
 
   useEffect(() => {
     let cancelled = false;

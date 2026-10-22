@@ -34,6 +34,7 @@ supportate sono:
 19. [Limiti attuali](#limiti-attuali)
 20. [Deploy e repository](#deploy-e-repository)
 21. [Mappa delle aree della webapp](#mappa-delle-aree-della-webapp)
+22. [Visibilità di sezioni e pagine](#visibilità-di-sezioni-e-pagine)
 
 ## Funzionalità principali
 
@@ -397,8 +398,10 @@ anche se l’email non esiste, per evitare enumerazione degli account CMS.
 - `pages`
 - `site` (record riservato `app-images` per le immagini globali della webApp)
 
-La scheda riepilogativa `all` dell’admin combina guide, news e library; non è un
-tipo di contenuto S3 separato.
+Il menu CMS è organizzato per sezioni: Guide pratiche, Quiz, Analizza documento,
+Notifiche, News, Traduttore, Trova uffici, Immagini app, Altro.
+Su mobile diventa una barra di tab scorrevoli. Altro permette di gestire
+`library` e le pagine generiche `pages`; l'API legacy `type=all` resta disponibile.
 
 ### Campi
 
@@ -408,6 +411,7 @@ Metadati condivisi:
 - `type`
 - `category`
 - `url`
+- `visibility` per guide, news, library e pages (non per le immagini `site`)
 
 Campi localizzati per `it`, `en` e `bn`:
 
@@ -570,6 +574,7 @@ Tutte le route richiedono JWT CMS:
 | `GET` | `/api/admin/content/{type}/{id}` | Bozza multilingua |
 | `PUT` | `/api/admin/content/{type}/{id}` | Crea o aggiorna bozza |
 | `POST` | `/api/admin/content/{type}/{id}/publish` | Pubblica |
+| `PUT` | `/api/admin/content/{type}/{id}/visibility` | Imposta la visibilità e pubblica subito l'ultima bozza salvata |
 | `DELETE` | `/api/admin/content/{type}/{id}` | Archivia e rimuove |
 | `POST` | `/api/admin/content/{type}/{id}/media` | Carica immagine, audio o video localizzato |
 
@@ -610,7 +615,8 @@ Le route applicative richiedono una sessione Cognito o preview valida.
 | `/admin/login` | Login CMS |
 | `/admin/forgot-password` | Richiesta reset |
 | `/admin/reset-password` | Impostazione nuova password |
-| `/admin/content` | Gestione contenuti |
+| `/admin/content` | Redirect a `/admin/content/guide-pratiche` |
+| `/admin/content/:section` | Gestione della sezione, visibilità e contenuti |
 | `/admin/account` | Cambio password |
 
 ## Struttura del repository
@@ -874,8 +880,8 @@ gestiti dal CMS, dati dimostrativi e integrazioni esterne.
 
 - `/admin/login`, recupero/reset password e `/admin/account`: credenziali CMS
   separate, reset via email e modifica password.
-- `/admin/content`: riepilogo Pages di guide, news e libreria, filtri e gestione
-  bozze/pubblicati/archivio; Pages è una vista riepilogativa, non un tipo separato.
+- `/admin/content/:section`: menu per sezioni con controlli di visibilità,
+  contenuti per tipo e filtro lingua; le pagine generiche si gestiscono in Altro.
 - Editor con testi IT/EN/BN, metadati, immagini, audio e video per lingua,
   ordinamento delle guide e caricamento dei file supportati.
 - Salvataggio bozze, pubblicazione, archiviazione/eliminazione e rinomina dei
@@ -886,3 +892,71 @@ gestiti dal CMS, dati dimostrativi e integrazioni esterne.
   file privati o dagli strumenti operatore: non esiste un editor whitelist nel CMS.
 - I video possono essere gestiti e caricati nel CMS; la presenza del campo
   non garantisce un player video in ogni pagina pubblica.
+
+## Visibilità di sezioni e pagine
+
+### Regole e prima attivazione
+
+| Stato | Admin | Fincantieri/ELIS (`fincantieri_users`) | Standard |
+|---|---|---|---|
+| Interno (`internal`) | Sì | No | No |
+| Anteprima (`preview`) | Sì | Sì | No |
+| Pubblicato (`published`) | Sì | Sì | Sì |
+
+Una pagina è mostrata soltanto se sono visibili **sia la sezione sia la pagina**.
+La Home rimane sempre disponibile e non ha uno stato configurabile.
+Gli utenti senza un ruolo esplicito sono trattati come standard per la visibilità.
+
+Se `config/sections.json` manca o ha un formato invalido, si usano questi default:
+
+- Pubblicato: Guide, Analizza documento, Traduttore, Privacy.
+- Interno: Quiz, Notifiche, News, Trova uffici, Libreria.
+
+Questi default sono intenzionalmente attivi da subito: le sezioni Interne sono
+nascoste agli utenti standard anche se contengono vecchie pagine pubblicate.
+Il campo `visibility` mancante nelle pagine esistenti equivale a `published`;
+non annulla però la restrizione della sezione. Le pagine nuove nascono `internal`.
+
+### Uso del CMS
+
+- Ogni sezione ha tre pulsanti: Interno, Anteprima, Pubblicato. Il cambio salva
+  subito dal server su S3, con `updatedAt` e `updatedBy`.
+- La conferma è richiesta solo passando a Pubblicato. Il feedback “Salvato”
+  conferma il completamento della richiesta.
+- Ogni riga di guide, news, libreria e pagine generiche ha lo stesso controllo:
+  cambiandolo si pubblica immediatamente l'ultima versione **già salvata**, nelle
+  tre lingue. Una rinomina rimuove i vecchi URL pubblicati come prima.
+- Salvare normalmente una bozza non cambia la sua visibilità e non la pubblica.
+  “Pubblica modifiche” aggiorna la copia online, conservando lo stato scelto.
+- Le sezioni senza contenuti CMS mostrano la pagina e il percorso in sola lettura.
+- In Altro si regolano anche le sezioni Libreria e Privacy. Immagini app e la
+  voce contenitore Altro non hanno un proprio stato.
+- Dopo un cambio dal CMS, ricaricare l'app per rileggere la configurazione.
+  Menu, Home, elenchi e dettagli applicano le stesse regole. Una route di sezione
+  non visibile reindirizza a `/home`; un dettaglio non visibile appare non trovato.
+- Durante il ripristino Cognito le route attendono il profilo applicativo reale:
+  un admin non viene reindirizzato usando il ruolo standard provvisorio.
+
+### API e permessi
+
+- `GET /api/sections`: lettura pubblica, restituisce `{ sections }`, senza scrivere.
+- `PUT /api/admin/sections/{key}`: JWT CMS obbligatorio, body `{ "status": "preview" }`.
+- `PUT /api/admin/content/{type}/{id}/visibility`: JWT CMS obbligatorio,
+  body `{ "visibility": "preview" }`.
+- Il server gestisce `config/sections.json`: non crearlo o modificarlo a mano.
+  La policy `infra/sections-iam.yaml` consente lettura/scrittura sulla sola chiave.
+  Le normali policy contenuti devono consentire le scritture delle bozze e copie online.
+
+**Confine di sicurezza:** le regole richieste filtrano navigazione e rendering
+dell'app. Le API di lettura contenuti e gli URL dei media restano pubblici come
+prima: questa funzionalità non rende riservati i file o i JSON contro richieste
+dirette. Non usarla come protezione di documenti o dati confidenziali.
+
+### Verifica
+
+`npm test` include matrice ruoli/sezione/pagina, salvataggi automatici su storage
+simulato, audit, credenziali CMS, default mancanti, contenuti legacy, rinomina e
+attesa del profilo al refresh. Il controllo browser opzionale
+`node --experimental-websocket scripts/test-visibility-browser.cjs` usa Chromium
+e il dominio di sviluppo Replit: tutte le API vengono intercettate con fixture,
+senza modificare utenti o file S3 reali.

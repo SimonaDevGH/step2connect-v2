@@ -7,6 +7,8 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
+import { canSeeVisibility } from '../lib/sectionAccess';
 
 const API = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -14,14 +16,19 @@ export default function PageResolver() {
   const location = useLocation();
   const navigate = useNavigate();
   const { lang }  = useLanguage();
+  const { user, profileReady } = useAuth();
 
   const [page,    setPage]    = useState(null);    // contenuto CMS
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
+    if (!profileReady) return;
     let cancelled = false;
     const url = location.pathname;
+    setPage(null);
+    setNotFound(false);
+    setLoading(true);
 
     fetch(`${API}/api/content/pages-by-url?url=${encodeURIComponent(url)}&lang=${lang}`)
       .then((r) => {
@@ -31,7 +38,7 @@ export default function PageResolver() {
       })
       .then((data) => {
         if (cancelled) return;
-        if (!data) {
+        if (!data || !canSeeVisibility(data.visibility, user)) {
           setNotFound(true);
         } else {
           setPage(data);
@@ -52,14 +59,14 @@ export default function PageResolver() {
       });
 
     return () => { cancelled = true; };
-  }, [location.pathname, lang]);
+  }, [location.pathname, lang, profileReady, user?.type]);
 
   // Redirect se non trovato
   useEffect(() => {
     if (notFound) navigate('/home', { replace: true });
   }, [notFound, navigate]);
 
-  if (loading) {
+  if (!profileReady || loading) {
     return (
       <div className="page-content">
         <div className="admin-loading">Caricamento…</div>
@@ -67,7 +74,7 @@ export default function PageResolver() {
     );
   }
 
-  if (!page) return null;
+  if (!page || !canSeeVisibility(page.visibility, user)) return null;
 
   return (
     <div className="page-content">

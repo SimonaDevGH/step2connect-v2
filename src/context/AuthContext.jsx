@@ -68,6 +68,7 @@ function mergeProfileIntoUser(setUser, profile, expectedPhone) {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
+  const [profileReady, setProfileReady] = useState(false);
 
   // Al mount: controlla prima la sessione preview firmata, poi Amplify
   useEffect(() => {
@@ -78,6 +79,7 @@ export function AuthProvider({ children }) {
           const previewProfile = await getPreviewSession(previewToken);
           if (previewProfile) {
             setUser(buildPreviewUser(previewProfile));
+            setProfileReady(true);
             setAuthReady(true);
             return;
           }
@@ -96,10 +98,15 @@ export function AuthProvider({ children }) {
         // la lettura del profilo è disponibile.
         if (idToken) {
           getMyProfile(idToken)
-            .then((profile) => mergeProfileIntoUser(setUser, profile, userObj.phone));
+            .then((profile) => mergeProfileIntoUser(setUser, profile, userObj.phone))
+            .catch(() => {})
+            .finally(() => setProfileReady(true));
+        } else {
+          setProfileReady(true);
         }
       } catch {
         setUser(null);
+        setProfileReady(true);
       } finally {
         setAuthReady(true);
       }
@@ -187,6 +194,7 @@ export function AuthProvider({ children }) {
         company: userData.company ?? userObj.company,
         site: userData.site ?? userObj.site,
       };
+      setProfileReady(false);
       setUser({
         ...userObj,
         ...profileHint,
@@ -197,7 +205,11 @@ export function AuthProvider({ children }) {
       if (idToken) {
         const profileSync = syncProfile(idToken, profileHint);
         profileSync.then(() => getMyProfile(idToken))
-          .then((profile) => mergeProfileIntoUser(setUser, profile, profileHint.phone));
+          .then((profile) => mergeProfileIntoUser(setUser, profile, profileHint.phone))
+          .catch(() => {})
+          .finally(() => setProfileReady(true));
+      } else {
+        setProfileReady(true);
       }
 
       return { success: true };
@@ -219,16 +231,18 @@ export function AuthProvider({ children }) {
       console.warn('[AUTH] signOut error:', err);
     } finally {
       setUser(null);
+      setProfileReady(false);
     }
   };
 
   const loginPreviewSession = (previewSession) => {
     localStorage.setItem('s2c_preview_session', previewSession.token);
     setUser(buildPreviewUser(previewSession));
+    setProfileReady(true);
   };
 
   return (
-    <AuthContext.Provider value={{ user, authReady, login, requestOTP, logout, loginPreviewSession }}>
+    <AuthContext.Provider value={{ user, authReady, profileReady, login, requestOTP, logout, loginPreviewSession }}>
       {children}
     </AuthContext.Provider>
   );

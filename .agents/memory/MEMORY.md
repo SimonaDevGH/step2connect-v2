@@ -2,7 +2,6 @@
 - [Dev workflow](dev-workflow.md) — concurrently lancia Vite (5000) + Express (3001); proxy Vite per /api in dev
 - [Content S3 schema](content-s3-schema.md) — chiavi S3: content/{draft|published|archive}/{type}/{lang}/{id}.json; un file per lingua
 - [Public content origin](public-content-origin.md) — le pagine pubbliche CMS devono chiamare l’API dello stesso origin, non il vecchio gateway configurato lato client
-- [Admin content overview](admin-content-overview.md) — la scheda Pages è il riepilogo di guide, news e library, non un tipo CMS separato
 - [Localized media fallback](localized-media-fallback.md) — i fallback legacy devono distinguere campi assenti da valori vuoti intenzionali per lingua
 - [Authenticated profile lookup](authenticated-profile-lookup.md) — il profilo DynamoDB va cercato solo dal telefono nel JWT Cognito verificato
 - [Preview/CMS auth boundary](admin-menu-visibility.md) — la preview telefonica può abilitare il link ma non autorizza mai le API CMS
