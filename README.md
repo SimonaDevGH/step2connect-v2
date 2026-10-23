@@ -427,7 +427,7 @@ Il filtro **Immagini app** in `/admin/content` gestisce inoltre, per ogni lingua
 
 - hero della home;
 - hero principale delle guide;
-- hero delle sei categorie guide;
+- hero delle cinque categorie guide;
 - hero della pagina Analizza documento;
 - logo Step2Connect;
 - logo Fincantieri nel menu laterale.
@@ -810,8 +810,14 @@ gestiti dal CMS, dati dimostrativi e integrazioni esterne.
 
 ### Guide
 
-- `/guides`: introduzione al servizio e categorie salute, lavoro, scuola,
-  documenti, casa/bollette e vita in città.
+- `/guides`: introduzione al servizio e cinque categorie: Documenti e permessi,
+  Salute e pronto soccorso, Casa e bollette, Scuola e famiglia, Vivere in città.
+- La categoria Lavoro e busta paga è rimossa: non compare nell'app né nei
+  selettori di categorie/immagini del CMS. I vecchi percorsi `/guides/work`
+  e `/guides/work/:item` mostrano rispettivamente categoria/guida non trovata.
+  Nessun contenuto memorizzato viene cancellato.
+- Controllo browser delle sole categorie, con API simulate:
+  `node --experimental-websocket scripts/test-visibility-browser.cjs --categories-only`.
 - `/guides/:category`: elenco della categoria ordinato secondo i valori CMS.
 - `/guides/:category/:item` e route dirette: dettaglio con testo CMS pubblicato
   e audio quando disponibile. Metadati e struttura delle categorie sono locali.

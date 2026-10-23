@@ -48,12 +48,20 @@ async function main() {
         pending.delete(value.id);
         value.error ? entry.reject(new Error(JSON.stringify(value.error))) : entry.resolve(value.result);
       } else if (events[value.method]) {
-        Promise.resolve(events[value.method](value.params)).catch((err) => { console.error(err.message); process.exitCode = 1; });
+        Promise.resolve(events[value.method](value.params)).catch((err) => {
+          // Page.navigate can cancel an old document's paused request before
+          // Fetch.fulfillRequest reaches Chromium. This is not a failed API call.
+          if (err.message.includes('Invalid InterceptionId.')) return;
+          console.error(err.message);
+          process.exitCode = 1;
+        });
       }
     };
     const evaluate = async (expression) => {
       const result = await cdp('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
-      if (result.exceptionDetails) throw new Error(result.exceptionDetails.text);
+      if (result.exceptionDetails) throw new Error(
+        `${result.exceptionDetails.exception?.description || result.exceptionDetails.text}\nExpression: ${expression}`,
+      );
       return result.result?.value;
     };
     const wait = async (expression) => {
@@ -117,6 +125,24 @@ async function main() {
       localStorage.setItem('adminToken', ${JSON.stringify(dummyToken)});
     ` });
     const visit = async (route) => cdp('Page.navigate', { url: origin + route });
+    const checkGuideCategories = async () => {
+      await visit('/guides');
+      await wait(`document.querySelectorAll('.guide-cat-card').length === 5`);
+      assert.equal(await evaluate(`document.querySelector('.guides-grid').textContent.includes('Lavoro')`), false);
+      const capture = await cdp('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
+      await fs.writeFile(path.join(os.tmpdir(), 's2c-guides-five-categories.png'), Buffer.from(capture.data, 'base64'));
+      await visit('/guides/work');
+      await wait(`document.body.textContent.includes('Categoria non trovata')`);
+      await visit('/guides/work/fixture-published');
+      await wait(`document.body.textContent.includes('Guida non trovata')`);
+      assert.equal(await evaluate(`document.body.textContent.includes('Body published')`), false);
+    };
+    if (process.argv.includes('--categories-only')) {
+      role = 'fincantieri_users';
+      await checkGuideCategories();
+      console.log('GUIDE_CATEGORIES_PASS: exactly five categories; work absent; old category and detail routes not found. All APIs simulated.');
+      return;
+    }
     await visit('/admin/content');
     await wait(`location.pathname === '/admin/content/guide-pratiche' && !!document.querySelector('.cms-row-visibility')`);
     assert.equal(await evaluate(`document.querySelectorAll('.cms-section-tab').length`), 9);
@@ -131,6 +157,7 @@ async function main() {
     await wait(`document.body.textContent.includes('Salvato')`);
     assert.equal(guides[0].visibility, 'preview');
     // Restore the internal fixture through the same UI.
+    await wait(`document.querySelectorAll('.cms-row-visibility')[0]?.querySelectorAll('button')[0]?.disabled === false`);
     await evaluate(`document.querySelectorAll('.cms-row-visibility')[0].querySelectorAll('button')[0].click()`);
     await wait(`document.body.textContent.includes('Salvato')`);
     assert.equal(guides[0].visibility, 'internal');
@@ -153,6 +180,7 @@ async function main() {
     assert.equal(await evaluate(`document.querySelector('.side-menu').textContent.includes('Trova uffici')`), false);
     await visit('/quiz');
     await wait(`location.pathname === '/quiz' && !!document.querySelector('.page-hero')`);
+    await checkGuideCategories();
     await visit('/guides/documents');
     await wait(`document.body.textContent.includes('Fixture preview')`);
     assert.equal(await evaluate(`document.body.textContent.includes('Fixture internal')`), false);
@@ -172,4 +200,12 @@ async function main() {
   }
 }
 
-main().catch((err) => { console.error(err.message); process.exitCode = 1; });
+// node --test also discovers scripts named test-*. The browser journey is
+// intentionally opt-in: it needs a running dev server and native WebSocket.
+if (process.env.NODE_TEST_CONTEXT) {
+  require('node:test').test('optional Chromium visibility journey', {
+    skip: 'Run node --experimental-websocket scripts/test-visibility-browser.cjs separately',
+  }, () => {});
+} else {
+  main().catch((err) => { console.error(err.message); process.exitCode = 1; });
+}

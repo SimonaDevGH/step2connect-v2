@@ -15,7 +15,6 @@ const CATEGORY_IMAGE_KEYS = {
   homeBills: 'guidesHomeBills',
   school: 'guidesSchool',
   cityLife: 'guidesCityLife',
-  work: 'guidesWork',
 };
 
 export default function GuideCategoryPage() {

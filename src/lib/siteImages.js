@@ -8,7 +8,6 @@ export const SITE_IMAGE_GROUPS = [
   { key: 'guidesHomeBills', label: 'Casa e bollette' },
   { key: 'guidesSchool', label: 'Scuola e famiglia' },
   { key: 'guidesCityLife', label: 'Vita in città' },
-  { key: 'guidesWork', label: 'Lavoro' },
   { key: 'analyze', label: 'Analizza documento' },
   { key: 'logos', label: 'Loghi' },
 ];
@@ -21,7 +20,6 @@ export const SITE_IMAGE_SLOTS = [
   { key: 'guidesHomeBills', group: 'guidesHomeBills', label: 'Immagine principale', fallback: '/guides-homeBills.jpg' },
   { key: 'guidesSchool', group: 'guidesSchool', label: 'Immagine principale', fallback: '/guides-school.jpg' },
   { key: 'guidesCityLife', group: 'guidesCityLife', label: 'Immagine principale', fallback: '/guides-cityLife.jpg' },
-  { key: 'guidesWork', group: 'guidesWork', label: 'Immagine principale', fallback: '/guides-work.jpg' },
   { key: 'analyzeDocumentHero', group: 'analyze', label: 'Immagine principale', fallback: '/analyze-document.jpg' },
   { key: 'appLogo', group: 'logos', label: 'Step2Connect — login e barra superiore', fallback: '/logo-white.png' },
   { key: 'partnerLogo', group: 'logos', label: 'Fincantieri — menu laterale', fallback: '/logo-fincantieri-white.png' },

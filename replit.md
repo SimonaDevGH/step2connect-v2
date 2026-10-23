@@ -143,6 +143,13 @@ Non inserire segreti nel repository. Le principali variabili sono:
 Variabili opzionali includono `DYNAMODB_USERS_TABLE`,
 `DYNAMODB_PHONE_INDEX`, `DYNAMODB_REGION` e `SES_FROM_EMAIL`.
 
+## Categorie delle guide
+
+Le sole categorie valide sono Documenti e permessi, Salute e pronto soccorso,
+Casa e bollette, Scuola e famiglia, Vivere in città. L'utente ha richiesto la
+rimozione di Lavoro e busta paga dall'app e dai selettori CMS; non ripristinarla
+come categoria vuota o “in arrivo”. La rimozione non cancella dati già salvati.
+
 ## Visibilità sezioni e pagine
 
 Lo stato si cambia dal CMS: il server gestisce `config/sections.json` senza

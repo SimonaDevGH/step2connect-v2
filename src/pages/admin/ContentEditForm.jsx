@@ -25,7 +25,6 @@ const GUIDE_CATEGORIES = [
   { value: 'homeBills', label: '🏠 Casa e bollette' },
   { value: 'school',    label: '🎓 Scuola e famiglia' },
   { value: 'cityLife',  label: '🏙️ Vita in città' },
-  { value: 'work',      label: '💼 Lavoro' },
 ];
 
 async function apiFetch(path, token, opts = {}) {

@@ -1,4 +1,4 @@
-import { FileText, Heart, Home, GraduationCap, Map, Briefcase } from 'lucide-react';
+import { FileText, Heart, Home, GraduationCap, Map } from 'lucide-react';
 
 // ─── GUIDE CATEGORIES ─────────────────────────────────────────────────────────
 // Each category has an id, icon, color, emoji, and ordered list of item ids.
@@ -67,15 +67,6 @@ export const GUIDE_CATEGORIES = [
       'roadSafety',
       'mediator',
     ],
-  },
-  {
-    id: 'work',
-    heroImage: '/guides-work.jpg',
-    icon: Briefcase,
-    color: '#E9C46A',
-    emoji: '💼',
-    empty: true, // Coming soon — do not add items
-    items: [],
   },
 ];
 
