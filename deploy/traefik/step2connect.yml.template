@@ -16,6 +16,10 @@ http:
       rule: "Host(`__HOST__`)"
       entryPoints:
         - websecure
+      # Solo DEV: protezione con le credenziali comuni dei siti di sviluppo B4
+      # (middleware definito in dev-basic-auth.yml). Rimuovere per PROD.
+      middlewares:
+        - dev-basic-auth@file
       tls:
         certResolver: le
       service: step2connect-app-__APP_ENV__-svc
