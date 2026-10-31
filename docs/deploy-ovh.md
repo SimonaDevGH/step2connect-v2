@@ -35,6 +35,31 @@ Internet ──443──> Nginx (TLS Let's Encrypt, rate limit /api)
   prod/  .env  app/ (clone Git)  .current_tag
 ```
 
+### Variante: server condiviso con Traefik (befor1)
+
+Il server B4 `befor1` ospita già altri progetti e pubblica i siti con un
+container **Traefik** (file provider, rete Docker `web`, resolver `le`).
+Su questo server:
+
+- **non** eseguire `bootstrap-server.sh` né `setup-nginx.sh`: Docker è già
+  presente, le porte 80/443 sono di Traefik, il firewall e i siti esistenti non
+  vanno toccati;
+- seguire la convenzione del server: utente `ubuntu`, progetti in
+  `/home/ubuntu/stacks/` → base `/home/ubuntu/stacks/step2connect`;
+- nel `.env` impostare `TRAEFIK_NETWORK=web`: `deploy.sh` aggiunge
+  `deploy/docker-compose.traefik.yml` e il container è raggiungibile da
+  Traefik come `step2connect-<env>:5000`;
+- creare la rotta copiando `deploy/traefik/step2connect.yml.template` in
+  `/home/ubuntu/traefik-dynamic/step2connect-app-<env>.yml` (file nuovo, i file
+  `step2connect-dev.yml` / `stack.yml` esistenti servono il WordPress e non
+  vanno modificati);
+- in GitHub impostare la variable `OVH_DEPLOY_BASE=/home/ubuntu/stacks/step2connect`
+  e `OVH_SSH_USER=ubuntu`.
+
+`deploy.sh` ricava la cartella base dalla propria posizione
+(`<base>/<env>/app/deploy/scripts/deploy.sh`), quindi funziona sia in
+`/opt/step2connect` sia in `/home/ubuntu/stacks/step2connect`.
+
 ### Flusso dei branch
 
 | Branch | Ambiente | Deploy |

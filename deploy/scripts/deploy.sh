@@ -19,7 +19,8 @@ main() {
   [[ "$app_env" == prod ]] && default_ref=main
   local ref="${2:-$default_ref}"
 
-  local base_dir="${BASE_DIR:-/opt/step2connect}"
+  # Default: la cartella che contiene <env>/app/deploy/scripts/deploy.sh
+  local base_dir="${BASE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
   local env_dir="$base_dir/$app_env"
   local app_dir="$env_dir/app"
   local env_file="$env_dir/.env"
@@ -53,6 +54,9 @@ main() {
 
   export APP_ENV="$app_env" ENV_FILE="$env_file" HOST_PORT="$host_port"
   local compose=(docker compose -p "$project" --env-file "$env_file" -f "$app_dir/deploy/docker-compose.yml")
+  if grep -qE '^TRAEFIK_NETWORK=.+' "$env_file"; then
+    compose+=(-f "$app_dir/deploy/docker-compose.traefik.yml")
+  fi
 
   echo "==> [$app_env] build immagine step2connect:$app_env-$sha"
   IMAGE_TAG="$sha" "${compose[@]}" build --pull

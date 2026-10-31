@@ -52,6 +52,7 @@ jobs:
           SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
           SSH_KNOWN_HOSTS: ${{ secrets.OVH_SSH_KNOWN_HOSTS }}
           DEPLOY_REF: ${{ github.event.inputs.ref || github.sha }}
+          DEPLOY_BASE: ${{ vars.OVH_DEPLOY_BASE || '/opt/step2connect' }}
         run: |
           [[ "$DEPLOY_REF" =~ ^[A-Za-z0-9._/-]+$ ]] || { echo "ref non valido: $DEPLOY_REF"; exit 1; }
           install -d -m 700 ~/.ssh
@@ -60,4 +61,4 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
           ssh -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=yes \
             "${SSH_USER:-deploy}@${OVH_SSH_HOST}" \
-            "/opt/step2connect/dev/app/deploy/scripts/deploy.sh dev '${DEPLOY_REF}'"
+            "${DEPLOY_BASE}/dev/app/deploy/scripts/deploy.sh dev '${DEPLOY_REF}'"

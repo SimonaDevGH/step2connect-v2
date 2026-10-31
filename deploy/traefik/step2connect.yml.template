@@ -1,0 +1,27 @@
+# Rotta Traefik (file provider) per un ambiente Step2Connect.
+# Copiare in <cartella traefik-dynamic>/step2connect-app-__APP_ENV__.yml
+# sostituendo __APP_ENV__ (dev|prod) e __HOST__ (sottodominio della webapp).
+# Traefik ricarica il file da solo; il certificato è emesso dal resolver "le".
+http:
+  routers:
+    step2connect-app-__APP_ENV__-http:
+      rule: "Host(`__HOST__`)"
+      entryPoints:
+        - web
+      middlewares:
+        - redirect-https
+      service: noop@internal
+
+    step2connect-app-__APP_ENV__-https:
+      rule: "Host(`__HOST__`)"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: le
+      service: step2connect-app-__APP_ENV__-svc
+
+  services:
+    step2connect-app-__APP_ENV__-svc:
+      loadBalancer:
+        servers:
+          - url: "http://step2connect-__APP_ENV__:5000"
