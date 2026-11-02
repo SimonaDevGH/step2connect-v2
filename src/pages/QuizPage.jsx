@@ -1,140 +1,81 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BadgeCheck, ChevronRight, RefreshCw, Trophy } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-
-// ─── MOCK DATA ────────────────────────────────────────────────────────────────
-// Replace with real quiz API or CMS
-// ─────────────────────────────────────────────────────────────────────────────
-const QUESTIONS = [
-  {
-    q: { it: 'Cosa devi fare entro 8 giorni dall\'arrivo in un nuovo comune?', en: 'What must you do within 8 days of arriving in a new municipality?', bn: 'নতুন কমিউনে আসার ৮ দিনের মধ্যে কী করতে হবে?' },
-    options: {
-      it: ['Registrarsi all\'anagrafe', 'Aprire un conto in banca', 'Comprare un\'auto', 'Iscriversi al sindicato'],
-      en: ['Register at the registry office', 'Open a bank account', 'Buy a car', 'Join a union'],
-      bn: ['রেজিস্ট্রি অফিসে নিবন্ধন করুন', 'ব্যাংক অ্যাকাউন্ট খুলুন', 'গাড়ি কিনুন', 'ইউনিয়নে যোগ দিন'],
-    },
-    answer: 0,
-  },
-  {
-    q: { it: 'Quanto dura di solito il primo permesso di soggiorno per lavoro?', en: 'How long does the first work residence permit usually last?', bn: 'প্রথম কাজের বাসস্থান পারমিট সাধারণত কতদিন থাকে?' },
-    options: {
-      it: ['1 anno', '2 anni', '5 anni', '6 mesi'],
-      en: ['1 year', '2 years', '5 years', '6 months'],
-      bn: ['১ বছর', '২ বছর', '৫ বছর', '৬ মাস'],
-    },
-    answer: 1,
-  },
-  {
-    q: { it: 'Qual è il numero unico di emergenza in Italia?', en: 'What is the single emergency number in Italy?', bn: 'ইতালিতে একক জরুরি নম্বর কী?' },
-    options: {
-      it: ['999', '118', '112', '113'],
-      en: ['999', '118', '112', '113'],
-      bn: ['৯৯৯', '১১৮', '১১২', '১১৩'],
-    },
-    answer: 2,
-  },
-  {
-    q: { it: 'Il codice fiscale è composto da quanti caratteri?', en: 'How many characters is the codice fiscale?', bn: 'কোডিচে ফিসকালে কতটি অক্ষর আছে?' },
-    options: {
-      it: ['10', '14', '16', '20'],
-      en: ['10', '14', '16', '20'],
-      bn: ['১০', '১৪', '১৬', '২০'],
-    },
-    answer: 2,
-  },
-];
+import { useAuth } from '../context/AuthContext';
+import { GUIDE_CATEGORIES } from '../data/guides';
+import { canSeeVisibility } from '../lib/sectionAccess';
+import { quizApi, quizStars } from '../lib/quizApi';
 
 export default function QuizPage() {
   const { t, lang } = useLanguage();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const [started, setStarted] = useState(false);
-  const [current, setCurrent] = useState(0);
-  const [selected, setSelected] = useState(null);
-  const [score, setScore] = useState(0);
-  const [finished, setFinished] = useState(false);
+  const [items, setItems] = useState([]);
+  const [progress, setProgress] = useState({});
+  const [badges, setBadges] = useState({});
+  const [category, setCategory] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const sequence = useRef(0);
 
-  const q = QUESTIONS[current];
-
-  const handleAnswer = (idx) => {
-    if (selected !== null) return;
-    setSelected(idx);
-    if (idx === q.answer) setScore((s) => s + 1);
+  const load = () => {
+    const request = ++sequence.current;
+    setLoading(true); setError('');
+    Promise.all([quizApi(`/api/quiz?lang=${lang}`), quizApi('/api/quiz/progress')])
+      .then(([catalog, saved]) => {
+        if (request !== sequence.current) return;
+        const visible = (catalog.items || []).filter((item) => canSeeVisibility(item.visibility, user));
+        setItems(visible);
+        setProgress(catalog.quizResults || saved.quizResults || {});
+        setBadges(catalog.badges || {});
+      })
+      .catch((err) => { if (request === sequence.current) setError(err.message || t('quizLoadError')); })
+      .finally(() => { if (request === sequence.current) setLoading(false); });
   };
+  useEffect(() => { load(); return () => { sequence.current++; }; }, [lang, user]);
 
-  const handleNext = () => {
-    if (current < QUESTIONS.length - 1) {
-      setCurrent((c) => c + 1);
-      setSelected(null);
-    } else {
-      setFinished(true);
-    }
-  };
+  const grouped = useMemo(() => GUIDE_CATEGORIES
+    .map((cat) => ({ ...cat, quizzes: items.filter((quiz) => quiz.category === cat.id) }))
+    .filter((cat) => cat.quizzes.length > 0), [items]);
+  const selected = grouped.find((entry) => entry.id === category);
 
-  const reset = () => { setCurrent(0); setSelected(null); setScore(0); setFinished(false); setStarted(false); };
+  if (loading) return <main className="page-content quiz-page"><div className="quiz-hero"><span className="quiz-hero-mark">Q</span><h1>{t('quizTitle')}</h1><p>{t('quizDesc')}</p></div><div className="quiz-catalog-skeleton"><i/><i/><i/></div></main>;
+  if (error) return <main className="page-content quiz-page"><div className="quiz-hero"><span className="quiz-hero-mark">Q</span><h1>{t('quizTitle')}</h1><p>{t('quizDesc')}</p></div><div className="quiz-empty"><p>{error}</p><button className="quiz-button" onClick={load}><RefreshCw size={17}/>{t('quizRetry')}</button></div></main>;
 
-  return (
-    <div className="page-content">
-      <div className="page-hero" style={{ background: '#E9C46A' }}>
-        <button className="back-btn dark" onClick={() => navigate('/home')}>
-          <ChevronLeft size={24} /> Home
-        </button>
-        <div className="page-hero-icon">🧠</div>
-        <h2 className="page-hero-title dark">{t('quizTitle')}</h2>
-        <p className="page-hero-sub dark">{t('quizDesc')}</p>
-      </div>
-
-      <div className="quiz-body">
-        {!started && !finished && (
-          <div className="quiz-start">
-            <p>📝 {QUESTIONS.length} domande</p>
-            <button className="btn-primary" onClick={() => setStarted(true)}>{t('start')}</button>
-          </div>
-        )}
-
-        {started && !finished && (
-          <>
-            <div className="quiz-progress">
-              <div className="quiz-progress-bar" style={{ width: `${((current + 1) / QUESTIONS.length) * 100}%` }} />
-            </div>
-            <p className="quiz-counter">{current + 1} / {QUESTIONS.length}</p>
-            <p className="quiz-question">{q.q[lang] || q.q.it}</p>
-            <div className="quiz-options">
-              {(q.options[lang] || q.options.it).map((opt, idx) => {
-                let cls = 'quiz-option';
-                if (selected !== null) {
-                  if (idx === q.answer) cls += ' correct';
-                  else if (idx === selected) cls += ' wrong';
-                }
-                return (
-                  <button key={idx} className={cls} onClick={() => handleAnswer(idx)}>
-                    {opt}
-                  </button>
-                );
-              })}
-            </div>
-            {selected !== null && (
-              <div className="quiz-feedback">
-                <p className={selected === q.answer ? 'text-correct' : 'text-wrong'}>
-                  {selected === q.answer ? `✅ ${t('correct')}` : `❌ ${t('wrong')}`}
-                </p>
-                <button className="btn-primary" onClick={handleNext}>
-                  {current < QUESTIONS.length - 1 ? t('next') : t('finish')}
-                </button>
-              </div>
-            )}
-          </>
-        )}
-
-        {finished && (
-          <div className="quiz-result">
-            <p className="quiz-score-label">{t('score')}</p>
-            <p className="quiz-score">{score} / {QUESTIONS.length}</p>
-            {score === QUESTIONS.length ? <p>🎉 Perfetto!</p> : score >= QUESTIONS.length / 2 ? <p>👍 Bravo!</p> : <p>📚 Studia ancora un po\'!</p>}
-            <button className="btn-primary" onClick={reset}>{t('retry')}</button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  return <main className="page-content quiz-page">
+    <header className="quiz-hero">
+      {category && <button className="quiz-hero-back" onClick={() => setCategory(null)}><ArrowLeft size={18}/>{t('quizAllCategories')}</button>}
+      <span className="quiz-hero-mark" aria-hidden="true">Q</span>
+      <div className="quiz-hero-copy"><p className="quiz-eyebrow">{t('quizPractice')}</p><h1>{category ? t(`guideCat_${category}`) : t('quizTitle')}</h1><p>{category ? t('quizPickChallenge') : t('quizDesc')}</p></div>
+      <span className="quiz-hero-spark" aria-hidden="true">✦</span>
+    </header>
+    {items.length === 0 ? <section className="quiz-empty">
+      <span className="quiz-empty-icon"><Trophy size={26}/></span><h2>{t('quizEmptyTitle')}</h2><p>{t('quizEmptyDesc')}</p>
+    </section> : selected ? <section className="quiz-list-section">
+      <div className="quiz-list-heading"><div><p className="quiz-eyebrow">{t('quizCategory')}</p><h2>{t(`guideCat_${category}`)}</h2></div><span>{selected.quizzes.length} {t('quizCount')}</span></div>
+      {selected.quizzes.map((quiz) => {
+        const score = progress[quiz.id];
+        return <button className="quiz-list-card" key={quiz.id} onClick={() => navigate(`/quiz/${encodeURIComponent(quiz.id)}`)}>
+          <span className="quiz-list-symbol">{selected.emoji || '✦'}</span>
+          <span className="quiz-list-info"><strong>{quiz.title}</strong><small>{quiz.questions?.length || 0} {t('quizQuestions')} · {t('quizMinute')}</small></span>
+          <span className="quiz-card-status">{score?.passedAt && <BadgeCheck size={19}/>}<span className="quiz-mini-stars">{[1,2,3].map((s) => <i key={s} className={s <= quizStars(score?.bestScore, quiz.questions?.length) ? 'earned' : ''}>★</i>)}</span></span>
+          <ChevronRight size={19} className="quiz-chevron"/>
+        </button>;
+      })}
+    </section> : <section className="quiz-category-grid">
+      <div className="quiz-section-intro"><span>{t('quizChooseTopic')}</span><strong>{grouped.length} {t('quizTopics')}</strong></div>
+      {grouped.map((cat) => {
+        const complete = cat.quizzes.filter((quiz) => progress[quiz.id]?.passedAt).length;
+        const unlocked = Boolean(badges[cat.id]) || (cat.quizzes.length > 0 && complete === cat.quizzes.length);
+        const Icon = cat.icon;
+        return <button key={cat.id} className="quiz-category-card" onClick={() => setCategory(cat.id)} style={{ '--category-color': cat.color }}>
+          <span className="quiz-category-icon"><Icon size={23}/></span>
+          <span className="quiz-category-content"><strong>{t(`guideCat_${cat.id}`)}</strong><small>{complete} {t('quizOf')} {cat.quizzes.length} {t('quizPassedPlural')}</small><span className="quiz-category-progress"><i style={{ width: `${cat.quizzes.length ? complete / cat.quizzes.length * 100 : 0}%` }}/></span></span>
+          <span className={`quiz-expert ${unlocked ? 'unlocked' : ''}`} aria-label={`${t('quizExpert')} ${t(`guideCat_${cat.id}`)}`}><Trophy size={14}/><span>{t('quizExpert')}<small>{unlocked ? t('quizUnlocked') : t('quizLocked')}</small></span></span>
+          <ArrowRight size={18} className="quiz-chevron"/>
+        </button>;
+      })}
+    </section>}
+  </main>;
 }

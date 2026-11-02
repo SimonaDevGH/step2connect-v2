@@ -35,7 +35,7 @@ async function getUserByPhone(phone, documentClient = client) {
     TableName: TABLE_NAME,
     ExpressionAttributeNames: names,
     ExpressionAttributeValues: values,
-    ProjectionExpression: '#phone, firstName, userId, #type, adminPsw, sede, notificationsRead',
+    ProjectionExpression: '#phone, firstName, userId, #type, adminPsw, sede, notificationsRead, quizResults',
   };
 
   if (PHONE_INDEX) {
@@ -143,6 +143,71 @@ async function markNotificationsReadByPhone(phone, ids, documentClient = client)
   throw Object.assign(new Error('Letture modificate contemporaneamente: riprovare'), { status: 409 });
 }
 
+async function saveQuizResultByPhone(phone, quiz, answers, documentClient = client) {
+  const firstAnswers = Object.fromEntries(quiz.questions.map((q) => [q.qid, answers[q.qid] === q.answer]));
+  const score = Object.values(firstAnswers).filter(Boolean).length;
+  const passed = score >= quiz.passThreshold;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const profile = await getUserByPhone(phone, documentClient);
+    if (!profile?.userId) return { score, passed, saved: false, progress: null, quizResults: {} };
+    const old = profile.quizResults || {};
+    const previous = old[quiz.id];
+    const now = new Date().toISOString();
+    const progress = {
+      firstAnswers: previous?.firstAnswers || firstAnswers,
+      firstScore: previous?.firstScore ?? score,
+      bestScore: Math.max(previous?.bestScore || 0, score),
+      attempts: (previous?.attempts || 0) + 1,
+      passedAt: previous?.passedAt || (passed ? now : ''),
+      lastAt: now,
+    };
+    const next = { ...old, [quiz.id]: progress };
+    try {
+      await documentClient.send(new UpdateCommand({
+        TableName: TABLE_NAME, Key: { userId: profile.userId },
+        UpdateExpression: 'SET #results = :next',
+        ConditionExpression: 'attribute_exists(#id) AND #phone = :phone AND (attribute_not_exists(#results) OR #results = :old)',
+        ExpressionAttributeNames: { '#id': 'userId', '#phone': 'phone', '#results': 'quizResults' },
+        ExpressionAttributeValues: { ':next': next, ':phone': phone, ':old': old },
+      }));
+      return { score, passed, saved: true, progress, quizResults: next, previouslyPassed: Boolean(previous?.passedAt) };
+    } catch (err) {
+      if (err.name !== 'ConditionalCheckFailedException') throw err;
+    }
+  }
+  throw Object.assign(new Error('Risultati modificati contemporaneamente: riprovare'), { status: 409 });
+}
+
+async function quizResultAggregates(quiz, documentClient = client) {
+  let people = 0, passed = 0, ExclusiveStartKey;
+  const counters = Object.fromEntries(quiz.questions.map((q) => [q.qid, { correct: 0, total: 0 }]));
+  do {
+    const page = await documentClient.send(new ScanCommand({
+      TableName: TABLE_NAME, ProjectionExpression: '#results',
+      ExpressionAttributeNames: { '#results': 'quizResults' }, ExclusiveStartKey,
+    }));
+    for (const profile of page.Items || []) {
+      const result = profile.quizResults?.[quiz.id];
+      if (!result) continue;
+      people++;
+      if (result.passedAt) passed++;
+      for (const q of quiz.questions) {
+        if (typeof result.firstAnswers?.[q.qid] !== 'boolean') continue;
+        counters[q.qid].total++;
+        if (result.firstAnswers[q.qid]) counters[q.qid].correct++;
+      }
+    }
+    ExclusiveStartKey = page.LastEvaluatedKey;
+  } while (ExclusiveStartKey);
+  return {
+    people, passRate: people ? Math.round(passed * 100 / people) : 0,
+    questions: quiz.questions.map((q) => ({
+      qid: q.qid, correctRate: counters[q.qid].total ? Math.round(counters[q.qid].correct * 100 / counters[q.qid].total) : null,
+      anchor: q.anchor, guideUrl: quiz.guideUrl,
+    })),
+  };
+}
+
 module.exports = {
   getUserByPhone,
   isAdminProfile,
@@ -151,4 +216,6 @@ module.exports = {
   setUserRoleByPhone,
   promoteWhitelistUserByPhone,
   markNotificationsReadByPhone,
+  saveQuizResultByPhone,
+  quizResultAggregates,
 };

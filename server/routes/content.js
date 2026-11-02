@@ -12,6 +12,8 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   const { type, lang = 'it' } = req.query;
   if (!type) return res.status(400).json({ error: 'type is required' });
+  // Quiz visibility is authenticated, unlike the legacy public content API.
+  if (type === 'quiz') return res.status(404).json({ error: 'Not found' });
 
   try {
     const prefix = `content/published/${type}/${lang}/`;
@@ -56,6 +58,7 @@ router.get('/pages-by-url', async (req, res) => {
 // Dettaglio singolo contenuto pubblicato.
 router.get('/:type/:id', async (req, res) => {
   const { type, id } = req.params;
+  if (type === 'quiz') return res.status(404).json({ error: 'Not found' });
   const { lang = 'it' } = req.query;
   const key = `content/published/${type}/${lang}/${id}.json`;
   try {

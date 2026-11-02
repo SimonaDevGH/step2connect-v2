@@ -9,7 +9,7 @@ import './admin-content.css';
 
 const SECTION_NAV = [
   { slug: 'guide-pratiche', key: 'guides', title: 'Guide pratiche', path: '/guides', types: ['guides'] },
-  { slug: 'quiz', key: 'quiz', title: 'Quiz', path: '/quiz' },
+  { slug: 'quiz', key: 'quiz', title: 'Quiz', path: '/quiz', types: ['quiz'] },
   { slug: 'analizza-documento', key: 'analyze-document', title: 'Analizza documento', path: '/analyze-document' },
   { slug: 'notifiche', key: 'notifications', title: 'Notifiche', path: '/notifications' },
   { slug: 'news', key: 'news', title: 'News', path: '/news', types: ['news'] },

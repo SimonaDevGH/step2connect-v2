@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Pencil, Plus, RefreshCw, Send, Trash2, Images } from 'lucide-react';
 import ContentEditForm from './ContentEditForm';
+import { QuizEditForm, QuizImportToolbar } from './QuizTools';
 
 const LANGS = ['it', 'en', 'bn'];
 const VISIBILITY = [
@@ -152,11 +153,20 @@ export default function AdminContentList({ types = ['guides', 'news', 'library',
   if (editItem !== null) {
     return (
       <div className="cms-editor-wrap">
-        <ContentEditForm
-          contentType={editItem.type}
-          contentId={editItem.id === 'new' ? null : editItem.id}
-          onClose={() => { setEditItem(null); loadItems(); }}
-        />
+        {editItem.type === 'quiz' ? (
+          <QuizEditForm
+            quizId={editItem.id === 'new' ? null : editItem.id}
+            adminToken={adminToken}
+            onUnauthorized={onUnauthorized}
+            onClose={() => { setEditItem(null); loadItems(); }}
+          />
+        ) : (
+          <ContentEditForm
+            contentType={editItem.type}
+            contentId={editItem.id === 'new' ? null : editItem.id}
+            onClose={() => { setEditItem(null); loadItems(); }}
+          />
+        )}
       </div>
     );
   }
@@ -201,6 +211,7 @@ export default function AdminContentList({ types = ['guides', 'news', 'library',
         )}
       </div>
 
+      {type === 'quiz' && <QuizImportToolbar adminToken={adminToken} onUnauthorized={onUnauthorized} onImported={loadItems} />}
       {error && <div className="admin-error" role="alert">{error}</div>}
       {notice && <div className="admin-success cms-inline-notice" role="status">{notice}</div>}
 

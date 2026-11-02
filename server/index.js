@@ -51,6 +51,9 @@ app.use('/api/admin/sections', sectionRoutes.adminRouter);
 const notificationRoutes = require('./routes/notifications');
 app.use('/api/admin/notifications', notificationRoutes.adminRouter);
 app.use('/api/notifications', notificationRoutes.userRouter);
+const quizRoutes = require('./routes/quiz');
+app.use('/api/admin/quiz', quizRoutes.adminRouter);
+app.use('/api/quiz', quizRoutes.userRouter);
 
 // ── HEALTH ────────────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => res.json({ ok: true }));

@@ -181,3 +181,18 @@ non sono un archivio riservato. Non confondere visibilità con autorizzazione.
 
 Per la documentazione completa, le route e gli script operativi consultare
 `README.md`.
+
+## Quiz collegati alle guide
+
+I quiz Vero/Falso sono contenuti CMS multilingua collegati alle guide, non dati
+finti. Import Excel in due fasi, solo bozze, nuovi quiz Interni; i record esistenti
+mantengono visibilità e richiedono pubblicazione esplicita delle modifiche.
+Il player legge copie pubblicate anche per gli admin. Il cambio di visibilità
+usa la stessa pubblicazione immediata delle guide.
+Le API quiz sono autenticate e filtrate anche lato server: le API pubbliche
+generiche dei contenuti non espongono i quiz.
+Il server calcola i risultati e aggiorna solo quizResults nei profili esistenti.
+Il primo tentativo è immutabile; le statistiche del CMS sono solo aggregate.
+La validazione V2 usa le guide reali solo in lettura: 28 quiz / 112 domande,
+medico di base 022 ed emergenze 023. Nessun import operativo automatico o
+modifica ai profili reali nei test. README documenta gestione e pubblicazione.

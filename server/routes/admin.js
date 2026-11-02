@@ -10,7 +10,7 @@ const { validateContent } = require('../lib/validate');
 const { VISIBILITIES } = require('../lib/sections');
 
 const router = express.Router();
-const CONTENT_TYPES = ['guides', 'news', 'library', 'pages', 'site'];
+const CONTENT_TYPES = ['guides', 'news', 'library', 'pages', 'site', 'quiz'];
 const LIST_LANGUAGES = ['it', 'en', 'bn'];
 const FILE_LANGUAGE_CODES = { it: 'it', en: 'en', bn: 'bd' };
 const FEATURED_SERVICE_GUIDE_ID = 'guida-al-servizio';
@@ -120,6 +120,10 @@ router.get('/', async (req, res) => {
 router.get('/:type/:id', async (req, res) => {
   const { type, id } = req.params;
   try {
+    if (type === 'quiz') {
+      const record = await require('../lib/quiz').getEditor(id);
+      return record ? res.json(record) : res.status(404).json({ error: 'Quiz non trovato' });
+    }
     const [it, en, bn] = await Promise.all([
       getJson(`content/draft/${type}/it/${id}.json`).then((draft) =>
         draft || getJson(`content/published/${type}/it/${id}.json`)),
@@ -175,6 +179,15 @@ router.put('/:type/:id', async (req, res) => {
   const author = adminUserId(req);
 
   try {
+    if (type === 'quiz') {
+      const quiz = require('../lib/quiz');
+      const prepared = await quiz.prepareQuiz(req.body);
+      if (previousId !== prepared.records[0].id && previousId !== 'new') {
+        return res.status(400).json({ error: 'Non è possibile rinominare il quiz' });
+      }
+      await quiz.savePrepared(prepared, author);
+      return res.json({ ok: true, id: prepared.records[0].id, warnings: prepared.warnings });
+    }
     const payload = validateContent({ ...req.body, type });
     const id = payload.id;
     const isRename = previousId !== id;
@@ -243,6 +256,7 @@ router.put('/:type/:id', async (req, res) => {
 
     res.json({ ok: true, id, url: publicUrl, renamed: isRename, updatedAt: now });
   } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
     if (err.name === 'ZodError') {
       const issues = (err.issues || err.errors || []).map((issue) => ({
         path: issue.path || [],
@@ -268,7 +282,7 @@ router.put('/:type/:id', async (req, res) => {
 router.put('/:type/:id/visibility', async (req, res) => {
   const { type, id } = req.params;
   const visibility = req.body?.visibility;
-  if (!['guides', 'news', 'library', 'pages'].includes(type)
+  if (!['guides', 'news', 'library', 'pages', 'quiz'].includes(type)
     || !/^[a-zA-Z0-9_-]{1,100}$/.test(id) || !VISIBILITIES.includes(visibility)) {
     return res.status(400).json({ error: 'Invalid content or visibility' });
   }

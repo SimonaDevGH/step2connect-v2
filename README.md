@@ -36,6 +36,7 @@ supportate sono:
 21. [Mappa delle aree della webapp](#mappa-delle-aree-della-webapp)
 22. [Visibilità di sezioni e pagine](#visibilità-di-sezioni-e-pagine)
 23. [Calendario notifiche e letture personali](#calendario-notifiche-e-letture-personali)
+24. [Quiz collegati alle guide](#quiz-collegati-alle-guide)
 
 ## Funzionalità principali
 
@@ -600,6 +601,7 @@ immagine della configurazione `site`; per `site` sono ammessi solo upload immagi
 | `/library` | Libreria |
 | `/library/:id` | Dettaglio elemento libreria |
 | `/quiz` | Quiz |
+| `/quiz/:id` | Quiz Vero/Falso collegato a una guida |
 | `/offices` | Ricerca uffici |
 | `/notifications` | Notifiche |
 | `/translator` | Traduttore WhatsApp |
@@ -749,7 +751,7 @@ hardcoded nel bucket. Non eseguirlo automaticamente in produzione.
   AWS SES.
 - Le notifiche sono esclusivamente interne alla webapp: non vengono inviate
   notifiche push, SMS o email dal calendario.
-- Quiz, elenco uffici e schede legacy dei servizi usano dati locali, non un CMS
+- Elenco uffici e schede legacy dei servizi usano dati locali, non un CMS
   o un servizio aggiornato in tempo reale.
 - Il traduttore apre WhatsApp: non traduce automaticamente il testo nell'app
   e il numero di destinazione nel codice è ancora un segnaposto.
@@ -850,10 +852,11 @@ gestiti dal CMS, dati dimostrativi e integrazioni esterne.
 
 ### Quiz
 
-- `/quiz`: domande a scelta multipla in tre lingue, risposta corretta,
-  avanzamento, punteggio finale e possibilità di ricominciare.
-- Domande e risposte sono locali; non esistono gestione quiz nel CMS o
-  salvataggio server dei risultati.
+- `/quiz`: categorie delle guide con quiz visibili, avanzamento, stelle e badge.
+- `/quiz/:id`: domande Vero/Falso IT/EN/BN, spiegazioni, audio opzionale e link ai
+  paragrafi della guida, con ritorno al tentativo in corso.
+- Gestione CMS, import/export Excel, statistiche aggregate e risultati persistenti:
+  vedere [Quiz collegati alle guide](#quiz-collegati-alle-guide).
 
 ### Cerca uffici
 
@@ -1097,3 +1100,134 @@ disponibile; i test Excel sintetici non dipendono dagli allegati.
 verifica campanella, letture, secondo browser, lingua, CMS, import/export e
 calendario con API simulate. Controlla le guide reali solo in lettura: non
 scrive su S3 o DynamoDB reali.
+
+## Quiz collegati alle guide
+
+### Gestione dal CMS
+
+Aprire **CMS → Quiz**. L'elenco riusa lingua, Modifica,
+Interno/Anteprima/Pubblicato, Pubblica modifiche ed Elimina dei contenuti editoriali.
+La visibilità della sezione e quella del quiz sono controlli distinti:
+entrambe devono consentire l'accesso.
+
+1. **Importa da Excel** → selezionare `.xlsx` → **Anteprima import**.
+2. Controllare quiz nuovi/aggiornati, errori e avvisi. L'anteprima non scrive.
+3. **Conferma import** salva soltanto le bozze nelle tre lingue:
+   nuovi quiz in Interno, quiz esistenti con la visibilità precedente.
+   La versione già pubblicata non cambia automaticamente.
+4. **Pubblica modifiche** rende disponibile la bozza mantenendo la visibilità.
+   Anche un quiz Interno deve avere una copia pubblicata per essere giocato
+   dagli amministratori.
+5. Scegliere Anteprima per `fincantieri_users`, Pubblicato per gli standard.
+   Come per le guide, scegliere una visibilità pubblica subito l'ultima bozza:
+   controllare prima i testi.
+
+**Modifica** apre un editor dedicato con guida in sola lettura e link, soglia,
+Vero/Falso e paragrafo per domanda, affermazione/spiegazione e URL audio
+IT/EN/BN, aggiunta, eliminazione e riordino delle domande.
+Il menu paragrafi usa la bozza italiana con inizio del testo.
+I contatori misurano parole: oltre 15 nell'affermazione diventano arancioni,
+senza bloccare il salvataggio. I testi italiani sono obbligatori.
+Il salvataggio resta bozza fino alla pubblicazione.
+
+La scheda **Statistiche** mostra soltanto aggregati: persone che hanno tentato,
+percentuale di persone che hanno superato almeno una volta e correttezza delle
+domande al primo tentativo. Sotto il 60% il dato è rosso con link al paragrafo.
+N/D indica assenza di risposte iniziali per una domanda.
+L'API non restituisce nomi, telefoni o risultati individuali.
+
+### Excel e dati
+
+Foglio preferito **Quiz 3 lingue**, altrimenti il primo; `.xlsx`, massimo
+5 MB e 5000 righe. Intestazioni riconosciute:
+
+| Colonna | Utilizzo |
+|---|---|
+| ID contenuto | `contentId`, testo con zeri iniziali |
+| ID guida CMS | `guideId`; ID quiz `quiz-<guideId>` |
+| Domanda | `qid` stabile |
+| Risposta | Solo Vero/Falso, convertito in booleano |
+| Paragrafo | `p1`, `p2`, ecc. |
+| Affermazione IT / EN / BN | Affermazioni nelle tre lingue |
+| Spiegazione IT / EN / BN | Spiegazioni nelle tre lingue |
+
+Titolo, Verifica, Note, Modifiche e altre colonne sono ignorate. Categoria,
+ordinamento, URL e titoli vengono dalle guide CMS, non dall'Excel.
+Qid/risposta/ancora sono condivisi nelle tre lingue.
+Le domande importate vengono ordinate per qid; un export inalterato conserva
+l'eventuale ordine riordinato nel CMS.
+
+Errori bloccanti: guida italiana inesistente, risposta non valida, testi IT
+mancanti, qid duplicati e ancora malformata. Avvisi: EN/BN incompleti,
+numero di domande diverso da quattro e ancora oltre i paragrafi della guida.
+La conferma ripete la validazione prima di scrivere.
+
+**Esporta Excel** scarica tutti i quiz correnti. Reimportare senza cambiamenti
+non riscrive file, audit, audio o visibilità. Le soglie esistenti vengono
+conservate; l'import non elimina i quiz assenti dal file.
+Verificato il V2 contro le guide reali CMS in sola lettura: **28 quiz,
+112 domande, nessun errore o avviso**, medico di base `022` e 112 `023` corretti.
+Il test non importa automaticamente l'allegato nel bucket operativo.
+
+I file sono `content/{draft|published|archive}/quiz/{it|en|bn}/...`, con
+pubblicazione, visibilità e archiviazione/eliminazione come gli altri contenuti.
+Le API pubbliche generiche `/api/content` non espongono i quiz.
+
+### Esperienza utente e risultati
+
+- Compaiono solo le categorie con quiz accessibili, con superati/totali,
+  stelle e badge Esperto della categoria.
+- Il player presenta segmenti grigi/verdi/rossi e controlli Vero/Falso grandi.
+  Dopo la risposta mostra sempre la spiegazione; coriandoli per quella corretta,
+  vibrazione breve se supportata per quella errata, nessun suono.
+  L'audio opzionale è disponibile solo quando configurato nella lingua.
+- **Leggi nella guida** apre `guideUrl#pN`: gli elementi HTML di primo livello
+  ricevono ancore in ordine, evidenziate per due secondi. **Torna al quiz**
+  riprende la domanda e la risposta in corso.
+- Il server calcola punteggio, superamento, stelle e badge dalla versione
+  pubblicata: campi score/stelle/superamento inviati dal client sono ignorati.
+  Su quattro domande: 4/4 = 3 stelle, 3/4 = 2, 2/4 = 1, meno = 0.
+  Con altre lunghezze si usano le equivalenti soglie proporzionali.
+  Sono disponibili Rifai e il successivo quiz non superato della categoria.
+- In fondo alla guida, la card Mettiti alla prova compare solo se il quiz
+  ha una versione pubblicata e accessibile.
+- Testi UI IT/EN/BN; testi quiz mancanti con fallback italiano, non audio.
+
+Nel record DynamoDB esistente viene aggiornato solo `quizResults`:
+per ID quiz, `firstAnswers` (correttezza, non scelta Vero/Falso),
+`firstScore`, `bestScore`, `attempts`, `passedAt`, `lastAt`.
+Il primo tentativo non viene mai sovrascritto. Le scritture condizionali
+gestiscono conflitti senza modificare ruolo o altri dati.
+Senza profilo il quiz funziona senza salvare, con avviso nell'interfaccia.
+Le sessioni Cognito e preview/whitelist usano la verifica firmata esistente.
+
+### API, permessi e test
+
+| Metodo | Endpoint | Accesso |
+|---|---|---|
+| GET | `/api/quiz?lang=it|en|bn` | Utente: catalogo visibile, progressi, badge |
+| GET | `/api/quiz/progress` | Utente: propri `quizResults` |
+| GET | `/api/quiz/:id?lang=...` | Utente: quiz pubblicato e visibile |
+| POST | `/api/quiz/:id/result?lang=...` | Utente: `{answers:{qid:boolean}}` |
+| GET / PUT | `/api/admin/content/quiz/:id` | CMS: editor / salvataggio bozza |
+| PUT | `/api/admin/content/quiz/:id/visibility` | CMS: visibilità e pubblicazione |
+| POST | `/api/admin/content/quiz/:id/publish` | CMS: pubblicazione bozze |
+| DELETE | `/api/admin/content/quiz/:id` | CMS: archiviazione e rimozione |
+| POST | `/api/admin/quiz/import/preview` | CMS: multipart `file` |
+| POST | `/api/admin/quiz/import/confirm` | CMS: `{quizzes:[...]}` |
+| GET | `/api/admin/quiz/export` | CMS: XLSX |
+| GET | `/api/admin/quiz/:id/stats` | CMS: aggregati |
+
+Occorrono i permessi S3 di lettura/scrittura/copia/eliminazione sui prefissi
+quiz, lista chiavi e lettura guide. Per DynamoDB servono lettura per telefono,
+Scan per aggregati e UpdateItem sul profilo esistente. Un indice telefono
+deve proiettare anche `quizResults`. Nessuna policy AWS viene modificata
+automaticamente.
+
+`npm test` copre validazione, metadati guida, lingue, visibilità, calcolo
+server, primo tentativo, conflitti, profilo mancante, aggregati ed export/reimport
+senza modifiche. Il test dell'allegato V2 è opzionale se assente nel checkout.
+`node --experimental-websocket scripts/check-quiz-browser.cjs [file.xlsx]`
+verifica categorie, due tentativi, secondo browser, BN, p5 evidenziato e ritorno,
+editor/statistiche/import/export CMS e layout mobile con API simulate.
+Nessun profilo o quiz reale su AWS viene modificato dai test.

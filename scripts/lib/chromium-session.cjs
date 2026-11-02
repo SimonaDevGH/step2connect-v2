@@ -68,7 +68,7 @@ async function chromiumSession() {
       socket.close();
       const exited = new Promise((resolve) => process.once('exit', resolve));
       process.kill('SIGTERM'); await exited;
-      await fs.rm(directory, { recursive: true, force: true });
+      await fs.rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     },
   };
 }
