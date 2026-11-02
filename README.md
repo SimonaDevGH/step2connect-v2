@@ -978,6 +978,10 @@ senza modificare utenti o file S3 reali.
 
 ## Calendario notifiche e letture personali
 
+Per le istruzioni passo passo dedicate agli amministratori, consultare la
+[Guida operativa Notifiche nel CMS](docs/notifiche-cms.md): creazione, calendario,
+importazione Excel, traduzioni, visibilità e risoluzione dei problemi.
+
 ### Calendario e gestione CMS
 
 In **CMS → Notifiche** il selettore di visibilità esistente resta sopra la gestione
