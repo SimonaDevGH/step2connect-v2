@@ -7,6 +7,8 @@ const sessions = [], results = {};
 const ids = ['permit-renewal', 'emergency', 'find-home', 'school-enrollment', 'public-transport'];
 const categories = ['documents', 'health', 'homeBills', 'school', 'cityLife'];
 let role = 'admin', exported = false, imported = false, saved = false;
+let failBulkOnce = true;
+const bulkCalls = [];
 const paragraphs = '<p>Primo paragrafo.</p><ul><li>Secondo paragrafo.</li></ul><p>Terzo paragrafo.</p><h3>Quarto paragrafo.</h3><p>Quinto paragrafo evidenziato.</p><p>Sesto paragrafo.</p>';
 (async () => {
   const book = new ExcelJS.Workbook();
@@ -15,7 +17,7 @@ const paragraphs = '<p>Primo paragrafo.</p><ul><li>Secondo paragrafo.</li></ul><
   const records = ids.map((id, index) => {
     const rows = []; sheet.eachRow((r, i) => { if (i > 1 && r.getCell(2).text === id) rows.push(r); });
     return {
-      id: `quiz-${id}`, type: 'quiz', guideId: id, category: categories[index],
+      id: `quiz-${id}`, type: 'quiz', guideId: id, category: categories[index], status: 'published',
       title: rows[0].getCell(3).text, guideUrl: `/guides/${categories[index]}/${id}`,
       contentId: rows[0].getCell(1).text, sortOrder: index, visibility: 'internal', passThreshold: 3,
       questions: rows.map((r) => ({ qid: r.getCell(4).text, answer: r.getCell(5).text === 'Vero', anchor: r.getCell(6).text })),
@@ -33,6 +35,7 @@ const paragraphs = '<p>Primo paragrafo.</p><ul><li>Secondo paragrafo.</li></ul><
   const create = async () => {
     const b = await chromiumSession(); sessions.push(b);
     b.events['Runtime.exceptionThrown'] = ({ exceptionDetails: e }) => b.failures.push(e.exception?.description || e.text);
+    b.events['Page.javascriptDialogOpening'] = () => b.cdp('Page.handleJavaScriptDialog', { accept: true });
     b.events['Fetch.requestPaused'] = async ({ requestId, request }) => {
       const url = new URL(request.url), path = url.pathname, lang = url.searchParams.get('lang') || 'it';
       const body = request.postData?.startsWith('{') ? JSON.parse(request.postData) : null;
@@ -58,7 +61,16 @@ const paragraphs = '<p>Primo paragrafo.</p><ul><li>Secondo paragrafo.</li></ul><
       else if (/^\/api\/admin\/quiz\/[^/]+\/stats$/.test(path)) data={people:1,passRate:100,questions:records[0].questions.map((q,i)=>({...q,correctRate:i===1?0:100,guideUrl:records[0].guideUrl}))};
       else if (path.startsWith('/api/admin/content/quiz/')) {
         const q=records.find(q=>path.split('/')[5]===q.id);
-        if(request.method==='PUT') {saved=true;data={ok:true};} else data=q;
+        if (request.method === 'POST' && /\/(unpublish|publish)$/.test(path)) {
+          const action = path.split('/').pop();
+          bulkCalls.push({ id: q.id, action });
+          if (action === 'publish' && q.id === records[1].id && failBulkOnce) {
+            failBulkOnce = false; code = 500; data = { error: 'Errore simulato' };
+          } else {
+            q.status = action === 'publish' ? 'published' : 'draft';
+            data = { ok: true };
+          }
+        } else if(request.method==='PUT') {saved=true;data={ok:true};} else data=q;
       } else if (/^\/api\/content\/guides\//.test(path)) data={id:path.split('/').pop(),title:'Guida reale di prova',body:paragraphs,visibility:'published',category:'documents'};
       else if (/^\/api\/admin\/content\/guides\//.test(path)) data={it:{body:paragraphs}};
       else if (path.startsWith('/api/notifications')) data={items:[],unread:0};
@@ -126,6 +138,31 @@ const paragraphs = '<p>Primo paragrafo.</p><ul><li>Secondo paragrafo.</li></ul><
     assert.equal(await second.evaluate(`!!document.querySelector('.guide-quiz-card')`),false);
     role='admin';await b.evaluate(`localStorage.setItem('s2c_lang','it')`);await b.visit('/admin/content/quiz');
     await b.wait(`!!document.querySelector('button[title="Modifica"]')`);
+    assert.ok(await b.evaluate(`document.querySelector('.cms-bulk-btn--publish').disabled`));
+    await b.evaluate(`document.querySelector('.cms-checkbox-cell input').click()`);
+    assert.ok(await b.evaluate(`document.querySelector('.cms-select-all input').indeterminate`));
+    await b.evaluate(`document.querySelector('.cms-select-all input').click()`);
+    assert.equal(await b.evaluate(`document.querySelectorAll('.cms-checkbox-cell input:checked').length`), 5);
+    await b.click('Riporta in bozza');
+    await b.wait(`document.body.textContent.includes('Riportati in bozza 5 di 5 quiz.') && document.querySelectorAll('.admin-status--draft').length===5`);
+    assert.equal(bulkCalls.length, 5);
+    assert.ok(records.every(q => q.status === 'draft' && q.visibility === 'internal'));
+    await b.evaluate(`document.querySelector('.cms-select-all input').click()`);
+    await b.click('Pubblica selezionati');
+    await b.wait(`document.body.textContent.includes('Pubblicati 4 di 5 quiz.') && document.querySelectorAll('.cms-checkbox-cell input:checked').length===1`);
+    assert.ok(await b.evaluate(`document.querySelector('.cms-select-all input').indeterminate`));
+    assert.equal(bulkCalls.length, 10);
+    await b.screenshot('s2c-quiz-bulk-partial.png');
+    await b.click('Pubblica selezionati');
+    await b.wait(`document.body.textContent.includes('Pubblicati 1 di 1 quiz.') && document.querySelectorAll('.admin-status--published').length===5`);
+    assert.equal(bulkCalls.length, 11);
+    assert.ok(records.every(q => q.status === 'published' && q.visibility === 'internal'));
+    await b.evaluate(`document.querySelector('.cms-select-all input').click()`);
+    await b.click('EN');
+    await b.wait(`document.querySelectorAll('.cms-checkbox-cell input:checked').length===0 && !document.querySelector('.cms-select-all input').indeterminate`);
+    await b.click('IT');
+    await b.wait(`!!document.querySelector('button[title="Modifica"]')`);
+    await b.screenshot('s2c-quiz-bulk.png');
     await b.evaluate(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.getAttribute('title')==='Modifica'||b.textContent.trim()==='Modifica');if(!b)throw Error('Missing edit');b.click()})()`);
     await b.wait(`document.querySelectorAll('.quiz-question-editor').length===4`);
     assert.ok(await b.evaluate(`[...document.querySelectorAll('select option')].some(o=>o.value==='p5')`));
@@ -140,6 +177,6 @@ const paragraphs = '<p>Primo paragrafo.</p><ul><li>Secondo paragrafo.</li></ul><
     await b.click('Conferma import');await b.wait(`document.body.textContent.includes('5 quiz importati')`);assert.ok(imported);
     await b.click('Esporta Excel');await b.wait(`!document.querySelector('.quiz-export-btn').disabled`);assert.ok(exported);
     for(const s of sessions)assert.deepEqual(s.failures,[]);
-    console.log('QUIZ_BROWSER_PASS: 5 categories, 2 attempts, server result display, p5 highlight/return/resume, second browser progress, BN, hidden internal quizzes/guide card for non-admin, CMS editor/stats/import/export, mobile');
+    console.log('QUIZ_BROWSER_PASS: categories, player, guide anchors, persistence, BN, roles, CMS editor/stats/import/export, bulk select/mixed/publish/unpublish/partial failure/retry/language reset, mobile');
   } finally {await Promise.all(sessions.map(s=>s.close().catch(e=>console.error('Browser cleanup:',e.message))));}
 })().catch(err=>{console.error(err);process.exitCode=1});

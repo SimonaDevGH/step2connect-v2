@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pencil, Plus, RefreshCw, Send, Trash2, Images } from 'lucide-react';
 import ContentEditForm from './ContentEditForm';
 import { QuizEditForm, QuizImportToolbar } from './QuizTools';
@@ -68,6 +68,20 @@ export default function AdminContentList({ types = ['guides', 'news', 'library',
   const [deleteError, setDeleteError] = useState('');
   const [pendingVisibility, setPendingVisibility] = useState('');
   const [publishingId, setPublishingId] = useState('');
+  const [selectedQuizIds, setSelectedQuizIds] = useState(() => new Set());
+  const [bulkAction, setBulkAction] = useState('');
+  const [bulkProgress, setBulkProgress] = useState({ completed: 0, total: 0 });
+  const selectAllRef = useRef(null);
+  const bulkBusy = Boolean(bulkAction);
+  const quizItems = type === 'quiz' ? items.filter((item) => item.type === 'quiz') : [];
+  const selectedQuizCount = quizItems.filter((item) => selectedQuizIds.has(String(item.id))).length;
+  const allQuizRowsSelected = quizItems.length > 0 && selectedQuizCount === quizItems.length;
+  const someQuizRowsSelected = selectedQuizCount > 0 && !allQuizRowsSelected;
+  const bulkActionsBlocked = bulkBusy || loading || Boolean(pendingVisibility || publishingId || deleting || deleteTarget);
+
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = someQuizRowsSelected;
+  }, [someQuizRowsSelected]);
 
   useEffect(() => {
     if (!types.includes(type)) setType(types[0] || 'guides');
@@ -79,7 +93,14 @@ export default function AdminContentList({ types = ['guides', 'news', 'library',
     setError('');
     try {
       const data = await apiFetch(`/api/admin/content?type=${encodeURIComponent(type)}&lang=${lang}`, adminToken);
-      setItems(Array.isArray(data) ? data : []);
+      const nextItems = Array.isArray(data) ? data : [];
+      setItems(nextItems);
+      if (type === 'quiz') {
+        const listedIds = new Set(nextItems.filter((item) => item.type === 'quiz').map((item) => String(item.id)));
+        setSelectedQuizIds((previous) => new Set([...previous].filter((id) => listedIds.has(id))));
+      } else {
+        setSelectedQuizIds(new Set());
+      }
     } catch (err) {
       if (err.status === 401 || err.message.toLowerCase().includes('token')) onUnauthorized?.();
       else setError(err.message || 'Impossibile caricare i contenuti.');
@@ -89,10 +110,11 @@ export default function AdminContentList({ types = ['guides', 'news', 'library',
     }
   }, [type, lang, adminToken, onUnauthorized]);
 
-  useEffect(() => { loadItems(); }, [loadItems, refreshKey]);
+  useEffect(() => { setSelectedQuizIds(new Set()); }, [type, lang]);
+  useEffect(() => { if (!bulkBusy) loadItems(); }, [loadItems, refreshKey, bulkBusy]);
 
   const handleVisibility = async (item, visibility) => {
-    if ((item.visibility || 'published') === visibility || pendingVisibility) return;
+    if (bulkBusy || (item.visibility || 'published') === visibility || pendingVisibility) return;
     if (visibility === 'published' && !window.confirm(`Pubblicare “${item.title || item.id}”? Sarà visibile a tutti gli utenti.`)) return;
     const itemKey = `${item.type}-${item.id}`;
     setPendingVisibility(itemKey);
@@ -118,6 +140,7 @@ export default function AdminContentList({ types = ['guides', 'news', 'library',
   };
 
   const handlePublish = async (item) => {
+    if (bulkBusy) return;
     if (!window.confirm(`Pubblicare le modifiche a “${item.title || item.id}”?`)) return;
     setPublishingId(`${item.type}-${item.id}`);
     setError('');
@@ -134,8 +157,60 @@ export default function AdminContentList({ types = ['guides', 'news', 'library',
     }
   };
 
+  const toggleQuizSelection = (id) => {
+    if (bulkBusy) return;
+    const key = String(id);
+    setSelectedQuizIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleAllQuizSelection = () => {
+    if (bulkBusy || loading || quizItems.length === 0) return;
+    setSelectedQuizIds(allQuizRowsSelected
+      ? new Set()
+      : new Set(quizItems.map((item) => String(item.id))));
+  };
+
+  const handleBulkAction = async (action) => {
+    if (bulkBusy || loading || pendingVisibility || publishingId || deleting || deleteTarget || selectedQuizCount === 0) return;
+    const selectedItems = quizItems.filter((item) => selectedQuizIds.has(String(item.id)));
+    const isPublish = action === 'publish';
+    const confirmation = isPublish
+      ? `Pubblicare ${selectedItems.length} quiz selezionati? Le modifiche saranno applicate in tutte e 3 le lingue (italiano, inglese e bengalese), mantenendo la visibilità attuale di ogni quiz.`
+      : `Riportare in bozza ${selectedItems.length} quiz selezionati? La versione online sarà rimossa in tutte e 3 le lingue (italiano, inglese e bengalese); le bozze e la visibilità attuale saranno conservate.`;
+    if (!window.confirm(confirmation)) return;
+
+    setBulkAction(action);
+    setBulkProgress({ completed: 0, total: selectedItems.length });
+    setError('');
+    setNotice('');
+    const succeeded = [];
+    const failed = [];
+    for (const item of selectedItems) {
+      try {
+        const endpoint = `/api/admin/content/quiz/${encodeURIComponent(item.id)}/${isPublish ? 'publish' : 'unpublish'}`;
+        await apiFetch(endpoint, adminToken, { method: 'POST' });
+        succeeded.push(String(item.id));
+      } catch (err) {
+        if (err.status === 401 || err.message.toLowerCase().includes('token')) onUnauthorized?.();
+        failed.push({ id: String(item.id), message: err.message || 'Errore sconosciuto' });
+      }
+      setBulkProgress((previous) => ({ ...previous, completed: previous.completed + 1 }));
+    }
+    setSelectedQuizIds(new Set(failed.map(({ id }) => id)));
+    setBulkAction('');
+    setNotice(
+      `${isPublish ? 'Pubblicati' : 'Riportati in bozza'} ${succeeded.length} di ${selectedItems.length} quiz.` +
+      (failed.length ? ` Non riusciti: ${failed.map(({ id, message }) => `${id} (${message})`).join('; ')}. I quiz non riusciti restano selezionati.` : ''),
+    );
+  };
+
   const handleConfirmDelete = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || bulkBusy) return;
     setDeleting(true);
     setDeleteError('');
     try {
@@ -181,6 +256,7 @@ export default function AdminContentList({ types = ['guides', 'news', 'library',
                 type="button"
                 key={contentType}
                 className={`admin-filter-btn ${type === contentType ? 'active' : ''}`}
+                disabled={bulkBusy}
                 onClick={() => setType(contentType)}
               >
                 {contentType === 'pages' ? 'Pagine' : contentType === 'site' ? 'Immagini app' : contentType}
@@ -194,26 +270,53 @@ export default function AdminContentList({ types = ['guides', 'news', 'library',
               type="button"
               key={language}
               className={`admin-filter-btn ${lang === language ? 'active' : ''}`}
+              disabled={bulkBusy}
               onClick={() => setLang(language)}
             >
               {language.toUpperCase()}
             </button>
           ))}
         </div>
-        <button type="button" className="admin-refresh-btn" onClick={loadItems} title="Ricarica" aria-label="Ricarica">
+        <button type="button" className="admin-refresh-btn" onClick={loadItems} title="Ricarica" aria-label="Ricarica" disabled={bulkBusy}>
           <RefreshCw size={17} />
         </button>
         {(type !== 'site' || items.length === 0) && (
-          <button type="button" className="admin-new-btn" onClick={() => setEditItem({ id: 'new', type })}>
+          <button type="button" className="admin-new-btn" onClick={() => setEditItem({ id: 'new', type })} disabled={bulkBusy}>
             {type === 'site' ? <Images size={17} /> : <Plus size={17} />}
             {type === 'site' ? 'Configura immagini' : 'Nuovo'}
           </button>
         )}
       </div>
 
-      {type === 'quiz' && <QuizImportToolbar adminToken={adminToken} onUnauthorized={onUnauthorized} onImported={loadItems} />}
+      {type === 'quiz' && (
+        <div className="cms-quiz-import-wrap" inert={bulkBusy ? '' : undefined} aria-disabled={bulkBusy || undefined}>
+          <QuizImportToolbar adminToken={adminToken} onUnauthorized={onUnauthorized} onImported={loadItems} />
+        </div>
+      )}
+      {type === 'quiz' && (
+        <div className="cms-bulk-toolbar" aria-label="Azioni quiz selezionati">
+          <label className="cms-select-all">
+            <input
+              ref={selectAllRef}
+              type="checkbox"
+              checked={allQuizRowsSelected}
+              disabled={loading || quizItems.length === 0 || bulkBusy}
+              onChange={toggleAllQuizSelection}
+            />
+            <span>Seleziona tutti ({quizItems.length})</span>
+          </label>
+          <span className="cms-bulk-count" aria-live="polite">{selectedQuizCount} selezionati</span>
+          <button type="button" className="cms-bulk-btn cms-bulk-btn--publish" disabled={!selectedQuizCount || bulkActionsBlocked} onClick={() => handleBulkAction('publish')}>
+            {bulkAction === 'publish' ? 'Pubblicazione…' : 'Pubblica selezionati'}
+          </button>
+          <button type="button" className="cms-bulk-btn" disabled={!selectedQuizCount || bulkActionsBlocked} onClick={() => handleBulkAction('unpublish')}>
+            {bulkAction === 'unpublish' ? 'Ripristino…' : 'Riporta in bozza'}
+          </button>
+          {bulkBusy && <span className="cms-bulk-progress" role="status">Operazione {Math.min(bulkProgress.completed + 1, bulkProgress.total)} di {bulkProgress.total}…</span>}
+        </div>
+      )}
       {error && <div className="admin-error" role="alert">{error}</div>}
-      {notice && <div className="admin-success cms-inline-notice" role="status">{notice}</div>}
+      {notice && <div className={`${notice.includes('Non riusciti:') ? 'admin-error' : 'admin-success'} cms-inline-notice`} role={notice.includes('Non riusciti:') ? 'alert' : 'status'}>{notice}</div>}
 
       {loading ? (
         <div className="cms-list-skeleton" aria-label="Caricamento contenuti">
@@ -245,9 +348,20 @@ export default function AdminContentList({ types = ['guides', 'news', 'library',
           {items.map((item) => {
             const itemKey = `${item.type}-${item.id}`;
             const pending = pendingVisibility === itemKey;
+            const isQuizRow = type === 'quiz' && item.type === 'quiz';
             return (
               <div key={itemKey} className="admin-item cms-admin-item" role="row">
-                <span className="admin-item-emoji">{item.emoji || '📄'}</span>
+                {isQuizRow ? (
+                  <label className="cms-checkbox-cell">
+                    <input
+                      type="checkbox"
+                      checked={selectedQuizIds.has(String(item.id))}
+                      disabled={bulkBusy}
+                      onChange={() => toggleQuizSelection(item.id)}
+                      aria-label={`Seleziona ${item.title || item.id}`}
+                    />
+                  </label>
+                ) : <span className="admin-item-emoji">{item.emoji || '📄'}</span>}
                 <div className="admin-item-info">
                   <p className="admin-item-title">{item.title || item.id}</p>
                   <p className="admin-item-meta">{item.id}</p>
@@ -257,7 +371,7 @@ export default function AdminContentList({ types = ['guides', 'news', 'library',
                   <div className="admin-item-cell cms-visibility-cell" data-label="Visibilità">
                     <ContentVisibility
                       item={item}
-                    disabled={Boolean(pendingVisibility)}
+                      disabled={Boolean(pendingVisibility) || bulkBusy}
                       onChange={handleVisibility}
                     />
                     {pending && <span className="cms-row-saving">Salvataggio…</span>}
@@ -271,19 +385,19 @@ export default function AdminContentList({ types = ['guides', 'news', 'library',
                 <span className="admin-item-cell admin-item-updated" data-label="Ultima modifica">{formatLastEdited(item.updatedAt)}</span>
                 <span className="admin-item-cell admin-item-url" data-label="Percorso" title={item.url || ''}>{item.url || '—'}</span>
                 <div className="admin-item-actions">
-                  <button type="button" title="Modifica" aria-label={`Modifica ${item.title || item.id}`} onClick={() => setEditItem({ id: item.id, type: item.type })}><Pencil size={16} /></button>
+                  <button type="button" title="Modifica" aria-label={`Modifica ${item.title || item.id}`} disabled={bulkBusy} onClick={() => setEditItem({ id: item.id, type: item.type })}><Pencil size={16} /></button>
                   {item.hasUnpublishedChanges && (
                     <button
                       type="button"
                       title="Pubblica modifiche"
                       aria-label={`Pubblica modifiche ${item.title || item.id}`}
-                      disabled={publishingId === itemKey}
+                      disabled={publishingId === itemKey || bulkBusy}
                       onClick={() => handlePublish(item)}
                     >
                       <Send size={16} />
                     </button>
                   )}
-                  <button type="button" title="Elimina" aria-label={`Elimina ${item.title || item.id}`} className="admin-action-danger" onClick={() => { setDeleteTarget(item); setDeleteError(''); }}><Trash2 size={16} /></button>
+                  <button type="button" title="Elimina" aria-label={`Elimina ${item.title || item.id}`} className="admin-action-danger" disabled={bulkBusy} onClick={() => { setDeleteTarget(item); setDeleteError(''); }}><Trash2 size={16} /></button>
                 </div>
               </div>
             );
@@ -300,8 +414,8 @@ export default function AdminContentList({ types = ['guides', 'news', 'library',
             <p className="admin-modal-hint">Bozza e contenuto pubblicato verranno rimossi in tutte le lingue.</p>
             {deleteError && <p className="admin-modal-error" role="alert">{deleteError}</p>}
             <div className="admin-modal-actions">
-              <button type="button" className="admin-modal-cancel" onClick={() => setDeleteTarget(null)} disabled={deleting}>Annulla</button>
-              <button type="button" className="admin-modal-delete" onClick={handleConfirmDelete} disabled={deleting}>{deleting ? 'Eliminazione…' : 'OK, cancella'}</button>
+              <button type="button" className="admin-modal-cancel" onClick={() => setDeleteTarget(null)} disabled={deleting || bulkBusy}>Annulla</button>
+              <button type="button" className="admin-modal-delete" onClick={handleConfirmDelete} disabled={deleting || bulkBusy}>{deleting ? 'Eliminazione…' : 'OK, cancella'}</button>
             </div>
           </div>
         </div>

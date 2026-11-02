@@ -330,13 +330,61 @@ async function publishDraft(type, id) {
 // POST /api/admin/content/:type/:id/publish
 router.post('/:type/:id/publish', async (req, res) => {
   const { type, id } = req.params;
+  if (type === 'quiz' && !/^[a-zA-Z0-9_-]{1,100}$/.test(id)) {
+    return res.status(400).json({ error: 'Invalid quiz' });
+  }
   try {
+    if (type === 'quiz') {
+      const versions = await Promise.all(LIST_LANGUAGES.map(async (lang) => ({
+        lang,
+        draft: await getJson(`content/draft/quiz/${lang}/${id}.json`),
+        online: await getJson(`content/published/quiz/${lang}/${id}.json`),
+      })));
+      if (versions.every(({ draft, online }) => !draft && !online)) {
+        return res.status(404).json({ error: 'Quiz non trovato' });
+      }
+      if (versions.some(({ draft, online }) => !draft && !online)) {
+        return res.status(409).json({ error: 'Salvare prima il quiz in tutte le lingue' });
+      }
+      for (const { lang, draft, online } of versions) {
+        if (!draft) await putJson(`content/draft/quiz/${lang}/${id}.json`, online);
+      }
+    }
     await publishDraft(type, id);
 
     res.json({ ok: true, publishedAt: new Date().toISOString() });
   } catch (err) {
     console.error('[admin] publish error', err);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Ritira solo la versione online del quiz; conserva bozze e visibilità.
+router.post('/:type/:id/unpublish', async (req, res) => {
+  const { type, id } = req.params;
+  if (type !== 'quiz' || !/^[a-zA-Z0-9_-]{1,100}$/.test(id)) {
+    return res.status(400).json({ error: 'Invalid quiz' });
+  }
+  try {
+    const versions = await Promise.all(LIST_LANGUAGES.map(async (lang) => ({
+      lang,
+      draft: await getJson(`content/draft/quiz/${lang}/${id}.json`),
+      online: await getJson(`content/published/quiz/${lang}/${id}.json`),
+    })));
+    if (versions.every(({ draft, online }) => !draft && !online)) {
+      return res.status(404).json({ error: 'Quiz non trovato' });
+    }
+    // Completa prima la conservazione delle bozze, poi rimuovi le copie online.
+    for (const { lang, draft, online } of versions) {
+      if (!draft && online) await putJson(`content/draft/quiz/${lang}/${id}.json`, online);
+    }
+    for (const lang of LIST_LANGUAGES) {
+      await deleteObject(`content/published/quiz/${lang}/${id}.json`);
+    }
+    res.json({ ok: true, status: 'draft' });
+  } catch (err) {
+    console.error('[admin] quiz unpublish error', err);
+    res.status(500).json({ error: 'Impossibile riportare il quiz in bozza; riprovare' });
   }
 });
 

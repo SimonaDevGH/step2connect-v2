@@ -145,6 +145,47 @@ test('quiz editor writes three internal drafts, guide metadata is authoritative 
   assert.equal((await call('/api/quiz', { role: 'fincantieri_users' })).data.items.length, 1);
   assert.equal((await call('/api/quiz', { role: 'standard' })).data.items.length, 0);
 });
+test('quiz publication and withdrawal preserve all language drafts, visibility and results', async () => {
+  reset();
+  await quiz.savePrepared(await quiz.prepareQuiz(record()), 'fixture');
+  const id = 'quiz-permit-request';
+  const path = `/api/admin/content/quiz/${id}`;
+  const drafts = quiz.LANGS.map((lang) => copy(objects.get(quiz.key('draft', lang, id))));
+  assert.equal((await call(`${path}/unpublish`, { role: null, method: 'POST' })).status, 401);
+  assert.equal((await call(`${path}/unpublish`, { method: 'POST' })).status, 401);
+  await publish(id);
+  assert.equal((await call('/api/quiz')).data.items.length, 1);
+  // Missing draft must be recovered from its online version without replacing newer drafts.
+  objects.delete(quiz.key('draft', 'bn', id));
+  objects.set('unrelated', { intact: true });
+  profiles.get('+fixture').quizResults = { [id]: { attempts: 2, bestScore: 4 } };
+  assert.equal((await call(`${path}/unpublish`, { cms: true, method: 'POST' })).status, 200);
+  for (const [index, lang] of quiz.LANGS.entries()) {
+    assert.deepEqual(objects.get(quiz.key('draft', lang, id)), drafts[index]);
+    assert.equal(objects.has(quiz.key('published', lang, id)), false);
+  }
+  assert.equal((await call('/api/quiz')).data.items.length, 0);
+  assert.equal((await call(`/api/quiz/${id}`)).status, 404);
+  assert.equal((await call(`/api/quiz/${id}/result`, { method: 'POST', body: { answers: {} } })).status, 404);
+  assert.equal(profiles.get('+fixture').quizResults[id].attempts, 2);
+  assert.deepEqual(objects.get('unrelated'), { intact: true });
+  assert.equal((await call(`${path}/unpublish`, { cms: true, method: 'POST' })).status, 200);
+  await publish(id);
+  for (const [index, lang] of quiz.LANGS.entries()) {
+    assert.deepEqual(objects.get(quiz.key('published', lang, id)), drafts[index]);
+  }
+  const list = await call('/api/admin/content?type=quiz&lang=it', { cms: true });
+  assert.equal(list.data[0].status, 'published');
+  assert.equal(list.data[0].visibility, 'internal');
+  assert.equal((await call('/api/admin/content/quiz/absent/unpublish', { cms: true, method: 'POST' })).status, 404);
+  assert.equal((await call('/api/admin/content/quiz/absent/publish', { cms: true, method: 'POST' })).status, 404);
+  assert.equal((await call('/api/admin/content/guides/permit-request/unpublish', { cms: true, method: 'POST' })).status, 400);
+  objects.delete(quiz.key('draft', 'bn', id));
+  objects.delete(quiz.key('published', 'bn', id));
+  const before = copy([...objects.entries()]);
+  assert.equal((await call(`${path}/publish`, { cms: true, method: 'POST' })).status, 409);
+  assert.deepEqual([...objects.entries()], before);
+});
 test('authoritative results preserve first attempt, best score, profile fields, conflict merges, progress, badge and aggregate privacy', async () => {
   reset();
   await quiz.savePrepared(await quiz.prepareQuiz(record()), 'fixture'); await publish();

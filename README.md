@@ -1122,6 +1122,28 @@ entrambe devono consentire l'accesso.
    Come per le guide, scegliere una visibilità pubblica subito l'ultima bozza:
    controllare prima i testi.
 
+### Pubblicazione e ritorno in bozza di più quiz
+
+Nell’elenco **CMS → Quiz** puoi selezionare i singoli quiz con le caselle oppure
+usare **Seleziona tutti** per includere tutti i quiz dell’elenco corrente.
+Le azioni **Pubblica selezionati** e **Riporta in bozza** richiedono conferma
+e si applicano a tutte e tre le lingue, senza cambiare la visibilità
+Interno/Anteprima/Pubblicato.
+
+Riportare in bozza ritira le versioni online: i quiz non sono più disponibili
+nel catalogo o nelle guide, nemmeno agli admin nell’app utente. Le bozze, le
+modifiche non pubblicate e i risultati già registrati restano conservati.
+È possibile pubblicarli nuovamente in seguito.
+Durante l’operazione viene mostrato l’avanzamento; in caso di errore parziale
+sono indicati i quiz non aggiornati, che restano selezionati per riprovare.
+La selezione si riferisce all’elenco corrente e viene azzerata al cambio lingua.
+
+L’API CMS `POST /api/admin/content/quiz/:id/unpublish` ritira un singolo quiz
+in tutte le lingue ed è protetta dalla stessa autenticazione amministrativa
+della pubblicazione. Le azioni multiple richiamano queste API quiz per quiz.
+
+### Editor e statistiche
+
 **Modifica** apre un editor dedicato con guida in sola lettura e link, soglia,
 Vero/Falso e paragrafo per domanda, affermazione/spiegazione e URL audio
 IT/EN/BN, aggiunta, eliminazione e riordino delle domande.
