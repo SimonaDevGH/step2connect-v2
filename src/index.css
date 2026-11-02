@@ -1538,6 +1538,15 @@ input, textarea { font-family: inherit; }
 .notif-text { font-size: 0.83rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 4px; }
 .notif-time { font-size: 0.75rem; color: var(--text-muted); }
 .notif-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--navy); flex-shrink: 0; margin-top: 4px; }
+.notif-card { width: 100%; text-align: left; cursor: pointer; font: inherit; }
+.notif-card .notif-text, .notif-card .notif-time { display: block; }
+.notif-card:disabled { cursor: wait; }
+.notif-actions { display: flex; justify-content: flex-end; }
+.notif-read-all { background: white; color: var(--navy); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+.notif-read-all:disabled { opacity: .5; cursor: default; }
+.notif-error { color: #a12626; font-size: .9rem; }
+.notif-bell { position: relative; flex-shrink: 0; margin-left: auto; }
+.notif-bell-count { position: absolute; top: -3px; right: -3px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 12px; display: grid; place-items: center; background: #d92d41; color: white; font-size: 10px; font-weight: 700; border: 2px solid var(--navy); }
 
 /* ── Translator ───────────────────────────────────────────────────────── */
 .translator-body { padding: 20px 16px; }

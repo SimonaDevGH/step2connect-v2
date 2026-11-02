@@ -269,6 +269,7 @@
 
 @media (max-width: 760px) {
   .cms-workspace { display: flex; flex-direction: column; }
+  .cms-workspace > .cms-main-column { width: 100%; }
   .cms-topbar { gap: 12px; padding: 9px 12px; }
   .cms-topbar .back-btn { font-size: .8rem; gap: 0; }
   .cms-admin-identity { flex-direction: column; gap: 2px; align-items: flex-start; }

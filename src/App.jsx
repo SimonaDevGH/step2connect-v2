@@ -1,11 +1,14 @@
 import { useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { AdminAuthProvider, useAdminAuth } from './context/AdminAuthContext';
 import { SiteImagesProvider, useSiteImages } from './context/SiteImagesContext';
 import { SectionsProvider } from './context/SectionsContext';
 import SectionRoute from './components/SectionRoute';
+import { NotificationsProvider, useNotifications } from './context/NotificationsContext';
+import { canSeeSection } from './lib/sectionAccess';
+import { useSections } from './context/SectionsContext';
 
 import LoginPage          from './pages/LoginPage';
 import HomePage           from './pages/HomePage';
@@ -33,7 +36,7 @@ import AdminResetPasswordPage  from './pages/admin/AdminResetPasswordPage';
 import BottomBar        from './components/BottomBar';
 import SideMenu         from './components/SideMenu';
 import LivePersonBubble from './components/LivePersonBubble';
-import { Menu, Languages } from 'lucide-react';
+import { Menu, Languages, Bell } from 'lucide-react';
 import { useLanguage } from './context/LanguageContext';
 
 const LANGS = [
@@ -95,6 +98,9 @@ function GuideSingleSegmentPage() {
 // ── Shell principale (app utente con Cognito) ─────────────────────────────────
 function AppShell() {
   const { user, authReady } = useAuth();
+  const navigate = useNavigate();
+  const { sections, sectionsReady } = useSections();
+  const { unread } = useNotifications();
   const { t, lang, changeLang } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
@@ -126,6 +132,14 @@ function AppShell() {
 
         <img src={siteImages.appLogo} alt="Step2Connect" className="top-bar-logo" />
 
+        {sectionsReady && canSeeSection('notifications', user, sections) && (
+          <button type="button" className="icon-btn notif-bell"
+            aria-label={`${t('notificationsTitle')}: ${unread} ${t('notificationUnread')}`}
+            onClick={() => navigate('/notifications')}>
+            <Bell size={22} />
+            {unread > 0 && <span className="notif-bell-count">{unread > 9 ? '9+' : unread}</span>}
+          </button>
+        )}
         <div className="top-lang-wrap">
           <button
             className={`top-lang-btn ${langOpen ? 'active' : ''}`}
@@ -190,6 +204,7 @@ export default function App() {
         <SiteImagesProvider>
           <AuthProvider>
             <SectionsProvider>
+            <NotificationsProvider>
             <AdminAuthProvider>
               <Routes>
                 {/* Area admin — routing completamente separato, senza Cognito */}
@@ -198,6 +213,7 @@ export default function App() {
                 <Route path="/*"       element={<AppShell />} />
               </Routes>
             </AdminAuthProvider>
+            </NotificationsProvider>
             </SectionsProvider>
           </AuthProvider>
         </SiteImagesProvider>

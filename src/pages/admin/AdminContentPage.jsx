@@ -4,6 +4,7 @@ import { ChevronLeft, ExternalLink, LogOut, RefreshCw, UserCircle } from 'lucide
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import { useSections } from '../../context/SectionsContext';
 import AdminContentList from './AdminContentList';
+import AdminNotifications from './AdminNotifications';
 import './admin-content.css';
 
 const SECTION_NAV = [
@@ -198,7 +199,9 @@ export default function AdminContentPage() {
               ))}
             </section>
           )}
-          {activeSection.types ? (
+          {activeSection.key === 'notifications' ? (
+            <AdminNotifications adminToken={adminToken} onUnauthorized={handleLogout} refreshKey={refreshKey} />
+          ) : activeSection.types ? (
             <AdminContentList
               key={activeSection.slug}
               types={activeSection.types}

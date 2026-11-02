@@ -150,6 +150,19 @@ Casa e bollette, Scuola e famiglia, Vivere in città. L'utente ha richiesto la
 rimozione di Lavoro e busta paga dall'app e dai selettori CMS; non ripristinarla
 come categoria vuota o “in arrivo”. La rimozione non cancella dati già salvati.
 
+## Notifiche
+
+Le notifiche sono interne alla webapp, senza push/SMS/email. Il calendario viene
+gestito esclusivamente dal server attraverso il CMS; ogni modifica archivia prima
+la versione precedente su S3. Le letture sono persistenti nel profilo DynamoDB,
+massimo 300 ID, senza creare nuovi profili.
+
+Il calendario allegato comprende 44 notifiche programmate più N-WELCOME:
+l'utente ha confermato di includere anche il tipo `welcome` (oltre a
+content_engagement e function_engagement), per un totale di 45. Welcome segue
+le medesime regole di date, territorio e stato attivo, non un invio push o un
+nuovo flusso di login. Non importare automaticamente i dati di test su S3.
+
 ## Visibilità sezioni e pagine
 
 Lo stato si cambia dal CMS: il server gestisce `config/sections.json` senza

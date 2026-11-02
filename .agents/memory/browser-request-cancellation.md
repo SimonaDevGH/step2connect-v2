@@ -12,3 +12,10 @@ questo annullamento come un errore applicativo produce falsi fallimenti intermit
 
 **How to apply:** ignorare esclusivamente questo errore di intercettazione
 annullata. Non ignorare errori HTTP, eccezioni della pagina o asserzioni fallite.
+
+Le interazioni CDP non aspettano il rendering React: dopo un click attendere
+esplicitamente il controllo o il nuovo stato nel DOM prima dell'interazione
+successiva, anziché presumere che la risoluzione di Runtime.evaluate lo garantisca.
+
+**Why:** senza questa attesa i controlli possono risultare intermittentemente
+assenti pur essendo funzionanti nell'app, specialmente menu e aggiornamenti asincroni.

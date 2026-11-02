@@ -48,6 +48,9 @@ app.use('/api/admin/auth',    adminAuthRoutes);
 app.use('/api/admin/content', adminRoutes);
 app.use('/api/sections', sectionRoutes.publicRouter);
 app.use('/api/admin/sections', sectionRoutes.adminRouter);
+const notificationRoutes = require('./routes/notifications');
+app.use('/api/admin/notifications', notificationRoutes.adminRouter);
+app.use('/api/notifications', notificationRoutes.userRouter);
 
 // ── HEALTH ────────────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => res.json({ ok: true }));

@@ -1,4 +1,12 @@
 export default {
+  markAllNotificationsRead: 'সবগুলো পঠিত হিসেবে চিহ্নিত করুন',
+  notifToday: 'আজ',
+  notifYesterday: 'গতকাল',
+  notifDaysAgo: '{count} দিন আগে',
+  notificationUnread: 'অপঠিত',
+  notificationsError: 'বিজ্ঞপ্তি লোড বা আপডেট করা যাচ্ছে না।',
+  notificationsRetry: 'আবার চেষ্টা করুন',
+  notificationsLoading: 'বিজ্ঞপ্তি লোড হচ্ছে…',
   appName: 'Step2Connect',
   tagline: 'ইতালিতে আপনার সহায়তা',
   loginTitle: 'লগইন করুন',

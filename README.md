@@ -35,6 +35,7 @@ supportate sono:
 20. [Deploy e repository](#deploy-e-repository)
 21. [Mappa delle aree della webapp](#mappa-delle-aree-della-webapp)
 22. [Visibilità di sezioni e pagine](#visibilità-di-sezioni-e-pagine)
+23. [Calendario notifiche e letture personali](#calendario-notifiche-e-letture-personali)
 
 ## Funzionalità principali
 
@@ -746,7 +747,8 @@ hardcoded nel bucket. Non eseguirlo automaticamente in produzione.
   nuovo caricamento.
 - L’invio email di reset richiede `SES_FROM_EMAIL` configurato e verificato in
   AWS SES.
-- Le notifiche push sono ancora dimostrative.
+- Le notifiche sono esclusivamente interne alla webapp: non vengono inviate
+  notifiche push, SMS o email dal calendario.
 - Quiz, elenco uffici e schede legacy dei servizi usano dati locali, non un CMS
   o un servizio aggiornato in tempo reale.
 - Il traduttore apre WhatsApp: non traduce automaticamente il testo nell'app
@@ -862,8 +864,13 @@ gestiti dal CMS, dati dimostrativi e integrazioni esterne.
 
 ### Notifiche
 
-- `/notifications`: elenco dimostrativo con titolo, testo, data e indicatore
-  letto/non letto. Non è un sistema push né una casella personale persistente.
+- `/notifications`: notifiche reali gestite dal CMS, con testo nella lingua
+  scelta (fallback italiano), emoji iniziale, data relativa e stato di lettura.
+- La campanella mostra il conteggio non letto (`9+` oltre nove); aprire una
+  notifica la segna come letta prima di aprire la destinazione. È disponibile
+  anche “Segna tutte come lette”. Errori di caricamento/salvataggio sono espliciti.
+- Il calendario è su S3; le letture sono nel profilo DynamoDB e restano valide
+  dopo logout/login da un altro browser. La sezione rispetta la visibilità per ruolo.
 
 ### Traduttore e analisi documenti
 
@@ -953,10 +960,12 @@ non annulla però la restrizione della sezione. Le pagine nuove nascono `interna
   La policy `infra/sections-iam.yaml` consente lettura/scrittura sulla sola chiave.
   Le normali policy contenuti devono consentire le scritture delle bozze e copie online.
 
-**Confine di sicurezza:** le regole richieste filtrano navigazione e rendering
+**Confine di sicurezza:** per i contenuti CMS generici le regole richieste filtrano navigazione e rendering
 dell'app. Le API di lettura contenuti e gli URL dei media restano pubblici come
 prima: questa funzionalità non rende riservati i file o i JSON contro richieste
 dirette. Non usarla come protezione di documenti o dati confidenziali.
+Le nuove API notifiche fanno eccezione: richiedono la sessione utente verificata
+e applicano anche sul server la visibilità della sezione.
 
 ### Verifica
 
@@ -966,3 +975,121 @@ attesa del profilo al refresh. Il controllo browser opzionale
 `node --experimental-websocket scripts/test-visibility-browser.cjs` usa Chromium
 e il dominio di sviluppo Replit: tutte le API vengono intercettate con fixture,
 senza modificare utenti o file S3 reali.
+
+## Calendario notifiche e letture personali
+
+### Calendario e gestione CMS
+
+In **CMS → Notifiche** il selettore di visibilità esistente resta sopra la gestione
+del calendario. Sono disponibili:
+
+- Elenco filtrabile per mese, stato attivo e traduzioni mancanti; stato data,
+  territorio, guida, messaggio IT e indicatori IT/EN/BN.
+- Interruttore attiva/disattiva con salvataggio immediato, nuova notifica,
+  modifica e cancellazione con conferma.
+- Calendario mensile: selezionare una notifica per modificarla.
+- Editor di tutti i campi, selezione guida con compilazione di ID contenuto,
+  ID guida e link, testi IT/EN/BN con contatori e anteprima nell'app.
+  Oltre 180 caratteri il contatore è arancione, non bloccante. L'ID è stabile
+  dopo la creazione; un import con lo stesso ID aggiorna il record.
+- Importa da Excel con anteprima di righe nuove/aggiornate, errori e avvisi;
+  conferma disabilitata finché ci sono errori. L'anteprima non scrive nulla.
+- Esporta Excel per scaricare il calendario corrente e reimportarlo.
+
+Il server gestisce `config/notifications.json` nel bucket configurato. Il file
+mancante equivale a un elenco vuoto. Ogni salvataggio che cambia i dati archivia
+prima la versione precedente in `config/archive/notifications_<timestamp>.json`;
+se l'archivio fallisce, il salvataggio si interrompe. L'import è un'unione per ID:
+i record non presenti nel file restano invariati. Un export reimportato senza
+modifiche non riscrive dati o audit. Non è necessario creare file S3 a mano.
+
+Ogni record contiene `id`, `obiettivo`, `tipo`, `contentId`, `guideId`, `link`,
+`message.{it,en,bn}`, `startDate`, `endDate`, `frequency`, `active`, `territory`,
+`dateStatus`, `hook`, `updatedAt`, `updatedBy`.
+
+I tipi validi sono `content_engagement`, `function_engagement` e **`welcome`**
+(aggiunto su conferma dell'utente per `N-WELCOME`). Una guida indicata deve
+esistere in `content/draft/guides/it/<guideId>.json`; è obbligatoria per
+`content_engagement`. Il messaggio IT è obbligatorio. I link accettano percorsi
+interni o HTTPS, non JavaScript, HTTP o URL relativi a un altro host (`//...`).
+
+### Import Excel
+
+È supportato `.xlsx` fino a 5 MB, massimo 5000 righe; il foglio preferito è
+`Calendario`, altrimenti il primo. Le colonne sono riconosciute per intestazione:
+
+| Colonna | Campo |
+|---|---|
+| `id_notifica` | `id` |
+| `obiettivo`, `tipo_notifica` | `obiettivo`, `tipo` |
+| `ID contenuto`, `ID guida CMS`, `pagina` | `contentId`, `guideId`, `link` |
+| `data_pubblicazione`, `data_fine` | `startDate`, `endDate` |
+| `frequenza`, `notifica_attiva`, `territorio` | `frequency`, `active`, `territory` |
+| `Aggancio (perché quella data)`, `Stato data` | `hook`, `dateStatus` |
+| `Messaggio IT`, `Messaggio EN`, `Messaggio BN` | `message` |
+
+Le colonne proposte (`Messaggio IT proposto`, `Aggancio proposto`, `Stato data
+proposto`) prevalgono se compilate. Le altre colonne sono ignorate.
+`Approvazione = Da eliminare` salta la riga con un avviso.
+Sono gestite date Excel (anche sistema 1904), formule con risultato già
+calcolato e testo `GG/MM/AAAA`. Le formule senza risultato memorizzato non
+vengono eseguite. Senza data fine si usano 14 giorni dopo l'inizio.
+VERO/TRUE/Sì/1 significano attiva. Gli avvisi includono IT oltre 180 caratteri,
+traduzioni mancanti, data passata e più di due notifiche nella stessa settimana
+(lunedì–domenica). Gli ID duplicati e le guide inesistenti bloccano la conferma.
+
+Il calendario V3 allegato contiene **45 righe**, cioè le 44 programmate più
+`N-WELCOME`; tutte sono valide dopo l'aggiunta esplicita del tipo `welcome`.
+Sono verificati N-009 → `gp-registration`, N-011/N-042 → `emergency` e gli avvisi
+lunghi per N-015, N-028, N-034, N-035. Il caricamento dell'allegato per i test
+non effettua un import automatico sul bucket operativo.
+
+### Visibilità e letture
+
+- Le date sono giorni inclusivi del calendario **Europe/Rome**, indipendenti
+  dal fuso del server/browser. Si mostra solo `active=true` nella finestra data.
+  `frequency` è conservata come metadato; non genera nuove date o invii automatici.
+- Territorio Tutti, oppure corrispondenza senza maiuscole con `sede` del profilo
+  DynamoDB. Senza sede sono visibili soltanto le notifiche Tutti.
+- Le API accettano ID token Cognito e le sessioni firmate preview/codice personale.
+  Queste ultime ricontrollano ruolo e credenziali correnti in whitelist/admin.
+  Il token CMS non è una sessione utente.
+- `notificationsRead` è una lista nel record esistente, chiave `userId`. Le
+  modifiche usano una condizione per telefono e versione della lista, ritentando
+  i conflitti, senza modificare altri campi o creare profili. Si conservano gli
+  ultimi 300 ID; con un profilo mancante le notifiche restano non lette.
+- Caricamento dopo login, al cambio lingua e ogni dieci minuti. Al logout/cambio
+  utente o lingua le risposte precedenti non vengono mostrate al nuovo contesto.
+
+### API
+
+| Metodo | Endpoint | Accesso |
+|---|---|---|
+| GET | `/api/admin/notifications` | JWT CMS |
+| PUT / DELETE | `/api/admin/notifications/:id` | JWT CMS |
+| POST | `/api/admin/notifications/import/preview` | JWT CMS; multipart `file` |
+| POST | `/api/admin/notifications/import/confirm` | JWT CMS; `{notifications:[...]}` |
+| GET | `/api/admin/notifications/export` | JWT CMS; download XLSX |
+| GET | `/api/notifications?lang=it|en|bn` | Sessione utente; `{items,unread}` |
+| POST | `/api/notifications/read?lang=...` | Sessione utente; `{ids:[...]}` |
+| POST | `/api/notifications/read-all?lang=...` | Sessione utente |
+
+I record utente restituiti contengono solo `id`, `message` nella lingua richiesta,
+`link`, `startDate`, `read`. La sezione Interna è accessibile solo agli admin anche
+tramite API; Anteprima anche a `fincantieri_users`, Pubblicata anche agli standard.
+
+### Permessi e verifica
+
+`infra/notifications-iam.yaml` documenta lettura/scrittura della configurazione e
+dell'archivio. Occorre inoltre la lettura delle guide draft e la policy DynamoDB
+esistente con Scan/Query e UpdateItem. Un eventuale indice telefono deve proiettare
+anche `sede` e `notificationsRead`. Non sono state applicate modifiche IAM automatiche.
+
+`npm test` copre autenticazione reale firmata con chiavi di prova, letture,
+conflitti, limite 300, date/fuso, territori, fallback lingua, archivio, validazione
+Excel e round trip. Il test dell'allegato V3 si esegue quando il file caricato è
+disponibile; i test Excel sintetici non dipendono dagli allegati.
+`node --experimental-websocket scripts/check-notifications-browser.cjs [file.xlsx]`
+verifica campanella, letture, secondo browser, lingua, CMS, import/export e
+calendario con API simulate. Controlla le guide reali solo in lettura: non
+scrive su S3 o DynamoDB reali.

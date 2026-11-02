@@ -35,7 +35,7 @@ async function getUserByPhone(phone, documentClient = client) {
     TableName: TABLE_NAME,
     ExpressionAttributeNames: names,
     ExpressionAttributeValues: values,
-    ProjectionExpression: '#phone, firstName, userId, #type, adminPsw',
+    ProjectionExpression: '#phone, firstName, userId, #type, adminPsw, sede, notificationsRead',
   };
 
   if (PHONE_INDEX) {
@@ -121,6 +121,28 @@ async function promoteWhitelistUserByPhone(phone, documentClient = client) {
   }
 }
 
+async function markNotificationsReadByPhone(phone, ids, documentClient = client) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const profile = await getUserByPhone(phone, documentClient);
+    if (!profile?.userId) return [];
+    const old = Array.isArray(profile.notificationsRead) ? profile.notificationsRead : [];
+    const next = [...new Set([...old.filter((id) => !ids.includes(id)), ...ids])].slice(-300);
+    try {
+      await documentClient.send(new UpdateCommand({
+        TableName: TABLE_NAME, Key: { userId: profile.userId },
+        UpdateExpression: 'SET #read = :next',
+        ConditionExpression: 'attribute_exists(#id) AND #phone = :phone AND (attribute_not_exists(#read) OR #read = :old)',
+        ExpressionAttributeNames: { '#id': 'userId', '#phone': 'phone', '#read': 'notificationsRead' },
+        ExpressionAttributeValues: { ':next': next, ':phone': phone, ':old': profile.notificationsRead ?? [] },
+      }));
+      return next;
+    } catch (err) {
+      if (err.name !== 'ConditionalCheckFailedException') throw err;
+    }
+  }
+  throw Object.assign(new Error('Letture modificate contemporaneamente: riprovare'), { status: 409 });
+}
+
 module.exports = {
   getUserByPhone,
   isAdminProfile,
@@ -128,4 +150,5 @@ module.exports = {
   isStandardProfile,
   setUserRoleByPhone,
   promoteWhitelistUserByPhone,
+  markNotificationsReadByPhone,
 };

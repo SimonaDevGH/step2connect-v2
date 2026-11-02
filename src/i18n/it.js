@@ -211,6 +211,14 @@ export default {
   // Notifications
   notificationsTitle: 'Notifiche',
   noNotifications: 'Nessuna notifica',
+  markAllNotificationsRead: 'Segna tutte come lette',
+  notifToday: 'Oggi',
+  notifYesterday: 'Ieri',
+  notifDaysAgo: '{count} giorni fa',
+  notificationUnread: 'Non letta',
+  notificationsError: 'Impossibile caricare o aggiornare le notifiche.',
+  notificationsRetry: 'Riprova',
+  notificationsLoading: 'Caricamento notifiche…',
 
   // Translator
   translatorTitle: 'Traduttore WhatsApp',
