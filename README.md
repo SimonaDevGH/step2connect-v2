@@ -34,6 +34,8 @@ supportate sono:
 19. [Limiti attuali](#limiti-attuali)
 20. [Deploy e repository](#deploy-e-repository)
 21. [Mappa delle aree della webapp](#mappa-delle-aree-della-webapp)
+22. [Visibilità di sezioni e pagine](#visibilità-di-sezioni-e-pagine)
+23. [Calendario notifiche e letture personali](#calendario-notifiche-e-letture-personali)
 
 ## Funzionalità principali
 
@@ -397,8 +399,10 @@ anche se l’email non esiste, per evitare enumerazione degli account CMS.
 - `pages`
 - `site` (record riservato `app-images` per le immagini globali della webApp)
 
-La scheda riepilogativa `all` dell’admin combina guide, news e library; non è un
-tipo di contenuto S3 separato.
+Il menu CMS è organizzato per sezioni: Guide pratiche, Quiz, Analizza documento,
+Notifiche, News, Traduttore, Trova uffici, Immagini app, Altro.
+Su mobile diventa una barra di tab scorrevoli. Altro permette di gestire
+`library` e le pagine generiche `pages`; l'API legacy `type=all` resta disponibile.
 
 ### Campi
 
@@ -408,6 +412,7 @@ Metadati condivisi:
 - `type`
 - `category`
 - `url`
+- `visibility` per guide, news, library e pages (non per le immagini `site`)
 
 Campi localizzati per `it`, `en` e `bn`:
 
@@ -423,7 +428,7 @@ Il filtro **Immagini app** in `/admin/content` gestisce inoltre, per ogni lingua
 
 - hero della home;
 - hero principale delle guide;
-- hero delle sei categorie guide;
+- hero delle cinque categorie guide;
 - hero della pagina Analizza documento;
 - logo Step2Connect;
 - logo Fincantieri nel menu laterale.
@@ -570,6 +575,7 @@ Tutte le route richiedono JWT CMS:
 | `GET` | `/api/admin/content/{type}/{id}` | Bozza multilingua |
 | `PUT` | `/api/admin/content/{type}/{id}` | Crea o aggiorna bozza |
 | `POST` | `/api/admin/content/{type}/{id}/publish` | Pubblica |
+| `PUT` | `/api/admin/content/{type}/{id}/visibility` | Imposta la visibilità e pubblica subito l'ultima bozza salvata |
 | `DELETE` | `/api/admin/content/{type}/{id}` | Archivia e rimuove |
 | `POST` | `/api/admin/content/{type}/{id}/media` | Carica immagine, audio o video localizzato |
 
@@ -610,7 +616,8 @@ Le route applicative richiedono una sessione Cognito o preview valida.
 | `/admin/login` | Login CMS |
 | `/admin/forgot-password` | Richiesta reset |
 | `/admin/reset-password` | Impostazione nuova password |
-| `/admin/content` | Gestione contenuti |
+| `/admin/content` | Redirect a `/admin/content/guide-pratiche` |
+| `/admin/content/:section` | Gestione della sezione, visibilità e contenuti |
 | `/admin/account` | Cambio password |
 
 ## Struttura del repository
@@ -740,7 +747,8 @@ hardcoded nel bucket. Non eseguirlo automaticamente in produzione.
   nuovo caricamento.
 - L’invio email di reset richiede `SES_FROM_EMAIL` configurato e verificato in
   AWS SES.
-- Le notifiche push sono ancora dimostrative.
+- Le notifiche sono esclusivamente interne alla webapp: non vengono inviate
+  notifiche push, SMS o email dal calendario.
 - Quiz, elenco uffici e schede legacy dei servizi usano dati locali, non un CMS
   o un servizio aggiornato in tempo reale.
 - Il traduttore apre WhatsApp: non traduce automaticamente il testo nell'app
@@ -804,8 +812,14 @@ gestiti dal CMS, dati dimostrativi e integrazioni esterne.
 
 ### Guide
 
-- `/guides`: introduzione al servizio e categorie salute, lavoro, scuola,
-  documenti, casa/bollette e vita in città.
+- `/guides`: introduzione al servizio e cinque categorie: Documenti e permessi,
+  Salute e pronto soccorso, Casa e bollette, Scuola e famiglia, Vivere in città.
+- La categoria Lavoro e busta paga è rimossa: non compare nell'app né nei
+  selettori di categorie/immagini del CMS. I vecchi percorsi `/guides/work`
+  e `/guides/work/:item` mostrano rispettivamente categoria/guida non trovata.
+  Nessun contenuto memorizzato viene cancellato.
+- Controllo browser delle sole categorie, con API simulate:
+  `node --experimental-websocket scripts/test-visibility-browser.cjs --categories-only`.
 - `/guides/:category`: elenco della categoria ordinato secondo i valori CMS.
 - `/guides/:category/:item` e route dirette: dettaglio con testo CMS pubblicato
   e audio quando disponibile. Metadati e struttura delle categorie sono locali.
@@ -850,8 +864,13 @@ gestiti dal CMS, dati dimostrativi e integrazioni esterne.
 
 ### Notifiche
 
-- `/notifications`: elenco dimostrativo con titolo, testo, data e indicatore
-  letto/non letto. Non è un sistema push né una casella personale persistente.
+- `/notifications`: notifiche reali gestite dal CMS, con testo nella lingua
+  scelta (fallback italiano), emoji iniziale, data relativa e stato di lettura.
+- La campanella mostra il conteggio non letto (`9+` oltre nove); aprire una
+  notifica la segna come letta prima di aprire la destinazione. È disponibile
+  anche “Segna tutte come lette”. Errori di caricamento/salvataggio sono espliciti.
+- Il calendario è su S3; le letture sono nel profilo DynamoDB e restano valide
+  dopo logout/login da un altro browser. La sezione rispetta la visibilità per ruolo.
 
 ### Traduttore e analisi documenti
 
@@ -874,8 +893,8 @@ gestiti dal CMS, dati dimostrativi e integrazioni esterne.
 
 - `/admin/login`, recupero/reset password e `/admin/account`: credenziali CMS
   separate, reset via email e modifica password.
-- `/admin/content`: riepilogo Pages di guide, news e libreria, filtri e gestione
-  bozze/pubblicati/archivio; Pages è una vista riepilogativa, non un tipo separato.
+- `/admin/content/:section`: menu per sezioni con controlli di visibilità,
+  contenuti per tipo e filtro lingua; le pagine generiche si gestiscono in Altro.
 - Editor con testi IT/EN/BN, metadati, immagini, audio e video per lingua,
   ordinamento delle guide e caricamento dei file supportati.
 - Salvataggio bozze, pubblicazione, archiviazione/eliminazione e rinomina dei
@@ -886,3 +905,195 @@ gestiti dal CMS, dati dimostrativi e integrazioni esterne.
   file privati o dagli strumenti operatore: non esiste un editor whitelist nel CMS.
 - I video possono essere gestiti e caricati nel CMS; la presenza del campo
   non garantisce un player video in ogni pagina pubblica.
+
+## Visibilità di sezioni e pagine
+
+### Regole e prima attivazione
+
+| Stato | Admin | Fincantieri/ELIS (`fincantieri_users`) | Standard |
+|---|---|---|---|
+| Interno (`internal`) | Sì | No | No |
+| Anteprima (`preview`) | Sì | Sì | No |
+| Pubblicato (`published`) | Sì | Sì | Sì |
+
+Una pagina è mostrata soltanto se sono visibili **sia la sezione sia la pagina**.
+La Home rimane sempre disponibile e non ha uno stato configurabile.
+Gli utenti senza un ruolo esplicito sono trattati come standard per la visibilità.
+
+Se `config/sections.json` manca o ha un formato invalido, si usano questi default:
+
+- Pubblicato: Guide, Analizza documento, Traduttore, Privacy.
+- Interno: Quiz, Notifiche, News, Trova uffici, Libreria.
+
+Questi default sono intenzionalmente attivi da subito: le sezioni Interne sono
+nascoste agli utenti standard anche se contengono vecchie pagine pubblicate.
+Il campo `visibility` mancante nelle pagine esistenti equivale a `published`;
+non annulla però la restrizione della sezione. Le pagine nuove nascono `internal`.
+
+### Uso del CMS
+
+- Ogni sezione ha tre pulsanti: Interno, Anteprima, Pubblicato. Il cambio salva
+  subito dal server su S3, con `updatedAt` e `updatedBy`.
+- La conferma è richiesta solo passando a Pubblicato. Il feedback “Salvato”
+  conferma il completamento della richiesta.
+- Ogni riga di guide, news, libreria e pagine generiche ha lo stesso controllo:
+  cambiandolo si pubblica immediatamente l'ultima versione **già salvata**, nelle
+  tre lingue. Una rinomina rimuove i vecchi URL pubblicati come prima.
+- Salvare normalmente una bozza non cambia la sua visibilità e non la pubblica.
+  “Pubblica modifiche” aggiorna la copia online, conservando lo stato scelto.
+- Le sezioni senza contenuti CMS mostrano la pagina e il percorso in sola lettura.
+- In Altro si regolano anche le sezioni Libreria e Privacy. Immagini app e la
+  voce contenitore Altro non hanno un proprio stato.
+- Dopo un cambio dal CMS, ricaricare l'app per rileggere la configurazione.
+  Menu, Home, elenchi e dettagli applicano le stesse regole. Una route di sezione
+  non visibile reindirizza a `/home`; un dettaglio non visibile appare non trovato.
+- Durante il ripristino Cognito le route attendono il profilo applicativo reale:
+  un admin non viene reindirizzato usando il ruolo standard provvisorio.
+
+### API e permessi
+
+- `GET /api/sections`: lettura pubblica, restituisce `{ sections }`, senza scrivere.
+- `PUT /api/admin/sections/{key}`: JWT CMS obbligatorio, body `{ "status": "preview" }`.
+- `PUT /api/admin/content/{type}/{id}/visibility`: JWT CMS obbligatorio,
+  body `{ "visibility": "preview" }`.
+- Il server gestisce `config/sections.json`: non crearlo o modificarlo a mano.
+  La policy `infra/sections-iam.yaml` consente lettura/scrittura sulla sola chiave.
+  Le normali policy contenuti devono consentire le scritture delle bozze e copie online.
+
+**Confine di sicurezza:** per i contenuti CMS generici le regole richieste filtrano navigazione e rendering
+dell'app. Le API di lettura contenuti e gli URL dei media restano pubblici come
+prima: questa funzionalità non rende riservati i file o i JSON contro richieste
+dirette. Non usarla come protezione di documenti o dati confidenziali.
+Le nuove API notifiche fanno eccezione: richiedono la sessione utente verificata
+e applicano anche sul server la visibilità della sezione.
+
+### Verifica
+
+`npm test` include matrice ruoli/sezione/pagina, salvataggi automatici su storage
+simulato, audit, credenziali CMS, default mancanti, contenuti legacy, rinomina e
+attesa del profilo al refresh. Il controllo browser opzionale
+`node --experimental-websocket scripts/test-visibility-browser.cjs` usa Chromium
+e il dominio di sviluppo Replit: tutte le API vengono intercettate con fixture,
+senza modificare utenti o file S3 reali.
+
+## Calendario notifiche e letture personali
+
+Per le istruzioni passo passo dedicate agli amministratori, consultare la
+[Guida operativa Notifiche nel CMS](docs/notifiche-cms.md): creazione, calendario,
+importazione Excel, traduzioni, visibilità e risoluzione dei problemi.
+
+### Calendario e gestione CMS
+
+In **CMS → Notifiche** il selettore di visibilità esistente resta sopra la gestione
+del calendario. Sono disponibili:
+
+- Elenco filtrabile per mese, stato attivo e traduzioni mancanti; stato data,
+  territorio, guida, messaggio IT e indicatori IT/EN/BN.
+- Interruttore attiva/disattiva con salvataggio immediato, nuova notifica,
+  modifica e cancellazione con conferma.
+- Calendario mensile: selezionare una notifica per modificarla.
+- Editor di tutti i campi, selezione guida con compilazione di ID contenuto,
+  ID guida e link, testi IT/EN/BN con contatori e anteprima nell'app.
+  Oltre 180 caratteri il contatore è arancione, non bloccante. L'ID è stabile
+  dopo la creazione; un import con lo stesso ID aggiorna il record.
+- Importa da Excel con anteprima di righe nuove/aggiornate, errori e avvisi;
+  conferma disabilitata finché ci sono errori. L'anteprima non scrive nulla.
+- Esporta Excel per scaricare il calendario corrente e reimportarlo.
+
+Il server gestisce `config/notifications.json` nel bucket configurato. Il file
+mancante equivale a un elenco vuoto. Ogni salvataggio che cambia i dati archivia
+prima la versione precedente in `config/archive/notifications_<timestamp>.json`;
+se l'archivio fallisce, il salvataggio si interrompe. L'import è un'unione per ID:
+i record non presenti nel file restano invariati. Un export reimportato senza
+modifiche non riscrive dati o audit. Non è necessario creare file S3 a mano.
+
+Ogni record contiene `id`, `obiettivo`, `tipo`, `contentId`, `guideId`, `link`,
+`message.{it,en,bn}`, `startDate`, `endDate`, `frequency`, `active`, `territory`,
+`dateStatus`, `hook`, `updatedAt`, `updatedBy`.
+
+I tipi validi sono `content_engagement`, `function_engagement` e **`welcome`**
+(aggiunto su conferma dell'utente per `N-WELCOME`). Una guida indicata deve
+esistere in `content/draft/guides/it/<guideId>.json`; è obbligatoria per
+`content_engagement`. Il messaggio IT è obbligatorio. I link accettano percorsi
+interni o HTTPS, non JavaScript, HTTP o URL relativi a un altro host (`//...`).
+
+### Import Excel
+
+È supportato `.xlsx` fino a 5 MB, massimo 5000 righe; il foglio preferito è
+`Calendario`, altrimenti il primo. Le colonne sono riconosciute per intestazione:
+
+| Colonna | Campo |
+|---|---|
+| `id_notifica` | `id` |
+| `obiettivo`, `tipo_notifica` | `obiettivo`, `tipo` |
+| `ID contenuto`, `ID guida CMS`, `pagina` | `contentId`, `guideId`, `link` |
+| `data_pubblicazione`, `data_fine` | `startDate`, `endDate` |
+| `frequenza`, `notifica_attiva`, `territorio` | `frequency`, `active`, `territory` |
+| `Aggancio (perché quella data)`, `Stato data` | `hook`, `dateStatus` |
+| `Messaggio IT`, `Messaggio EN`, `Messaggio BN` | `message` |
+
+Le colonne proposte (`Messaggio IT proposto`, `Aggancio proposto`, `Stato data
+proposto`) prevalgono se compilate. Le altre colonne sono ignorate.
+`Approvazione = Da eliminare` salta la riga con un avviso.
+Sono gestite date Excel (anche sistema 1904), formule con risultato già
+calcolato e testo `GG/MM/AAAA`. Le formule senza risultato memorizzato non
+vengono eseguite. Senza data fine si usano 14 giorni dopo l'inizio.
+VERO/TRUE/Sì/1 significano attiva. Gli avvisi includono IT oltre 180 caratteri,
+traduzioni mancanti, data passata e più di due notifiche nella stessa settimana
+(lunedì–domenica). Gli ID duplicati e le guide inesistenti bloccano la conferma.
+
+Il calendario V3 allegato contiene **45 righe**, cioè le 44 programmate più
+`N-WELCOME`; tutte sono valide dopo l'aggiunta esplicita del tipo `welcome`.
+Sono verificati N-009 → `gp-registration`, N-011/N-042 → `emergency` e gli avvisi
+lunghi per N-015, N-028, N-034, N-035. Il caricamento dell'allegato per i test
+non effettua un import automatico sul bucket operativo.
+
+### Visibilità e letture
+
+- Le date sono giorni inclusivi del calendario **Europe/Rome**, indipendenti
+  dal fuso del server/browser. Si mostra solo `active=true` nella finestra data.
+  `frequency` è conservata come metadato; non genera nuove date o invii automatici.
+- Territorio Tutti, oppure corrispondenza senza maiuscole con `sede` del profilo
+  DynamoDB. Senza sede sono visibili soltanto le notifiche Tutti.
+- Le API accettano ID token Cognito e le sessioni firmate preview/codice personale.
+  Queste ultime ricontrollano ruolo e credenziali correnti in whitelist/admin.
+  Il token CMS non è una sessione utente.
+- `notificationsRead` è una lista nel record esistente, chiave `userId`. Le
+  modifiche usano una condizione per telefono e versione della lista, ritentando
+  i conflitti, senza modificare altri campi o creare profili. Si conservano gli
+  ultimi 300 ID; con un profilo mancante le notifiche restano non lette.
+- Caricamento dopo login, al cambio lingua e ogni dieci minuti. Al logout/cambio
+  utente o lingua le risposte precedenti non vengono mostrate al nuovo contesto.
+
+### API
+
+| Metodo | Endpoint | Accesso |
+|---|---|---|
+| GET | `/api/admin/notifications` | JWT CMS |
+| PUT / DELETE | `/api/admin/notifications/:id` | JWT CMS |
+| POST | `/api/admin/notifications/import/preview` | JWT CMS; multipart `file` |
+| POST | `/api/admin/notifications/import/confirm` | JWT CMS; `{notifications:[...]}` |
+| GET | `/api/admin/notifications/export` | JWT CMS; download XLSX |
+| GET | `/api/notifications?lang=it|en|bn` | Sessione utente; `{items,unread}` |
+| POST | `/api/notifications/read?lang=...` | Sessione utente; `{ids:[...]}` |
+| POST | `/api/notifications/read-all?lang=...` | Sessione utente |
+
+I record utente restituiti contengono solo `id`, `message` nella lingua richiesta,
+`link`, `startDate`, `read`. La sezione Interna è accessibile solo agli admin anche
+tramite API; Anteprima anche a `fincantieri_users`, Pubblicata anche agli standard.
+
+### Permessi e verifica
+
+`infra/notifications-iam.yaml` documenta lettura/scrittura della configurazione e
+dell'archivio. Occorre inoltre la lettura delle guide draft e la policy DynamoDB
+esistente con Scan/Query e UpdateItem. Un eventuale indice telefono deve proiettare
+anche `sede` e `notificationsRead`. Non sono state applicate modifiche IAM automatiche.
+
+`npm test` copre autenticazione reale firmata con chiavi di prova, letture,
+conflitti, limite 300, date/fuso, territori, fallback lingua, archivio, validazione
+Excel e round trip. Il test dell'allegato V3 si esegue quando il file caricato è
+disponibile; i test Excel sintetici non dipendono dagli allegati.
+`node --experimental-websocket scripts/check-notifications-browser.cjs [file.xlsx]`
+verifica campanella, letture, secondo browser, lingua, CMS, import/export e
+calendario con API simulate. Controlla le guide reali solo in lettura: non
+scrive su S3 o DynamoDB reali.
