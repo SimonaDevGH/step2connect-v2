@@ -35,7 +35,7 @@ async function getUserByPhone(phone, documentClient = client) {
     TableName: TABLE_NAME,
     ExpressionAttributeNames: names,
     ExpressionAttributeValues: values,
-    ProjectionExpression: '#phone, firstName, userId, #type, adminPsw, sede, notificationsRead, quizResults',
+    ProjectionExpression: '#phone, firstName, userId, #type, adminPsw, sede, notificationsRead, quizResults, badges',
   };
 
   if (PHONE_INDEX) {
@@ -143,6 +143,33 @@ async function markNotificationsReadByPhone(phone, ids, documentClient = client)
   throw Object.assign(new Error('Letture modificate contemporaneamente: riprovare'), { status: 409 });
 }
 
+async function awardQuizBadgesByPhone(phone, definitions, quizzes, documentClient = client) {
+  const { states } = require('./quizBadges');
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const profile = await getUserByPhone(phone, documentClient);
+    if (!profile?.userId) return { badges: {}, newlyUnlockedIds: [], quizResults: {} };
+    const old = profile.badges || {};
+    const eligible = states(definitions, quizzes, profile.quizResults || {}, old)
+      .filter((badge) => badge.eligible && !badge.unlocked);
+    if (!eligible.length) return { badges: old, newlyUnlockedIds: [], quizResults: profile.quizResults || {} };
+    const now = new Date().toISOString();
+    const next = { ...old, ...Object.fromEntries(eligible.map((badge) => [badge.id, now])) };
+    try {
+      await documentClient.send(new UpdateCommand({
+        TableName: TABLE_NAME, Key: { userId: profile.userId },
+        UpdateExpression: 'SET #badges = :next',
+        ConditionExpression: `attribute_exists(#id) AND #phone = :phone AND ${profile.badges === undefined ? 'attribute_not_exists(#badges)' : '#badges = :old'}`,
+        ExpressionAttributeNames: { '#id': 'userId', '#phone': 'phone', '#badges': 'badges' },
+        ExpressionAttributeValues: { ':phone': phone, ':next': next, ...(profile.badges === undefined ? {} : { ':old': old }) },
+      }));
+      return { badges: next, newlyUnlockedIds: eligible.map((badge) => badge.id), quizResults: profile.quizResults || {} };
+    } catch (err) {
+      if (err.name !== 'ConditionalCheckFailedException') throw err;
+    }
+  }
+  throw Object.assign(new Error('Badge modificati contemporaneamente: riprovare'), { status: 409 });
+}
+
 async function saveQuizResultByPhone(phone, quiz, answers, documentClient = client) {
   const firstAnswers = Object.fromEntries(quiz.questions.map((q) => [q.qid, answers[q.qid] === q.answer]));
   const score = Object.values(firstAnswers).filter(Boolean).length;
@@ -217,5 +244,6 @@ module.exports = {
   promoteWhitelistUserByPhone,
   markNotificationsReadByPhone,
   saveQuizResultByPhone,
+  awardQuizBadgesByPhone,
   quizResultAggregates,
 };

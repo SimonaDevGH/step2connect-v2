@@ -258,4 +258,7 @@ export default {
   openWhatsApp: 'WhatsApp খুলুন',
   translatorHint: 'অনুবাদ করতে টেক্সট লিখুন',
   waMessage: 'হ্যালো! আপনি কি আমাকে এই টেক্সটটি অনুবাদ করতে পারবেন: ',
+  myBadges: 'আমার ব্যাজ',
+  quizBadgesUnlocked: 'ব্যাজ আনলক হয়েছে!',
+  quizViewBadges: 'আমার ব্যাজ দেখুন',
 };

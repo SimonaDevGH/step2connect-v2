@@ -8,7 +8,7 @@ const jwt = require('jsonwebtoken');
 process.env.SESSION_SECRET = 'quiz-test-only-not-real';
 const objects = new Map(), profiles = new Map();
 const copy = (v) => v == null ? v : structuredClone(v);
-let writes = 0, conflict = false;
+let writes = 0, conflict = false, badgeConflict = false;
 const storage = {
   getJson: async (key) => copy(objects.get(key)) || null,
   putJson: async (key, value) => { writes++; objects.set(key, copy(value)); },
@@ -27,6 +27,16 @@ const db = { send: async (cmd) => {
     assert.ok(p);
     assert.match(x.ConditionExpression, /attribute_exists/);
     assert.equal(x.ExpressionAttributeValues[':phone'], p.phone);
+    if (x.UpdateExpression === 'SET #badges = :next') {
+      assert.match(x.ConditionExpression, /#badges = :old|attribute_not_exists\(#badges\)/);
+      if (badgeConflict) {
+        badgeConflict = false;
+        p.badges = { ...p.badges, health: '2026-01-01T00:00:00.000Z' };
+        throw Object.assign(new Error('conflict'), { name: 'ConditionalCheckFailedException' });
+      }
+      p.badges = copy(x.ExpressionAttributeValues[':next']);
+      return {};
+    }
     assert.equal(x.UpdateExpression, 'SET #results = :next');
     if (conflict) {
       conflict = false;
@@ -225,6 +235,77 @@ test('authoritative results preserve first attempt, best score, profile fields, 
   assert.equal(unsaved.data.score, 4);
   assert.equal(profiles.size, 1);
   assert.equal((await call('/api/quiz/quiz-permit-request/result', { method: 'POST', body: { answers: { q1: 'false' } } })).status, 400);
+});
+test('editable badge configuration, durable category/champion awards, progress and visibility are server authoritative', async () => {
+  reset();
+  const path = '/api/admin/quiz/badges';
+  assert.equal((await call(path, { role: null })).status, 401);
+  assert.equal((await call(path)).status, 401);
+  assert.equal((await call('/api/quiz/badges', { role: null })).status, 401);
+  const defaults = (await call(path, { cms: true })).data.items;
+  assert.equal(defaults.length, 6);
+  assert.equal(defaults[0].title.bn, 'কাগজপত্রের ওস্তাদ');
+  assert.equal(objects.has('config/quiz-badges.json'), false);
+  let state = (await call('/api/quiz/badges')).data;
+  assert.equal(state.earned, 0);
+  assert.ok(state.items.every((b) => !b.unlocked));
+  const edited = copy(defaults);
+  edited[0].title = { it: 'Nuovo titolo', en: 'New title', bn: 'নতুন শিরোনাম' };
+  edited[0].emoji = '⭐';
+  assert.equal((await call(path, { cms: true, method: 'PUT', body: { items: edited } })).status, 200);
+  assert.deepEqual(objects.get('config/quiz-badges.json'), edited);
+  for (const broken of [
+    edited.slice(1), [...edited.slice(0, 5), edited[0]],
+    edited.map((b, i) => i ? b : { ...b, category: 'health' }),
+    edited.map((b, i) => i ? b : { ...b, title: { ...b.title, bn: '' } }),
+  ]) assert.equal((await call(path, { cms: true, method: 'PUT', body: { items: broken } })).status, 400);
+  await quiz.savePrepared(await quiz.prepareQuiz(record()), 'fixture'); await publish();
+  // Drafts and internal quizzes outside this user's role do not count.
+  state = (await call('/api/quiz/badges', { role: 'standard' })).data;
+  assert.equal(state.items[0].total, 0);
+  guide('draft-only'); await quiz.savePrepared(await quiz.prepareQuiz(record('draft-only')), 'fixture');
+  guide('second'); await quiz.savePrepared(await quiz.prepareQuiz(record('second')), 'fixture'); await publish('quiz-second');
+  const answers = { q1: false, q2: true, q3: false, q4: true };
+  let result = await call('/api/quiz/quiz-permit-request/result', { method: 'POST', body: { answers, badges: { champion: 'forged' } } });
+  assert.deepEqual(result.data.newlyUnlockedBadges, []);
+  state = (await call('/api/quiz/badges')).data;
+  assert.equal(state.items[0].passed, 1); assert.equal(state.items[0].total, 2);
+  assert.equal(state.items[0].unlocked, false);
+  badgeConflict = true;
+  result = await call('/api/quiz/quiz-second/result', { method: 'POST', body: { answers } });
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.data.newlyUnlockedBadges.map((b) => b.id), ['documents', 'champion']);
+  assert.equal(result.data.newlyUnlockedBadges[0].title.bn, 'নতুন শিরোনাম');
+  assert.equal(profiles.get('+fixture').badges.health, '2026-01-01T00:00:00.000Z');
+  const date = profiles.get('+fixture').badges.documents;
+  assert.ok(Number.isFinite(Date.parse(date)));
+  result = await call('/api/quiz/quiz-second/result', { method: 'POST', body: { answers } });
+  assert.deepEqual(result.data.newlyUnlockedBadges, []);
+  guide('later'); await quiz.savePrepared(await quiz.prepareQuiz(record('later')), 'fixture'); await publish('quiz-later');
+  state = (await call('/api/quiz/badges')).data;
+  assert.equal(state.items[0].total, 3); assert.equal(state.items[0].passed, 2);
+  assert.equal(state.items[0].unlockedAt, date);
+  assert.equal(state.items.find((b) => b.id === 'champion').unlocked, true);
+  await call('/api/admin/content/quiz/quiz-second/unpublish', { cms: true, method: 'POST' });
+  state = (await call('/api/quiz/badges', { role: 'standard' })).data;
+  assert.equal(state.items[0].total, 0); assert.equal(state.items[0].unlockedAt, date);
+  assert.equal((await call('/api/quiz/badges', { role: 'missing' })).data.earned, 0);
+  // Nine health quizzes, only one passed: real progress rather than a fake unlocked badge.
+  reset();
+  for (let i = 1; i <= 9; i++) {
+    guide(`health-${i}`, 'health');
+    await quiz.savePrepared(await quiz.prepareQuiz(record(`health-${i}`)), 'fixture');
+    await publish(`quiz-health-${i}`);
+  }
+  await call('/api/quiz/quiz-health-1/result', { method: 'POST', body: { answers } });
+  state = (await call('/api/quiz/badges')).data;
+  const health = state.items.find((b) => b.id === 'health');
+  assert.equal(health.passed, 1); assert.equal(health.total, 9); assert.equal(health.unlocked, false);
+  // Previously recorded successes are reconciled on the badge endpoint.
+  for (let i = 1; i <= 9; i++) profiles.get('+fixture').quizResults[`quiz-health-${i}`] = { passedAt: '2026-01-01T00:00:00.000Z' };
+  state = (await call('/api/quiz/badges')).data;
+  assert.equal(state.items.find((b) => b.id === 'health').unlocked, true);
+  assert.equal(state.items.find((b) => b.id === 'champion').unlocked, true);
 });
 test('Excel preview has no writes, validation/warnings, import preserves visibility, export reimport leaves data and audit unchanged', async () => {
   reset();

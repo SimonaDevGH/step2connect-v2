@@ -272,4 +272,7 @@ export default {
   openWhatsApp: 'Apri WhatsApp',
   translatorHint: 'Scrivi il testo da tradurre',
   waMessage: 'Ciao! Puoi tradurmi questo testo: ',
+  myBadges: 'I miei badge',
+  quizBadgesUnlocked: 'Badge sbloccato!',
+  quizViewBadges: 'Vedi i miei badge',
 };

@@ -5,6 +5,7 @@ import { useAdminAuth } from '../../context/AdminAuthContext';
 import { useSections } from '../../context/SectionsContext';
 import AdminContentList from './AdminContentList';
 import AdminNotifications from './AdminNotifications';
+import QuizBadgeEditor from './QuizBadgeEditor';
 import './admin-content.css';
 
 const SECTION_NAV = [
@@ -98,6 +99,7 @@ export default function AdminContentPage() {
   const { adminToken, adminUser, logout } = useAdminAuth();
   const { sections, sectionsReady, reloadSections } = useSections();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [quizTab, setQuizTab] = useState('content');
   const activeSection = SECTION_NAV.find((entry) => entry.slug === sectionSlug);
 
   useEffect(() => {
@@ -199,7 +201,26 @@ export default function AdminContentPage() {
               ))}
             </section>
           )}
-          {activeSection.key === 'notifications' ? (
+          {activeSection.slug === 'quiz' ? (
+            <>
+              <nav className="cms-quiz-subtabs" aria-label="Gestione quiz">
+                <button className={quizTab === 'content' ? 'active' : ''} onClick={() => setQuizTab('content')}>Quiz</button>
+                <button className={quizTab === 'badges' ? 'active' : ''} onClick={() => setQuizTab('badges')}>Badge</button>
+              </nav>
+              <div className={quizTab === 'content' ? '' : 'cms-quiz-panel-hidden'}>
+                <AdminContentList
+                  key={activeSection.slug}
+                  types={activeSection.types}
+                  adminToken={adminToken}
+                  onUnauthorized={handleLogout}
+                  refreshKey={refreshKey}
+                />
+              </div>
+              <div className={quizTab === 'badges' ? '' : 'cms-quiz-panel-hidden'}>
+                <QuizBadgeEditor adminToken={adminToken} onUnauthorized={handleLogout} />
+              </div>
+            </>
+          ) : activeSection.key === 'notifications' ? (
             <AdminNotifications adminToken={adminToken} onUnauthorized={handleLogout} refreshKey={refreshKey} />
           ) : activeSection.types ? (
             <AdminContentList

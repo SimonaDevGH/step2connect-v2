@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, BookOpen, Check, Headphones, RotateCcw, Volume2 
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { quizApi } from '../lib/quizApi';
+import './quiz-badges.css';
 
 function answerKey(user, lang, id) {
   return `s2c_quiz:${user?.phone || user?.email || user?.sub || 'guest'}:${lang}:${id}`;
@@ -139,7 +140,12 @@ export default function QuizPlayer() {
       <div className="quiz-stars" aria-label={`${result.stars} ${t('quizStars')}`}>{[1,2,3].map((star) => <span key={star} className={star <= result.stars ? 'earned' : ''}>★</span>)}</div>
       <h1>{result.score} <small>/ {questions.length}</small></h1>
       <p>{t('quizScoreLabel')}</p>
-      {result.badgeUnlocked && <div className="quiz-badge-unlock">✦ {t('quizBadgeUnlocked')}</div>}
+      {Array.isArray(result.newlyUnlockedBadges) && result.newlyUnlockedBadges.length > 0 && <div className="quiz-badge-awards" aria-live="polite">
+        {result.newlyUnlockedBadges.map((badge) => <div className="quiz-badge-award" key={badge.id}>
+          <span>{badge.emoji}</span><div><strong>{t('quizBadgesUnlocked')}</strong><small>{badge.title?.[lang] || badge.title?.it || badge.title?.en || badge.id}</small></div>
+        </div>)}
+        <button className="quiz-badges-view-button" onClick={() => navigate('/quiz/badges')}>{t('quizViewBadges')}<ArrowRight size={17}/></button>
+      </div>}
       {result.saved === false && <p role="status">{t('quizNotSaved')}</p>}
       <button className="quiz-continue" disabled={!nextQuiz} onClick={() => navigate(`/quiz/${nextQuiz.id}`, { replace: true })}>{t('quizNextQuiz')}<ArrowRight size={19}/></button>
       <button className="quiz-retry" onClick={() => { sessionStorage.removeItem(answerKey(user, lang, id)); setIndex(0); setAnswers({}); setResult(null); }}><RotateCcw size={17}/>{t('quizRedo')}</button>

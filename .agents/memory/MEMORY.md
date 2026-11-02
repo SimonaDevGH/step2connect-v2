@@ -11,3 +11,4 @@
 - [GitHub sync via connector](github-connector-sync.md) — il connector autorizza le API ma non il push HTTPS; verificare sempre blob e tree SHA
 - [Personal-code motivation](personal-code-motivation.md) — Fincantieri/ELIS richiedono login senza SMS per evitare costi, non privilegi amministrativi.
 - [Browser request cancellation](browser-request-cancellation.md) — una navigazione può annullare intercettazioni in attesa senza indicare un errore applicativo.
+- [Badge permanenti](quiz-badge-policy.md) — le conquiste restano valide quando cresce il catalogo; lo sblocco considera solo quiz pubblicati e visibili.

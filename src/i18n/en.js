@@ -258,4 +258,7 @@ export default {
   openWhatsApp: 'Open WhatsApp',
   translatorHint: 'Write the text to translate',
   waMessage: 'Hello! Can you translate this text for me: ',
+  myBadges: 'My badges',
+  quizBadgesUnlocked: 'Badge unlocked!',
+  quizViewBadges: 'View my badges',
 };

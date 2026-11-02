@@ -17,6 +17,7 @@ import FindOfficesPage    from './pages/FindOfficesPage';
 import NewsPage           from './pages/NewsPage';
 import QuizPage           from './pages/QuizPage';
 import QuizPlayer         from './pages/QuizPlayer';
+import QuizBadgesPage     from './pages/QuizBadgesPage';
 import LibraryPage        from './pages/LibraryPage';
 import GuidesPage         from './pages/GuidesPage';
 import GuideCategoryPage  from './pages/GuideCategoryPage';
@@ -177,6 +178,7 @@ function AppShell() {
           <Route path="/news"                element={<SectionRoute section="news"><NewsPage /></SectionRoute>} />
           <Route path="/news/:id"            element={<SectionRoute section="news"><ContentDetailPage contentType="news" /></SectionRoute>} />
           <Route path="/quiz"                element={<SectionRoute section="quiz"><QuizPage /></SectionRoute>} />
+          <Route path="/quiz/badges"         element={<SectionRoute section="quiz"><QuizBadgesPage /></SectionRoute>} />
           <Route path="/quiz/:id"            element={<SectionRoute section="quiz"><QuizPlayer /></SectionRoute>} />
           <Route path="/library"             element={<SectionRoute section="library"><LibraryPage /></SectionRoute>} />
           <Route path="/library/:id"         element={<SectionRoute section="library"><ContentDetailPage contentType="library" /></SectionRoute>} />

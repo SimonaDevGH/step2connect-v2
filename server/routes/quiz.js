@@ -6,7 +6,8 @@ const { listKeys } = require('../lib/s3');
 const { getSections } = require('../lib/sections');
 const quiz = require('../lib/quiz');
 const excel = require('../lib/quizExcel');
-const { saveQuizResultByPhone, quizResultAggregates } = require('../lib/userProfiles');
+const badgeConfig = require('../lib/quizBadges');
+const { saveQuizResultByPhone, awardQuizBadgesByPhone, quizResultAggregates } = require('../lib/userProfiles');
 const adminRouter = express.Router();
 const userRouter = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -14,6 +15,13 @@ adminRouter.use(requireAdminJWT);
 userRouter.use(requireNotificationUser);
 userRouter.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 const run = (handler) => (req, res, next) => Promise.resolve(handler(req, res)).catch(next);
+
+adminRouter.get('/badges', run(async (_req, res) => {
+  res.set('Cache-Control', 'no-store').json({ items: await badgeConfig.definitions() });
+}));
+adminRouter.put('/badges', run(async (req, res) => {
+  res.json({ items: await badgeConfig.saveDefinitions(req.body?.items) });
+}));
 
 adminRouter.post('/import/preview', upload.single('file'), run(async (req, res) => {
   if (!req.file || !/\.xlsx$/i.test(req.file.originalname)) return res.status(400).json({ error: 'Caricare un file .xlsx' });
@@ -53,10 +61,19 @@ async function visible(req) {
   return (await quiz.publishedQuizzes(req.query.lang)).filter((q) => quiz.canSee(q.visibility || 'internal', profile));
 }
 userRouter.get('/progress', (req, res) => res.json({ quizResults: req.notificationUser.profile?.quizResults || {} }));
+userRouter.get('/badges', run(async (req, res) => {
+  const items = await visible(req);
+  const definitions = await badgeConfig.definitions();
+  const earned = await awardQuizBadgesByPhone(req.notificationUser.phone, definitions, items);
+  res.json(badgeConfig.response(definitions, items, earned.quizResults, earned.badges));
+}));
 userRouter.get('/', run(async (req, res) => {
   const items = await visible(req);
   const quizResults = req.notificationUser.profile?.quizResults || {};
-  res.json({ items, quizResults, badges: quiz.badges(items, quizResults) });
+  res.json({ items, quizResults, badges: {
+    ...quiz.badges(items, quizResults),
+    ...Object.fromEntries(Object.keys(req.notificationUser.profile?.badges || {}).map((id) => [id, true])),
+  } });
 }));
 userRouter.get('/:id', run(async (req, res) => {
   const record = (await visible(req)).find((q) => q.id === req.params.id);
@@ -71,12 +88,17 @@ userRouter.post('/:id/result', run(async (req, res) => {
   if (!answers || Array.isArray(answers) || typeof answers !== 'object'
     || Object.keys(answers).length !== record.questions.length
     || record.questions.some((q) => !Object.hasOwn(answers, q.qid) || typeof answers[q.qid] !== 'boolean')) quiz.fail('Rispondere a tutte le domande con vero/falso');
-  const before = quiz.badges(items, req.notificationUser.profile?.quizResults || {});
   const result = await saveQuizResultByPhone(req.notificationUser.phone, record, answers);
-  const after = quiz.badges(items, result.quizResults);
+  const definitions = await badgeConfig.definitions();
+  const earned = result.saved
+    ? await awardQuizBadgesByPhone(req.notificationUser.phone, definitions, items)
+    : { badges: {}, newlyUnlockedIds: [], quizResults: {} };
+  const badgeStates = badgeConfig.response(definitions, items, earned.quizResults, earned.badges);
+  const newlyUnlockedBadges = badgeStates.items.filter((b) => earned.newlyUnlockedIds.includes(b.id));
   res.json({
     ...result, stars: quiz.stars(result.score, record.questions.length),
-    badgeUnlocked: Boolean(result.saved && !before[record.category] && after[record.category]),
+    badgeUnlocked: newlyUnlockedBadges.length > 0, newlyUnlockedBadges,
+    badges: earned.badges,
   });
 }));
 function errors(err, _req, res, _next) {

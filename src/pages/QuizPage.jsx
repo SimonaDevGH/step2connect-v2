@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, BadgeCheck, ChevronRight, RefreshCw, Trophy } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -11,10 +11,11 @@ export default function QuizPage() {
   const { t, lang } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState([]);
   const [progress, setProgress] = useState({});
   const [badges, setBadges] = useState({});
-  const [category, setCategory] = useState(null);
+  const [category, setCategory] = useState(searchParams.get('category'));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const sequence = useRef(0);
@@ -34,18 +35,24 @@ export default function QuizPage() {
       .finally(() => { if (request === sequence.current) setLoading(false); });
   };
   useEffect(() => { load(); return () => { sequence.current++; }; }, [lang, user]);
+  useEffect(() => { setCategory(searchParams.get('category')); }, [searchParams]);
+  const tabs = <nav className="quiz-page-tabs" aria-label={lang === 'it' ? 'Sezione quiz' : lang === 'bn' ? 'কুইজ বিভাগ' : 'Quiz section'}>
+    <button className="active" aria-current="page" onClick={() => { setCategory(null); setSearchParams({}); }}>{t('quizTitle')}</button>
+    <button onClick={() => navigate('/quiz/badges')}>{t('myBadges')}</button>
+  </nav>;
 
   const grouped = useMemo(() => GUIDE_CATEGORIES
     .map((cat) => ({ ...cat, quizzes: items.filter((quiz) => quiz.category === cat.id) }))
     .filter((cat) => cat.quizzes.length > 0), [items]);
   const selected = grouped.find((entry) => entry.id === category);
 
-  if (loading) return <main className="page-content quiz-page"><div className="quiz-hero"><span className="quiz-hero-mark">Q</span><h1>{t('quizTitle')}</h1><p>{t('quizDesc')}</p></div><div className="quiz-catalog-skeleton"><i/><i/><i/></div></main>;
-  if (error) return <main className="page-content quiz-page"><div className="quiz-hero"><span className="quiz-hero-mark">Q</span><h1>{t('quizTitle')}</h1><p>{t('quizDesc')}</p></div><div className="quiz-empty"><p>{error}</p><button className="quiz-button" onClick={load}><RefreshCw size={17}/>{t('quizRetry')}</button></div></main>;
+  if (loading) return <main className="page-content quiz-page">{tabs}<div className="quiz-hero"><span className="quiz-hero-mark">Q</span><h1>{t('quizTitle')}</h1><p>{t('quizDesc')}</p></div><div className="quiz-catalog-skeleton"><i/><i/><i/></div></main>;
+  if (error) return <main className="page-content quiz-page">{tabs}<div className="quiz-hero"><span className="quiz-hero-mark">Q</span><h1>{t('quizTitle')}</h1><p>{t('quizDesc')}</p></div><div className="quiz-empty"><p>{error}</p><button className="quiz-button" onClick={load}><RefreshCw size={17}/>{t('quizRetry')}</button></div></main>;
 
   return <main className="page-content quiz-page">
+    {tabs}
     <header className="quiz-hero">
-      {category && <button className="quiz-hero-back" onClick={() => setCategory(null)}><ArrowLeft size={18}/>{t('quizAllCategories')}</button>}
+      {category && <button className="quiz-hero-back" onClick={() => { setCategory(null); setSearchParams({}); }}><ArrowLeft size={18}/>{t('quizAllCategories')}</button>}
       <span className="quiz-hero-mark" aria-hidden="true">Q</span>
       <div className="quiz-hero-copy"><p className="quiz-eyebrow">{t('quizPractice')}</p><h1>{category ? t(`guideCat_${category}`) : t('quizTitle')}</h1><p>{category ? t('quizPickChallenge') : t('quizDesc')}</p></div>
       <span className="quiz-hero-spark" aria-hidden="true">✦</span>
@@ -69,7 +76,7 @@ export default function QuizPage() {
         const complete = cat.quizzes.filter((quiz) => progress[quiz.id]?.passedAt).length;
         const unlocked = Boolean(badges[cat.id]) || (cat.quizzes.length > 0 && complete === cat.quizzes.length);
         const Icon = cat.icon;
-        return <button key={cat.id} className="quiz-category-card" onClick={() => setCategory(cat.id)} style={{ '--category-color': cat.color }}>
+        return <button key={cat.id} className="quiz-category-card" onClick={() => { setCategory(cat.id); setSearchParams({ category: cat.id }); }} style={{ '--category-color': cat.color }}>
           <span className="quiz-category-icon"><Icon size={23}/></span>
           <span className="quiz-category-content"><strong>{t(`guideCat_${cat.id}`)}</strong><small>{complete} {t('quizOf')} {cat.quizzes.length} {t('quizPassedPlural')}</small><span className="quiz-category-progress"><i style={{ width: `${cat.quizzes.length ? complete / cat.quizzes.length * 100 : 0}%` }}/></span></span>
           <span className={`quiz-expert ${unlocked ? 'unlocked' : ''}`} aria-label={`${t('quizExpert')} ${t(`guideCat_${cat.id}`)}`}><Trophy size={14}/><span>{t('quizExpert')}<small>{unlocked ? t('quizUnlocked') : t('quizLocked')}</small></span></span>

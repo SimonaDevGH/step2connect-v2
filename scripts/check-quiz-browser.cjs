@@ -2,6 +2,7 @@
 const assert = require('node:assert/strict');
 const ExcelJS = require('exceljs');
 const { chromiumSession } = require('./lib/chromium-session.cjs');
+const { DEFAULTS: badgeDefaults } = require('../server/lib/quizBadges');
 const origin = `https://${process.env.REPLIT_DEV_DOMAIN}`;
 const sessions = [], results = {};
 const ids = ['permit-renewal', 'emergency', 'find-home', 'school-enrollment', 'public-transport'];
@@ -9,6 +10,8 @@ const categories = ['documents', 'health', 'homeBills', 'school', 'cityLife'];
 let role = 'admin', exported = false, imported = false, saved = false;
 let failBulkOnce = true;
 const bulkCalls = [];
+let badgeDefinitions = structuredClone(badgeDefaults), badgeSaves = 0;
+const earnedBadges = {};
 const paragraphs = '<p>Primo paragrafo.</p><ul><li>Secondo paragrafo.</li></ul><p>Terzo paragrafo.</p><h3>Quarto paragrafo.</h3><p>Quinto paragrafo evidenziato.</p><p>Sesto paragrafo.</p>';
 (async () => {
   const book = new ExcelJS.Workbook();
@@ -32,6 +35,14 @@ const paragraphs = '<p>Primo paragrafo.</p><ul><li>Secondo paragrafo.</li></ul><
   });
   const localized = (q, lang) => ({ ...q, questions: q.questions.map((v) => ({ ...v, ...q.translations[lang || 'it'].questions.find((x) => x.qid === v.qid) })) });
   const catalog = (lang) => records.filter((q) => role === 'admin' || q.visibility === 'published').map((q) => localized(q, lang));
+  const badgeState = () => {
+    const items = badgeDefinitions.map((b) => {
+      const passed = b.id === 'health' ? 1 : records.filter((q) => q.category === b.category && results[q.id]?.passedAt).length;
+      return { ...b, unlocked: Boolean(earnedBadges[b.id]), unlockedAt: earnedBadges[b.id] || null,
+        passed, total: b.id === 'health' ? 9 : b.category ? 1 : 5 };
+    });
+    return { items, earned: items.filter((b) => b.unlocked).length, total: 6 };
+  };
   const create = async () => {
     const b = await chromiumSession(); sessions.push(b);
     b.events['Runtime.exceptionThrown'] = ({ exceptionDetails: e }) => b.failures.push(e.exception?.description || e.text);
@@ -43,6 +54,11 @@ const paragraphs = '<p>Primo paragrafo.</p><ul><li>Secondo paragrafo.</li></ul><
       if (path === '/api/users/preview-admin/session') data = { type: role, phone: '+390000000001', firstName: 'Fixture' };
       else if (path === '/api/sections') data = { sections: Object.fromEntries(['quiz','guides','notifications','news','offices','library','privacy','translator','analyze-document'].map((key) => [key,{status:'published'}])) };
       else if (path === '/api/quiz/progress') data = { quizResults: results };
+      else if (path === '/api/quiz/badges') data = badgeState();
+      else if (path === '/api/admin/quiz/badges') {
+        if (request.method === 'PUT') { badgeDefinitions = body.items; badgeSaves++; }
+        data = { items: badgeDefinitions };
+      }
       else if (path === '/api/quiz') data = { items: catalog(lang), quizResults: results, badges: {} };
       else if (/^\/api\/quiz\/[^/]+\/result$/.test(path)) {
         const q = records.find((q) => path.split('/')[3] === q.id);
@@ -50,7 +66,12 @@ const paragraphs = '<p>Primo paragrafo.</p><ul><li>Secondo paragrafo.</li></ul><
         const score = Object.values(firstAnswers).filter(Boolean).length;
         const old = results[q.id], passed = score >= 3;
         results[q.id] = { firstAnswers: old?.firstAnswers || firstAnswers, firstScore: old?.firstScore ?? score, bestScore: Math.max(old?.bestScore || 0, score), attempts: (old?.attempts || 0) + 1, passedAt: old?.passedAt || (passed ? 'fixture-date' : ''), lastAt: 'fixture-date' };
-        data = { score, stars: score === 4 ? 3 : score === 3 ? 2 : score === 2 ? 1 : 0, passed, badgeUnlocked: passed && !old?.passedAt, saved: true, quizResults: results, progress: results[q.id] };
+        const newlyUnlockedIds = passed && !earnedBadges[q.category] ? [q.category] : [];
+        for (const id of newlyUnlockedIds) earnedBadges[id] = '2027-01-12T10:00:00.000Z';
+        data = { score, stars: score === 4 ? 3 : score === 3 ? 2 : score === 2 ? 1 : 0, passed,
+          badgeUnlocked: newlyUnlockedIds.length > 0,
+          newlyUnlockedBadges: badgeState().items.filter((b) => newlyUnlockedIds.includes(b.id)),
+          saved: true, quizResults: results, progress: results[q.id] };
       } else if (path.startsWith('/api/quiz/')) {
         const q = catalog(lang).find((q) => q.id === path.split('/')[3]);
         if (q) data = { quiz: q }; else { code = 404; data = { error: 'Not found' }; }
@@ -111,6 +132,8 @@ const paragraphs = '<p>Primo paragrafo.</p><ul><li>Secondo paragrafo.</li></ul><
     }
     assert.equal(results[records[0].id].bestScore,3);
     assert.equal(await b.evaluate(`document.querySelectorAll('.quiz-result-card .quiz-stars .earned').length`),2);
+    assert.ok(await b.evaluate(`document.querySelector('.quiz-badge-award').textContent.includes('Esperto burocrate')`));
+    assert.ok(await b.evaluate(`document.querySelector('.quiz-badges-view-button').textContent.includes('Vedi i miei badge')`));
     await b.screenshot('s2c-quiz-result.png');
     await b.click('Rifai'); await b.wait(`!!document.querySelector('.quiz-answer-row')`);
     for(let i=0;i<4;i++){
@@ -125,6 +148,22 @@ const paragraphs = '<p>Primo paragrafo.</p><ul><li>Secondo paragrafo.</li></ul><
     const second=await create();await second.visit('/quiz');
     await second.wait(`document.querySelectorAll('.quiz-category-card').length===5`);
     assert.ok(await second.evaluate(`document.querySelector('.quiz-category-card').textContent.includes('1 di 1')`));
+    await second.cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+    await second.visit('/quiz/badges');
+    await second.wait(`document.querySelectorAll('.quiz-badge-card').length===6`);
+    assert.equal(await second.evaluate(`document.querySelectorAll('.quiz-badge-card.is-unlocked').length`), 1);
+    assert.ok(await second.evaluate(`document.querySelector('.quiz-badge-card.is-unlocked').textContent.includes('12/01/2027')`));
+    assert.ok(await second.evaluate(`document.querySelectorAll('.quiz-badge-card')[1].textContent.includes('1 di 9 quiz superati')`));
+    assert.ok(await second.evaluate(`document.documentElement.scrollWidth<=window.innerWidth`));
+    assert.equal(await second.evaluate(`getComputedStyle(document.querySelector('.quiz-badges-grid')).gridTemplateColumns.split(' ').length`), 2);
+    await second.screenshot('s2c-quiz-badges.png');
+    await second.evaluate(`document.querySelector('.quiz-badge-card.is-unlocked button').click()`);
+    await second.wait(`!!document.querySelector('[role=dialog]')`);
+    assert.ok(await second.evaluate(`document.querySelector('[role=dialog]').textContent.includes('Hai superato tutti i quiz di')`));
+    await second.cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
+    await second.wait(`!document.querySelector('[role=dialog]')`);
+    await second.evaluate(`document.querySelectorAll('.quiz-badge-card')[1].querySelector('.quiz-badge-locked-info button').click()`);
+    await second.wait(`location.pathname==='/quiz' && location.search==='?category=health' && document.querySelectorAll('.quiz-list-card').length===1`);
     await b.evaluate(`localStorage.setItem('s2c_lang','bn')`);await b.visit(`/quiz/${records[0].id}`);
     await b.wait(`!!document.querySelector('.quiz-question-card')`);
     assert.equal(await b.evaluate(`document.querySelector('.quiz-question-card p').textContent`),records[0].translations.bn.questions[0].statement);
@@ -139,7 +178,7 @@ const paragraphs = '<p>Primo paragrafo.</p><ul><li>Secondo paragrafo.</li></ul><
     role='admin';await b.evaluate(`localStorage.setItem('s2c_lang','it')`);await b.visit('/admin/content/quiz');
     await b.wait(`!!document.querySelector('button[title="Modifica"]')`);
     assert.ok(await b.evaluate(`document.querySelector('.cms-bulk-btn--publish').disabled`));
-    await b.evaluate(`document.querySelector('.cms-checkbox-cell input').click()`);
+    await b.wait(`(()=>{const input=document.querySelector('.cms-checkbox-cell input');if(!input)return false;input.click();return true;})()`);
     assert.ok(await b.evaluate(`document.querySelector('.cms-select-all input').indeterminate`));
     await b.evaluate(`document.querySelector('.cms-select-all input').click()`);
     assert.equal(await b.evaluate(`document.querySelectorAll('.cms-checkbox-cell input:checked').length`), 5);
@@ -176,7 +215,20 @@ const paragraphs = '<p>Primo paragrafo.</p><ul><li>Secondo paragrafo.</li></ul><
     await b.wait(`document.body.textContent.includes('Anteprima import')`);await b.click('Anteprima import');await b.wait(`!!document.querySelector('.quiz-confirm-import')`);
     await b.click('Conferma import');await b.wait(`document.body.textContent.includes('5 quiz importati')`);assert.ok(imported);
     await b.click('Esporta Excel');await b.wait(`!document.querySelector('.quiz-export-btn').disabled`);assert.ok(exported);
+    await b.click('Badge');
+    await b.wait(`document.querySelectorAll('.cms-quiz-badge-row').length===6`);
+    assert.equal(badgeSaves, 0);
+    await b.evaluate(`(()=>{const input=document.querySelectorAll('.cms-quiz-badge-row input')[1];const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(input,'Esperto aggiornato');input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+    await b.wait(`document.querySelector('.cms-quiz-badge-preview').textContent.includes('Esperto aggiornato') && document.querySelector('.cms-quiz-badge-status').textContent==='Salvato'`);
+    assert.equal(badgeDefinitions[0].title.it, 'Esperto aggiornato');
+    await b.screenshot('s2c-cms-badges.png');
+    await second.visit('/quiz/badges');
+    await second.wait(`document.querySelector('.quiz-badge-title')?.textContent==='Esperto aggiornato'`);
+    await second.evaluate(`localStorage.setItem('s2c_lang','bn')`);
+    await second.visit('/quiz/badges');
+    await second.wait(`document.querySelector('.quiz-badge-title')?.textContent==='কাগজপত্রের ওস্তাদ'`);
+    await second.screenshot('s2c-quiz-badges-bn.png');
     for(const s of sessions)assert.deepEqual(s.failures,[]);
-    console.log('QUIZ_BROWSER_PASS: categories, player, guide anchors, persistence, BN, roles, CMS editor/stats/import/export, bulk select/mixed/publish/unpublish/partial failure/retry/language reset, mobile');
+    console.log('QUIZ_BROWSER_PASS: quiz/player/anchors/roles/bulk, award animation, six badges, earned date, 1/9 health progress, modal/Escape, category link, CMS autosave/preview/live title, BN titles, mobile');
   } finally {await Promise.all(sessions.map(s=>s.close().catch(e=>console.error('Browser cleanup:',e.message))));}
 })().catch(err=>{console.error(err);process.exitCode=1});

@@ -1158,6 +1158,52 @@ domande al primo tentativo. Sotto il 60% il dato è rosso con link al paragrafo.
 N/D indica assenza di risposte iniziali per una domanda.
 L'API non restituisce nomi, telefoni o risultati individuali.
 
+### I miei badge
+
+La sezione Quiz presenta le schede **Quiz** e **I miei badge**. La seconda ha
+un indirizzo diretto, `/quiz/badges`, soggetto agli stessi permessi della sezione.
+Mostra sei badge, barra di avanzamento, data di conquista e progresso per
+categoria. I badge bloccati portano ai quiz della rispettiva categoria;
+quelli conquistati aprono una scheda di dettaglio.
+
+| Badge | Categoria |
+|---|---|
+| Esperto burocrate | Documenti e permessi |
+| Pronto all’emergenza | Salute e pronto soccorso |
+| Casa in regola | Casa e bollette |
+| Genitore a pieni voti | Scuola e famiglia |
+| Di casa in città | Vivere in città |
+| Campione Step2Connect | Tutte le categorie con almeno un quiz visibile |
+
+Il server assegna un badge di categoria dopo il superamento di **tutti i quiz
+pubblicati e visibili all’utente** di quella categoria, con almeno un quiz.
+Bozze, quiz ritirati e quiz riservati ad altri ruoli non entrano nel conteggio.
+Il Campione richiede tutti i badge delle categorie con almeno un quiz visibile:
+un catalogo vuoto non assegna alcun badge.
+
+Le date ISO sono conservate nell’attributo DynamoDB `badges`, mappa ID → data,
+senza sostituire gli altri campi del profilo. Gli aggiornamenti condizionali
+preservano le conquiste concorrenti e la prima data: **un badge ottenuto non
+si perde**, anche aggiungendo nuovi quiz o cambiando la visibilità del catalogo.
+Il server riconcilia anche i superamenti già registrati quando si apre la
+pagina badge. Non crea profili mancanti. A fine quiz restituisce i badge appena
+ottenuti, mostrati con animazione e collegamento alla raccolta.
+
+**CMS → Quiz → Badge** consente di cambiare emoji e titoli IT/EN/BN dei sei
+badge, con salvataggio automatico, stato di salvataggio e anteprima. ID,
+categorie e regole di sblocco non sono modificabili. La configurazione è scritta
+solo dal server in `config/quiz-badges.json`; se il file non esiste si usano i
+sei valori predefiniti, senza creare file durante la lettura.
+Le modifiche compaiono al successivo caricamento della pagina utente.
+
+API, tutte senza accesso anonimo:
+
+- `GET /api/quiz/badges`: definizioni multilingua, stato personale, progresso e date.
+- `POST /api/quiz/:id/result`: include `newlyUnlockedBadges` e date conservate.
+- `GET /api/admin/quiz/badges`: configurazione completa, autenticazione CMS.
+- `PUT /api/admin/quiz/badges`: corpo `{ items: [...] }`, esattamente i sei badge;
+  titoli obbligatori nelle tre lingue (massimo 120 caratteri), emoji obbligatoria.
+
 ### Excel e dati
 
 Foglio preferito **Quiz 3 lingue**, altrimenti il primo; `.xlsx`, massimo
