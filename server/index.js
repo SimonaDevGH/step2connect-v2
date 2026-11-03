@@ -23,7 +23,19 @@ const ALLOWED_ORIGINS = [
   // dev origins
   /^https?:\/\/.*\.replit\.dev$/,
   /^http:\/\/localhost:\d+$/,
+  // extra origins per ambiente (es. server OVH DEV/PROD), separati da virgola
+  ...(process.env.CORS_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean),
 ];
+
+// Dietro un reverse proxy (Nginx su OVH) req.ip deve arrivare da X-Forwarded-For,
+// altrimenti il rate limit in memoria tratta tutti i client come un unico IP.
+if (process.env.TRUST_PROXY) {
+  const tp = process.env.TRUST_PROXY;
+  app.set('trust proxy', /^\d+$/.test(tp) ? Number(tp) : tp === 'true' ? true : tp);
+}
 
 app.use(cors({
   origin: (origin, cb) => {

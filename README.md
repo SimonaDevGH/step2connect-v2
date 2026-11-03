@@ -133,7 +133,9 @@ interne devono quindi usare URL relativi, ad esempio `/api/content`.
 
 - Node.js 20 o superiore
 - npm
-- configurazione AWS/Cognito disponibile nei Replit Secrets
+- configurazione AWS/Cognito disponibile nei Replit Secrets (oppure nel file
+  `.env` dell'ambiente sul server OVH, vedi `docs/deploy-ovh.md`)
+- Docker con Compose plugin solo per il deploy containerizzato
 
 ### Comandi
 
@@ -191,6 +193,8 @@ gestite tramite Replit Secrets.
 | `DYNAMODB_USERS_TABLE` | `Step2Connect_Users` | Nome tabella profili |
 | `DYNAMODB_PHONE_INDEX` | vuoto | Indice DynamoDB con partition key `phone` |
 | `SES_FROM_EMAIL` | nessuno | Mittente verificato SES per reset password |
+| `CORS_ALLOWED_ORIGINS` | vuoto | Origin aggiuntive ammesse da CORS, separate da virgola (es. dominio DEV/PROD sul server OVH) |
+| `TRUST_PROXY` | non impostato | Valore `trust proxy` di Express dietro un reverse proxy (`1` con Nginx su OVH), necessario perché il rate limit veda l'IP reale |
 
 `VITE_*` viene incorporato nella build client: non usare mai questo prefisso per
 segreti.
@@ -642,6 +646,10 @@ server/
   index.js                      entrypoint server
 scripts/                        strumenti operativi e migrazioni
 infra/                          template IAM
+deploy/                         Docker Compose, Nginx e script per il server OVH (B4)
+docs/                           runbook operativi (deploy-ovh.md)
+Dockerfile                      immagine di produzione (build Vite + Express)
+.github/workflows/              CI/CD (deploy DEV su OVH)
 test/                           test Node
 ```
 
@@ -785,6 +793,24 @@ S3 e i profili DynamoDB sono dati esterni e non fanno parte del commit Git.
 Per confermare un aggiornamento live controllare health check, asset serviti
 e comportamento delle API interessate; asset frontend uguali non provano che
 il backend abbia lo stesso codice.
+
+### Server B4 (OVH)
+
+È in corso la migrazione su un server B4 ospitato su OVH, con ambienti DEV e
+PROD isolati in container Docker dietro Nginx (HTTPS Let's Encrypt). La
+procedura completa è in [`docs/deploy-ovh.md`](docs/deploy-ovh.md):
+
+- `deploy/scripts/bootstrap-server.sh`: preparazione una-tantum del server
+  (Docker, Nginx, Certbot, firewall, Fail2ban, utente `deploy`, deploy key);
+- `deploy/scripts/setup-nginx.sh`: virtual host e certificato per ambiente;
+- `deploy/scripts/deploy.sh <dev|prod> [ref]`: build, avvio, health check e
+  rollback automatico in caso di errore;
+- `.github/workflows/deploy-dev.yml`: test, build e deploy DEV a ogni push su
+  `develop` (saltato finché i secret del server non sono configurati).
+
+Le variabili per ambiente partono da `deploy/env/.env.example` e restano solo
+sul server (`/opt/step2connect/<env>/.env`). Le `VITE_*` sono incorporate nella
+build: dopo una modifica occorre un nuovo deploy.
 
 ## Mappa delle aree della webapp
 
