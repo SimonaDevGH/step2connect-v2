@@ -11,6 +11,60 @@ supportate sono:
 - inglese (`en`)
 - bengalese (`bn`)
 
+## Da dove iniziare
+
+Questo repository contiene **sia la webapp sia il server e il CMS**. Non è solo
+una raccolta di schermate: notifiche, quiz, risultati e badge hanno API dedicate.
+
+| Se vuoi… | Leggi |
+|---|---|
+| Capire cosa fa ogni pagina | [Mappa delle aree della webapp](#mappa-delle-aree-della-webapp) |
+| Gestire i contenuti senza programmare | [Guida rapida al CMS](#guida-rapida-al-cms) |
+| Creare e programmare notifiche | [Guida operativa notifiche](docs/notifiche-cms.md) |
+| Importare quiz, pubblicarli e gestire i badge | [Guida operativa quiz e badge](docs/quiz-e-badge-cms.md) |
+| Capire chi vede una sezione o un contenuto | [Visibilità](#visibilità-di-sezioni-e-pagine) |
+| Avviare il progetto sul computer o in sviluppo | [Installazione e avvio](#installazione-e-avvio) |
+| Configurare servizi e autorizzazioni AWS | [Configurazione](#configurazione) e [Sicurezza](#sicurezza) |
+| Conoscere le funzioni non ancora disponibili | [Limiti attuali](#limiti-attuali) |
+
+### Guida rapida al CMS
+
+Il **CMS** è il pannello per amministrare la webapp, accessibile da `/admin/login`
+con credenziali amministrative dedicate. Non usa il codice SMS degli utenti.
+
+1. Accedi e scegli la sezione da gestire.
+2. Per guide, news e libreria, apri un contenuto o creane uno nuovo; inserisci
+   testi e media nelle lingue richieste e salva la bozza.
+3. Controlla il contenuto, quindi pubblica le modifiche. Per i quiz puoi anche
+   selezionare più righe, usare **Seleziona tutti** e pubblicare o riportare
+   in bozza i selezionati.
+4. Verifica la **visibilità** della sezione e del singolo contenuto: devono
+   entrambe consentire l’accesso all’utente destinatario.
+5. Per notifiche e quiz puoi partire da Excel: **Importa → Anteprima →
+   Conferma**. L’anteprima non salva nulla. Le notifiche confermate seguono
+   subito calendario e visibilità; i quiz importati restano bozze finché
+   non vengono pubblicati.
+6. In **Quiz → Badge** puoi modificare emoji e titoli nelle tre lingue:
+   il salvataggio è automatico e mostra il proprio stato.
+
+**Due concetti diversi da non confondere:**
+
+- **Bozza / Online** indica se esiste una versione pubblicata del contenuto.
+  Le modifiche salvate in bozza non sostituiscono da sole la versione online.
+- **Interno / Anteprima / Pubblicato** indica il pubblico autorizzato:
+  rispettivamente amministratori, amministratori più Fincantieri/ELIS,
+  oppure tutti gli utenti autenticati. “Pubblicato” non significa accesso anonimo.
+  Scegliere la visibilità di un contenuto editoriale pubblica anche l’ultima
+  bozza: controllare prima i testi.
+
+Le notifiche sono messaggi **dentro la webapp**, non invii push, email o SMS.
+I badge e le letture personali restano associati al profilo dell’utente.
+
+**Dove vengono conservati i dati?** GitHub conserva codice e documentazione;
+S3 conserva contenuti, media e configurazioni del CMS; DynamoDB conserva profili,
+letture, risultati e date dei badge. Aggiornare GitHub non copia i dati privati
+né pubblica automaticamente una nuova versione del sito.
+
 ## Indice
 
 1. [Funzionalità principali](#funzionalità-principali)
@@ -59,6 +113,13 @@ supportate sono:
   guide per categoria.
 - Gestione dei ruoli applicativi tramite comando operatore, senza endpoint HTTP
   di promozione pubblici.
+- Notifiche reali con calendario CMS, import/export Excel, traduzioni, campanella
+  e letture personali persistenti.
+- Quiz Vero/Falso collegati alle guide, import/export Excel, editor multilingua,
+  pubblicazione singola o multipla e statistiche aggregate.
+- Raccolta “I miei badge”: sei badge, date di conquista permanenti e titoli
+  modificabili dal CMS nelle tre lingue.
+- Visibilità per ruolo applicata sia alle sezioni sia ai contenuti.
 - Integrazione LivePerson e collegamenti WhatsApp.
 
 ## Stack tecnico
@@ -694,6 +755,16 @@ La suite copre:
 - preservazione dei profili durante il login;
 - parsing del CSV di registrazione;
 - validazione dei numeri italiani e bangladesi.
+- visibilità di sezioni e contenuti per ruolo;
+- calendario notifiche, import/export Excel e letture personali;
+- quiz, punteggi calcolati dal server, pubblicazione e ritorno in bozza;
+- configurazione dei badge, sblocco per categoria, Campione e date permanenti.
+
+I controlli browser facoltativi sono in `scripts/check-notifications-browser.cjs`
+e `scripts/check-quiz-browser.cjs`; usano API simulate isolate. I file Excel
+originali della chat non sono distribuiti nel repository: i controlli che
+richiedono tali file devono riceverli separatamente. I test automatici non
+equivalgono a una verifica con un vero account sul sito pubblico.
 
 Dopo modifiche a codice, dipendenze o comandi di avvio, riavviare anche il
 workflow Replit e controllare log e preview.
@@ -855,6 +926,7 @@ gestiti dal CMS, dati dimostrativi e integrazioni esterne.
 - `/quiz`: categorie delle guide con quiz visibili, avanzamento, stelle e badge.
 - `/quiz/:id`: domande Vero/Falso IT/EN/BN, spiegazioni, audio opzionale e link ai
   paragrafi della guida, con ritorno al tentativo in corso.
+- `/quiz/badges`: raccolta dei sei badge, progressi, date e dettagli delle conquiste.
 - Gestione CMS, import/export Excel, statistiche aggregate e risultati persistenti:
   vedere [Quiz collegati alle guide](#quiz-collegati-alle-guide).
 
@@ -1102,6 +1174,9 @@ calendario con API simulate. Controlla le guide reali solo in lettura: non
 scrive su S3 o DynamoDB reali.
 
 ## Quiz collegati alle guide
+
+Per gestire questa sezione senza conoscere il codice, seguire la
+[Guida operativa quiz e badge nel CMS](docs/quiz-e-badge-cms.md).
 
 ### Gestione dal CMS
 
