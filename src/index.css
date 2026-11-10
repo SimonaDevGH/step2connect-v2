@@ -1035,6 +1035,33 @@ input, textarea { font-family: inherit; }
 }
 .login-tab.active { color: var(--navy); border-bottom-color: var(--navy); }
 
+.login-privacy-consent {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  margin-bottom: 16px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: var(--off-white);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.login-privacy-consent input {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  accent-color: var(--navy);
+  cursor: pointer;
+}
+.login-privacy-consent label { cursor: pointer; }
+.login-privacy-consent a,
+.login-privacy-footer a { color: var(--navy); text-decoration: underline; }
+.login-privacy-consent :focus-visible,
+.login-privacy-footer a:focus-visible { outline: 2px solid var(--navy); outline-offset: 3px; }
+.login-privacy-footer { text-align: center; font-size: 0.85rem; margin: 20px 0 0; }
+.login-privacy-footer a { display: inline-block; padding: 10px 4px; }
+
 .input-group {
   position: relative;
   margin-bottom: 16px;

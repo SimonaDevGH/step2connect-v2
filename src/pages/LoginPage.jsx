@@ -42,6 +42,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [company, setCompany] = useState('');
   const [site, setSite] = useState('');
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [registrationOptions, setRegistrationOptions] = useState({ companies: [], sites: [] });
   const [registrationOptionsLoading, setRegistrationOptionsLoading] = useState(false);
   const [registrationOptionsFailed, setRegistrationOptionsFailed] = useState(false);
@@ -82,13 +83,15 @@ export default function LoginPage() {
     setPhoneError('');
     setNoticeKey('');
     setOtp('');
+    setPrivacyAccepted(false);
   };
 
   const isRegisterValid = firstName.trim() && lastName.trim() && phone.trim()
-    && company && site && !registrationOptionsFailed && !registrationOptionsLoading;
+    && company && site && privacyAccepted && !registrationOptionsFailed && !registrationOptionsLoading;
   const isLoginValid = phone.trim();
 
   const handleSendOTP = async () => {
+    if (mode === 'register' && !isRegisterValid) return;
     if (!validatePhoneNumber(phone).valid) {
       setPhoneError(t('invalidPhoneNumber'));
       setError('');
@@ -366,6 +369,22 @@ export default function LoginPage() {
                   </select>
                 </div>
 
+                <div className="login-privacy-consent">
+                  <input
+                    id="privacy-accepted"
+                    type="checkbox"
+                    checked={privacyAccepted}
+                    onChange={(e) => setPrivacyAccepted(e.target.checked)}
+                    required
+                    aria-labelledby="privacy-accepted-label"
+                  />
+                  <div id="privacy-accepted-label">
+                    <label htmlFor="privacy-accepted">{t('privacyConsentPrefix')}</label>
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer">{t('privacyPolicyInline')}</a>
+                    <label htmlFor="privacy-accepted">{t('privacyConsentSuffix')} *</label>
+                  </div>
+                </div>
+
                 <button
                   className="btn-primary"
                   onClick={handleSendOTP}
@@ -459,6 +478,9 @@ export default function LoginPage() {
             <button className="btn-ghost" onClick={() => setStep('form')}>← {t('back')}</button>
           </>
         )}
+        <p className="login-privacy-footer">
+          <a href="/privacy" target="_blank" rel="noopener noreferrer">{t('privacyPolicyLink')}</a>
+        </p>
       </div>
     </div>
   );

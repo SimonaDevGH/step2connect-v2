@@ -1,16 +1,22 @@
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function PrivacyPage() {
   const { t } = useLanguage();
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const goBack = () => {
+    if (window.history.state?.idx > 0) navigate(-1);
+    else navigate('/', { replace: true });
+  };
 
   return (
     <div className="page-content privacy-page">
       <div className="page-hero" style={{ background: 'var(--navy)' }}>
-        <button className="back-btn" onClick={() => navigate(-1)}>
-          <ChevronLeft size={24} /> {t('menu')}
+        <button className="back-btn" onClick={goBack}>
+          <ChevronLeft size={24} /> {t(user ? 'menu' : 'back')}
         </button>
         <h2 className="page-hero-title">{t('privacyTitle')}</h2>
       </div>

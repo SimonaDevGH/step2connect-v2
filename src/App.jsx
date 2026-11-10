@@ -119,6 +119,7 @@ function AppShell() {
   if (!user) {
     return (
       <Routes>
+        <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/*" element={<LoginPage />} />
       </Routes>
     );

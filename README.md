@@ -290,6 +290,19 @@ prodotto intenzionale per questa applicazione interna; l’OTP resta obbligatori
 
 ### Registrazione Cognito
 
+L'informativa privacy è consultabile anche senza autenticazione all'indirizzo
+relativo `/privacy`. In registrazione è obbligatorio spuntare «Ho letto e accetto
+l'informativa privacy» prima di poter inviare il codice; la casella parte
+deselezionata e si azzera cambiando scheda Accedi/Registrati. Non compare in Accedi.
+Il consenso in questo passaggio resta solo nello stato del form: **non è salvato
+nel CRM né nel profilo utente**. Email e flusso SMS rimangono invariati.
+
+Il link nella casella e quello in fondo alla card (anche nello step del codice)
+aprono `/privacy` in una nuova scheda senza perdere i dati inseriti. I nuovi testi
+sono disponibili in italiano, inglese e bengalese. Aprendo direttamente la privacy,
+«Indietro» torna a `/` se non esiste una precedente navigazione interna; per gli
+utenti autenticati restano invariati la shell e l'accesso alla privacy esistenti.
+
 1. Il client invia a Cognito esclusivamente `phone_number`.
 2. Cognito richiede comunque una password tecnica: viene generato un UUID con il
    suffisso `Xz9!` per rispettare la policy.
