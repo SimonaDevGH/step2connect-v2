@@ -1082,6 +1082,11 @@ se l'archivio fallisce, il salvataggio si interrompe. L'import è un'unione per 
 i record non presenti nel file restano invariati. Un export reimportato senza
 modifiche non riscrive dati o audit. Non è necessario creare file S3 a mano.
 
+Gli errori server di importazione/salvataggio indicano il passaggio fallito
+(lettura, archivio o scrittura) e un riferimento di diagnosi. I log includono
+quel riferimento e i codici tecnici AWS, senza esporre contenuti o credenziali.
+Il superamento dell’anteprima non garantisce l’autorizzazione a scrivere su S3.
+
 Ogni record contiene `id`, `obiettivo`, `tipo`, `contentId`, `guideId`, `link`,
 `message.{it,en,bn}`, `startDate`, `endDate`, `frequency`, `active`, `territory`,
 `dateStatus`, `hook`, `updatedAt`, `updatedBy`.

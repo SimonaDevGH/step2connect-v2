@@ -18,11 +18,18 @@ let whitelist = { accessCode: '123456', enabled: true };
 const writes = [];
 const updates = [];
 let conflict = false;
+let storageFailure = '';
+function rejectStorage(operation) {
+  if (storageFailure !== operation) return;
+  throw Object.assign(new Error('private account details must not be returned'), {
+    name: 'AccessDenied', $metadata: { httpStatusCode: 403, requestId: 'fixture-request' },
+  });
+}
 const rsa = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 const storage = {
-  async getJson(key) { return objects.has(key) ? structuredClone(objects.get(key)) : null; },
-  async putJson(key, value) { objects.set(key, structuredClone(value)); writes.push(key); },
-  async copyObject(from, to) { assert.ok(objects.has(from)); objects.set(to, structuredClone(objects.get(from))); writes.push(to); },
+  async getJson(key) { rejectStorage('read'); return objects.has(key) ? structuredClone(objects.get(key)) : null; },
+  async putJson(key, value) { rejectStorage('write'); objects.set(key, structuredClone(value)); writes.push(key); },
+  async copyObject(from, to) { rejectStorage('archive'); assert.ok(objects.has(from)); objects.set(to, structuredClone(objects.get(from))); writes.push(to); },
 };
 const documentClient = { async send(command) {
   const input = command.input;
@@ -173,6 +180,61 @@ test('Rome boundaries, territory, Italian fallback, ordering and strict dates', 
   assert.equal(items[0].read, true);
   assert.equal(notifications.visibleNotifications(calendar, null, 'it', '2027-01-04').length, 2);
   assert.equal(notifications.visibleNotifications(calendar, { sede: 'marghera' }, 'it', '2027-01-04').length, 3);
+});
+
+test('import confirmation identifies the failed storage step without replacing the active calendar or exposing AWS details', async () => {
+  seed();
+  await notifications.saveNotifications([record()], 'fixture');
+  const old = structuredClone(objects.get(notifications.KEY));
+  try {
+    for (const step of ['read', 'archive', 'write']) {
+      storageFailure = step;
+      const result = await api('/api/admin/notifications/import/confirm', 'POST', {
+        notifications: [record('N-002')],
+      });
+      assert.equal(result.response.status, 500);
+      assert.equal(result.data.code, `NOTIFICATIONS_${step.toUpperCase()}_FAILED`);
+      assert.match(result.data.reference, /^[0-9a-f-]{36}$/);
+      assert.ok(result.data.error.includes('permessi AWS S3'));
+      assert.ok(!JSON.stringify(result.data).includes('private account details'));
+      assert.deepEqual(objects.get(notifications.KEY), old);
+    }
+  } finally { storageFailure = ''; }
+  // A failed queued save must not prevent a subsequent legitimate retry.
+  const retry = await api('/api/admin/notifications/import/confirm', 'POST', { notifications: [record('N-002')] });
+  assert.equal(retry.response.status, 200);
+  assert.equal(retry.data.imported, 1);
+});
+
+test('uploaded November calendar previews and confirms all 45 rows against isolated storage', {
+  skip: !fs.existsSync('attached_assets/S2C_calendario_notifiche_20261110_1794322344659.xlsx'),
+}, async () => {
+  seed();
+  const buffer = fs.readFileSync('attached_assets/S2C_calendario_notifiche_20261110_1794322344659.xlsx');
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  const sheet = workbook.getWorksheet('Calendario');
+  const headers = new Map();
+  sheet.getRow(1).eachCell((cell, column) => headers.set(String(cell.value), column));
+  sheet.eachRow((row, index) => {
+    if (index === 1) return;
+    const guideId = row.getCell(headers.get('ID guida CMS')).text.trim();
+    if (guideId) objects.set(`content/draft/guides/it/${guideId}.json`, { id: guideId });
+  });
+  const preview = await excel.previewImport(buffer);
+  assert.equal(preview.totalRows, 45);
+  assert.equal(preview.canConfirm, true);
+  assert.ok(preview.rows.every((row) => !row.errors.length));
+  await notifications.saveNotifications([record('existing')], 'fixture');
+  const old = structuredClone(objects.get(notifications.KEY));
+  const result = await api('/api/admin/notifications/import/confirm', 'POST', {
+    notifications: preview.rows.filter((row) => !row.skipped).map((row) => row.notification),
+  });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.data.imported, 45);
+  assert.equal(result.data.notifications.length, 46);
+  const archives = [...objects.entries()].filter(([key]) => key.startsWith('config/archive/notifications_'));
+  assert.ok(archives.some(([, value]) => JSON.stringify(value) === JSON.stringify(old)));
 });
 
 test('real Cognito and preview signatures, revoked credentials and CMS tokens cannot cross user authentication', async () => {

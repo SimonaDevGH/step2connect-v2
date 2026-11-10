@@ -15,8 +15,16 @@ function invalid(message, details) {
   return Object.assign(new Error(message), { status: 400, details });
 }
 
+async function storageStep(operation, action) {
+  try { return await action(); }
+  catch (err) {
+    err.notificationOperation = operation;
+    throw err;
+  }
+}
+
 async function getCalendar() {
-  const saved = await getJson(KEY);
+  const saved = await storageStep('read', () => getJson(KEY));
   if (saved === null) return { notifications: [] };
   if (!saved || !Array.isArray(saved.notifications)) throw new Error('Invalid notification configuration');
   return saved;
@@ -58,7 +66,8 @@ async function validateNotification(value, guideCache = new Map()) {
     if (!/^[A-Za-z0-9_-]{1,150}$/.test(notification.guideId)) errors.push('ID guida non valido');
     else {
       if (!guideCache.has(notification.guideId)) {
-        guideCache.set(notification.guideId, await getJson(`content/draft/guides/it/${notification.guideId}.json`));
+        guideCache.set(notification.guideId, await storageStep('read', () =>
+          getJson(`content/draft/guides/it/${notification.guideId}.json`)));
       }
       if (!guideCache.get(notification.guideId)) errors.push(`Guida CMS inesistente: ${notification.guideId}`);
     }
@@ -77,10 +86,10 @@ function mutateCalendar(change, author) {
     const updatedAt = new Date().toISOString();
     if (previous.updatedAt || previous.notifications.length || await getJson(KEY) !== null) {
       const stamp = updatedAt.replace(/[:.]/g, '-') + '_' + randomUUID();
-      await copyObject(KEY, `config/archive/notifications_${stamp}.json`);
+      await storageStep('archive', () => copyObject(KEY, `config/archive/notifications_${stamp}.json`));
     }
     const next = { notifications, updatedAt, updatedBy: author };
-    await putJson(KEY, next);
+    await storageStep('write', () => putJson(KEY, next));
     return next;
   });
   writeQueue = operation.catch(() => {});

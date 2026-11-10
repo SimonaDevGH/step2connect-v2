@@ -158,6 +158,14 @@ delle non lette.
 | Letture non persistenti | Verificare che esista il profilo e che DynamoDB consenta lettura/aggiornamento |
 | Errore durante il salvataggio | Verificare permessi S3 su configurazione e archivio; un archivio fallito blocca il salvataggio |
 
+Se **Conferma import** fallisce, il messaggio distingue la lettura del calendario,
+la creazione della copia di sicurezza e la scrittura della nuova versione.
+Contiene inoltre un **riferimento**: conservarlo insieme all’orario e
+all’indirizzo della pagina per individuare la richiesta nei log del server.
+Un errore nella copia di sicurezza impedisce la sostituzione del calendario.
+Il file Excel può essere corretto anche quando il salvataggio non riesce:
+l’anteprima valida il contenuto, ma non verifica i permessi di scrittura.
+
 ## 9. Note tecniche per i manutentori
 
 - Configurazione: `config/notifications.json` su S3; l'assenza del file equivale
