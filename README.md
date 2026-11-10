@@ -1005,6 +1005,10 @@ gestiti dal CMS, dati dimostrativi e integrazioni esterne.
 ### Privacy, pagine generiche e assistenza
 
 - `/privacy`: informativa nell'interfaccia multilingue.
+  La pagina si adatta a smartphone e tablet, sia pubblica sia nella shell degli
+  utenti autenticati: testo leggibile, indirizzi lunghi a capo e pulsante Indietro
+  con area di tocco di almeno 44px. Su desktop il testo ha una larghezza di lettura
+  limitata. Lo zoom del browser è consentito per l'accessibilità, anche nelle altre pagine.
 - Le route non riconosciute passano al resolver delle pagine CMS per URL, poi
   al fallback. Il resolver conserva l'override legacy del backend documentato.
 - LivePerson è un'integrazione esterna: le disponibilità dell'assistenza

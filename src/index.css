@@ -2037,10 +2037,38 @@ input, textarea { font-family: inherit; }
 }
 
 /* ── Privacy Page ─────────────────────────────────────────────────────── */
-.privacy-body {
-  padding: 24px 20px 40px;
+.privacy-page {
+  width: 100%;
+  min-width: 0;
 }
-.prv-h1 {
+.privacy-page .page-hero {
+  min-height: 0;
+  padding: 20px clamp(16px, 4vw, 28px) 24px;
+}
+.privacy-page .back-btn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 10px;
+  margin: -4px 0 8px -10px;
+  border-radius: 8px;
+}
+.privacy-page .back-btn:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
+}
+.privacy-page .page-hero-title {
+  font-size: clamp(1.25rem, 5vw, 1.5rem);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.privacy-page .privacy-body {
+  width: min(100%, 800px);
+  min-width: 0;
+  margin-inline: auto;
+  padding: clamp(20px, 4vw, 32px) clamp(16px, 4vw, 28px) 40px;
+  overflow-wrap: anywhere;
+}
+.privacy-page .prv-h1 {
   font-size: 1.2rem;
   font-weight: 800;
   color: var(--navy);
@@ -2048,7 +2076,7 @@ input, textarea { font-family: inherit; }
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
-.prv-h2 {
+.privacy-page .prv-h2 {
   font-size: 1rem;
   font-weight: 700;
   color: var(--navy);
@@ -2056,34 +2084,36 @@ input, textarea { font-family: inherit; }
   border-bottom: 1px solid var(--border);
   padding-bottom: 4px;
 }
-.prv-h3 {
-  font-size: 0.92rem;
+.privacy-page .prv-h3 {
+  font-size: 1rem;
   font-weight: 600;
   color: var(--text);
   margin: 14px 0 6px;
 }
-.privacy-body p {
-  font-size: 0.88rem;
+.privacy-page .privacy-body p {
+  font-size: 1rem;
   line-height: 1.6;
   color: var(--text);
   margin-bottom: 10px;
 }
-.prv-list {
+.privacy-page .prv-list {
   padding-left: 20px;
   margin-bottom: 10px;
 }
-.prv-list li {
-  font-size: 0.88rem;
+.privacy-page .prv-list li {
+  font-size: 1rem;
   line-height: 1.6;
   color: var(--text);
   margin-bottom: 6px;
 }
-.privacy-body a {
+.privacy-page .privacy-body a {
+  max-width: 100%;
   color: var(--navy);
   text-decoration: underline;
-  word-break: break-all;
+  word-break: normal;
+  overflow-wrap: anywhere;
 }
-.prv-updated {
+.privacy-page .prv-updated {
   font-size: 0.8rem;
   color: var(--text-muted);
   margin-top: 24px;
