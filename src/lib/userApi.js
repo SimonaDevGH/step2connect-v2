@@ -40,7 +40,7 @@ async function apiFetch(path, idToken, options = {}) {
  * @param {string} idToken
  * @param {{ phone, firstName, lastName, email, company, site }} profile
  */
-export async function syncProfile(idToken, profile) {
+export async function syncProfile(idToken, profile, { requireSuccess = false } = {}) {
   // Il login normale non raccoglie nuovamente i dati anagrafici: non inviare
   // stringhe vuote, altrimenti un backend di tipo upsert potrebbe cancellare
   // valori già presenti (anche se impostati manualmente).
@@ -51,14 +51,26 @@ export async function syncProfile(idToken, profile) {
   if (!syncPayload) return null;
 
   try {
+    if (requireSuccess && !BASE) throw new Error('Profile sync is not configured');
     return await apiFetch('/users/sync', idToken, {
       method: 'POST',
       body: JSON.stringify(syncPayload),
     });
   } catch (err) {
-    console.warn('[userApi] syncProfile failed (non-blocking):', err.message);
+    if (requireSuccess) throw err;
+    console.warn('[userApi] syncProfile failed (non-blocking)');
     return null;
   }
+}
+
+export function savePrivacyConsent(idToken, consent) {
+  return sameOriginApiFetch('/api/users/consent', idToken, {
+    method: 'POST',
+    body: JSON.stringify({
+      privacy_policy_consent: true,
+      privacyAcceptedAt: consent.privacyAcceptedAt,
+    }),
+  });
 }
 
 /**

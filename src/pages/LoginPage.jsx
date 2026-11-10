@@ -103,7 +103,11 @@ export default function LoginPage() {
     setPhoneError('');
 
     const userData = mode === 'register'
-      ? { firstName, lastName, email, company, site }
+      ? {
+        firstName, lastName, email, company, site,
+        privacy_policy_consent: true,
+        privacyAcceptedAt: new Date().toISOString(),
+      }
       : {};
 
     let flow;

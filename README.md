@@ -294,8 +294,41 @@ L'informativa privacy è consultabile anche senza autenticazione all'indirizzo
 relativo `/privacy`. In registrazione è obbligatorio spuntare «Ho letto e accetto
 l'informativa privacy» prima di poter inviare il codice; la casella parte
 deselezionata e si azzera cambiando scheda Accedi/Registrati. Non compare in Accedi.
-Il consenso in questo passaggio resta solo nello stato del form: **non è salvato
-nel CRM né nel profilo utente**. Email e flusso SMS rimangono invariati.
+Al click su «Invia codice», il momento dell'accettazione resta temporaneamente
+nello stato del form. **Nessun consenso viene scritto prima della verifica SMS.**
+Dopo la conferma del codice e l'accesso alla home, il client attende la riuscita
+di `/users/sync`, poi chiama `POST /api/users/consent` con l'ID token Cognito.
+Email e flusso SMS rimangono invariati.
+
+Il consenso è salvato nel profilo CRM `Step2Connect_Users` nei campi:
+
+| Campo | Valore |
+| --- | --- |
+| `privacy_policy_consent` | Booleano `true`, mai la stringa `"true"` o il valore `false` |
+| `privacyAcceptedAt` | Data e ora del click iniziale, in UTC, formato `YYYYMMDD HH:MM` |
+
+Il server valida il timestamp ISO del click trasmesso dal form e lo converte nel
+formato indicato: non usa come data di accettazione il momento successivo della
+verifica SMS. Il timestamp del click è dichiarato dal browser, non è una marca
+temporale certificata. L'identità proviene soltanto dal numero nel JWT Cognito
+verificato; il `userId` del CRM è risolto per telefono e non è assunto uguale al
+`sub`. L'endpoint usa esclusivamente `UpdateCommand`, non crea profili mancanti
+e conserva atomicamente la prima accettazione anche in caso di richieste simultanee.
+
+Solo il flusso Registrati chiama l'endpoint: Accedi e codice personale sono
+invariati. In caso di errore del consenso viene eseguito un solo nuovo tentativo;
+un secondo errore produce un messaggio tecnico senza dati personali e non blocca
+l'accesso. Se la sincronizzazione del profilo fallisce, il consenso non è scritto
+e viene registrato un errore generico. Non c'è un recupero automatico del consenso
+nei login successivi.
+
+**Limite esterno da verificare:** l'implementazione di `/users/sync` non è contenuta
+in questo repository. Il servizio deve aggiornare i soli campi ricevuti e
+preservare gli attributi privacy già presenti; non è stato possibile verificarlo
+dal suo codice. L'implementazione locale è stata autorizzata con questa verifica
+ancora aperta. La policy `infra/step2connect-users-iam.yaml` comprende già
+`dynamodb:UpdateItem`; un eventuale indice telefonico deve proiettare anche i due
+attributi privacy per poter rileggere l'accettazione esistente.
 
 Il link nella casella e quello in fondo alla card (anche nello step del codice)
 aprono `/privacy` in una nuova scheda senza perdere i dati inseriti. I nuovi testi

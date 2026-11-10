@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Least-privilege DynamoDB access for Step2Connect user-role resolution and provisioning
+Description: Least-privilege DynamoDB access for Step2Connect profile lookup, role updates and privacy consent
 
 Parameters:
   BackendIamUserName:

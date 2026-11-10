@@ -35,7 +35,7 @@ async function getUserByPhone(phone, documentClient = client) {
     TableName: TABLE_NAME,
     ExpressionAttributeNames: names,
     ExpressionAttributeValues: values,
-    ProjectionExpression: '#phone, firstName, userId, #type, adminPsw, sede, notificationsRead, quizResults, badges',
+    ProjectionExpression: '#phone, firstName, userId, #type, adminPsw, sede, notificationsRead, quizResults, badges, privacy_policy_consent, privacyAcceptedAt',
   };
 
   if (PHONE_INDEX) {
@@ -60,6 +60,50 @@ async function getUserByPhone(phone, documentClient = client) {
   } while (ExclusiveStartKey);
 
   return null;
+}
+
+// The client supplies the click instant, not an identity. Convert it to UTC here.
+function formatPrivacyAcceptedAt(value) {
+  if (typeof value !== 'string'
+    || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return null;
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime()) || date.toISOString() !== value
+    || date.getTime() > Date.now() + 5 * 60_000) return null;
+  return `${value.slice(0, 10).replace(/-/g, '')} ${value.slice(11, 16)}`;
+}
+
+async function recordPrivacyConsentByPhone(phone, acceptedAt, documentClient = client) {
+  const profile = await getUserByPhone(phone, documentClient);
+  if (!profile?.userId) return null;
+  if (profile.privacy_policy_consent === true) {
+    return { privacy_policy_consent: true, privacyAcceptedAt: profile.privacyAcceptedAt };
+  }
+  try {
+    const result = await documentClient.send(new UpdateCommand({
+      TableName: TABLE_NAME,
+      Key: { userId: profile.userId },
+      UpdateExpression: 'SET #consent = :true, #acceptedAt = if_not_exists(#acceptedAt, :acceptedAt)',
+      ConditionExpression: 'attribute_exists(userId) AND #phone = :phone AND (attribute_not_exists(#consent) OR #consent <> :true)',
+      ExpressionAttributeNames: {
+        '#phone': 'phone', '#consent': 'privacy_policy_consent', '#acceptedAt': 'privacyAcceptedAt',
+      },
+      ExpressionAttributeValues: { ':phone': phone, ':true': true, ':acceptedAt': acceptedAt },
+      ReturnValues: 'UPDATED_NEW',
+    }));
+    return {
+      privacy_policy_consent: true,
+      privacyAcceptedAt: result.Attributes?.privacyAcceptedAt ?? profile.privacyAcceptedAt ?? acceptedAt,
+    };
+  } catch (err) {
+    if (err.name !== 'ConditionalCheckFailedException') throw err;
+    // A simultaneous call may have stored the first acceptance already.
+    const current = await getUserByPhone(phone, documentClient);
+    if (current?.privacy_policy_consent === true) {
+      return { privacy_policy_consent: true, privacyAcceptedAt: current.privacyAcceptedAt };
+    }
+    if (!current?.userId) return null;
+    throw err;
+  }
 }
 
 async function setUserRoleByPhone(phone, role, documentClient = client) {
@@ -237,6 +281,8 @@ async function quizResultAggregates(quiz, documentClient = client) {
 
 module.exports = {
   getUserByPhone,
+  formatPrivacyAcceptedAt,
+  recordPrivacyConsentByPhone,
   isAdminProfile,
   isPreviewAdminProfile,
   isStandardProfile,

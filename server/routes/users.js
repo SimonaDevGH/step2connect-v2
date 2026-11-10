@@ -8,6 +8,8 @@ const {
   isPreviewAdminProfile,
   isStandardProfile,
   promoteWhitelistUserByPhone,
+  formatPrivacyAcceptedAt,
+  recordPrivacyConsentByPhone,
 } = require('../lib/userProfiles');
 const {
   findAdminByPhone,
@@ -312,6 +314,25 @@ router.get('/me', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('[users] profile lookup error:', err);
     res.status(500).json({ error: 'Unable to load user profile' });
+  }
+});
+
+// Identity comes exclusively from the verified Cognito token, never the body.
+router.post('/consent', requireAuth, async (req, res) => {
+  const phone = normalizePhone(req.cognitoUser?.phone_number);
+  if (!phone) return res.status(403).json({ error: 'Verified phone number required' });
+  const acceptedAt = formatPrivacyAcceptedAt(req.body?.privacyAcceptedAt);
+  if (req.body?.privacy_policy_consent !== true || !acceptedAt) {
+    return res.status(400).json({ error: 'Acceptance and a valid click timestamp are required' });
+  }
+  try {
+    const consent = await recordPrivacyConsentByPhone(phone, acceptedAt);
+    if (!consent) return res.status(404).json({ error: 'User profile not found' });
+    res.json({ ok: true, ...consent });
+  } catch {
+    // Do not log tokens, phone numbers, payloads or raw AWS errors.
+    console.error('[users] privacy consent save failed');
+    res.status(500).json({ error: 'Unable to save privacy consent' });
   }
 });
 

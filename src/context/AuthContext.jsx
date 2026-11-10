@@ -11,8 +11,9 @@ import {
   fetchUserAttributes,
 } from 'aws-amplify/auth';
 import '../lib/cognito.js'; // initialise Amplify once
-import { getMyProfile, syncProfile, getPreviewSession } from '../lib/userApi.js';
+import { getMyProfile, syncProfile, getPreviewSession, savePrivacyConsent } from '../lib/userApi.js';
 import { buildPreviewUser } from '../lib/previewSession.js';
+import { syncProfileAfterLogin } from '../lib/registrationConsent.js';
 
 const AuthContext = createContext(null);
 
@@ -203,12 +204,16 @@ export function AuthProvider({ children }) {
 
       // Sincronizza il profilo con il backend (non-blocking)
       if (idToken) {
-        const profileSync = syncProfile(idToken, profileHint);
+        const profileSync = syncProfileAfterLogin({
+          isRegister, idToken, profile: profileHint, consent: userData,
+          syncProfile, savePrivacyConsent,
+        });
         profileSync.then(() => getMyProfile(idToken))
           .then((profile) => mergeProfileIntoUser(setUser, profile, profileHint.phone))
           .catch(() => {})
           .finally(() => setProfileReady(true));
       } else {
+        if (isRegister) console.warn('[privacy-consent] authenticated token unavailable; consent not saved');
         setProfileReady(true);
       }
 
