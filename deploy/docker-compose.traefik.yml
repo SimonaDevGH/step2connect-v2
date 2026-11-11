@@ -1,0 +1,18 @@
+# Overlay per server condivisi in cui Traefik (file provider) pubblica i siti:
+# collega il container alla rete Docker di Traefik con alias stabile
+# step2connect-<env>, così la rotta in traefik-dynamic può puntare a
+# http://step2connect-<env>:5000. deploy.sh lo aggiunge se TRAEFIK_NETWORK
+# è valorizzata nel file .env dell'ambiente.
+
+services:
+  app:
+    networks:
+      default: {}
+      traefik:
+        aliases:
+          - step2connect-${APP_ENV}
+
+networks:
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK:-web}
