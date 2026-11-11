@@ -28,6 +28,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      # Il lockfile generato su Replit punta al registry interno di Replit.
+      - name: Registry npm pubblico nel lockfile
+        run: sed -i -E 's#https?://package-firewall\.replit\.[a-z]+/npm/#https://registry.npmjs.org/#g' package-lock.json
       - run: npm ci --no-audit --no-fund
       - run: npm test
       - run: npm run build

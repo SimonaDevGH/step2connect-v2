@@ -7,7 +7,11 @@ FROM node:22-alpine AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
+# Su Replit il lockfile viene riscritto con il registry interno di Replit
+# (package-firewall.replit.local / .internal), irraggiungibile da qui:
+# lo riportiamo al registry npm pubblico. Gli hash di integrità non cambiano.
+ARG NPM_LOCK_FIX='s#https?://package-firewall\.replit\.[a-z]+/npm/#https://registry.npmjs.org/#g'
+RUN sed -i -E "$NPM_LOCK_FIX" package-lock.json && npm ci --no-audit --no-fund
 
 COPY . .
 
@@ -27,7 +31,8 @@ ENV NODE_ENV=production \
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
+ARG NPM_LOCK_FIX='s#https?://package-firewall\.replit\.[a-z]+/npm/#https://registry.npmjs.org/#g'
+RUN sed -i -E "$NPM_LOCK_FIX" package-lock.json && npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 
 COPY server ./server
 COPY --from=build /app/dist ./dist

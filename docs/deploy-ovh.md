@@ -60,6 +60,15 @@ Su questo server:
 (`<base>/<env>/app/deploy/scripts/deploy.sh`), quindi funziona sia in
 `/opt/step2connect` sia in `/home/ubuntu/stacks/step2connect`.
 
+### Lockfile generato su Replit
+
+Su Replit `npm install` riscrive gli URL `resolved` di `package-lock.json`
+verso il registry interno di Replit (`package-firewall.replit.local` /
+`.internal`), irraggiungibile dal server B4 e da GitHub Actions. Il
+`Dockerfile` e il workflow `deploy-dev.yml` li riportano a
+`registry.npmjs.org` prima di `npm ci`, quindi non serve correggere il file a
+mano: gli hash di integrità restano invariati.
+
 ### Flusso dei branch
 
 | Branch | Ambiente | Deploy |
