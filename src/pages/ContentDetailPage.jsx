@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
+import { canSeeVisibility } from '../lib/sectionAccess';
 
 const CONTENT_TYPES = {
   news: {
@@ -27,7 +29,10 @@ export default function ContentDetailPage({ contentType }) {
   const { t, lang } = useLanguage();
   const navigate = useNavigate();
   const config = CONTENT_TYPES[contentType];
-  const [content, setContent] = useState(undefined);
+  const { user } = useAuth();
+  const [loadedContent, setContent] = useState(undefined);
+  const content = loadedContent && !canSeeVisibility(loadedContent.visibility, user)
+    ? null : loadedContent;
 
   useEffect(() => {
     let cancelled = false;

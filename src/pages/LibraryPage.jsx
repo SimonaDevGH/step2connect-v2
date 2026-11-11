@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Download } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
+import { canSeeVisibility } from '../lib/sectionAccess';
 
 // ─── FALLBACK (static data shown if API is unavailable) ──────────────────────
 const DOCUMENTS_FALLBACK = [
@@ -20,6 +22,7 @@ const API = '';
 export default function LibraryPage() {
   const { t, lang } = useLanguage();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [documents, setDocuments] = useState(DOCUMENTS_FALLBACK);
 
   useEffect(() => {
@@ -47,7 +50,7 @@ export default function LibraryPage() {
       </div>
 
       <div className="library-list">
-        {documents.map((doc, i) => (
+        {documents.filter((doc) => canSeeVisibility(doc.visibility, user)).map((doc, i) => (
           <div key={doc.id || i} className="library-card" style={{ '--cat-color': CAT_COLORS[doc.category] ?? '#888' }}>
             <button
               type="button"

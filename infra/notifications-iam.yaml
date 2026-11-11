@@ -1,0 +1,25 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Notification calendar and archive access for the CMS backend
+Parameters:
+  BackendIamUserName:
+    Type: String
+    Default: step2connect-cms-backend
+  ContentBucketName:
+    Type: String
+Resources:
+  NotificationsConfigPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: step2connect-notifications-config
+      Users:
+        - !Ref BackendIamUserName
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+            Resource:
+              - !Sub arn:${AWS::Partition}:s3:::${ContentBucketName}/config/notifications.json
+              - !Sub arn:${AWS::Partition}:s3:::${ContentBucketName}/config/archive/notifications_*

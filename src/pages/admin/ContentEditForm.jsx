@@ -25,7 +25,6 @@ const GUIDE_CATEGORIES = [
   { value: 'homeBills', label: '🏠 Casa e bollette' },
   { value: 'school',    label: '🎓 Scuola e famiglia' },
   { value: 'cityLife',  label: '🏙️ Vita in città' },
-  { value: 'work',      label: '💼 Lavoro' },
 ];
 
 async function apiFetch(path, token, opts = {}) {
@@ -252,7 +251,7 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
   };
 
   const handlePublish = async () => {
-    if (!confirm('Pubblicare? Il contenuto sarà visibile a tutti gli utenti.')) return;
+    if (!confirm('Pubblicare le modifiche? La visibilità impostata per pagina e sezione resta invariata.')) return;
     setPublishing(true);
     setError('');
     setFieldErrors({});
@@ -729,7 +728,7 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
             onClick={handlePublish}
             disabled={publishing || saving || Boolean(uploadingMedia) || !form.id}
           >
-            {publishing ? 'Pubblicazione…' : <><Send size={16} /> Pubblica</>}
+            {publishing ? 'Pubblicazione…' : <><Send size={16} /> Pubblica modifiche</>}
           </button>
         </div>
       </div>

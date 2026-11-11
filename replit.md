@@ -143,5 +143,56 @@ Non inserire segreti nel repository. Le principali variabili sono:
 Variabili opzionali includono `DYNAMODB_USERS_TABLE`,
 `DYNAMODB_PHONE_INDEX`, `DYNAMODB_REGION` e `SES_FROM_EMAIL`.
 
+## Categorie delle guide
+
+Le sole categorie valide sono Documenti e permessi, Salute e pronto soccorso,
+Casa e bollette, Scuola e famiglia, Vivere in città. L'utente ha richiesto la
+rimozione di Lavoro e busta paga dall'app e dai selettori CMS; non ripristinarla
+come categoria vuota o “in arrivo”. La rimozione non cancella dati già salvati.
+
+## Notifiche
+
+Le notifiche sono interne alla webapp, senza push/SMS/email. Il calendario viene
+gestito esclusivamente dal server attraverso il CMS; ogni modifica archivia prima
+la versione precedente su S3. Le letture sono persistenti nel profilo DynamoDB,
+massimo 300 ID, senza creare nuovi profili.
+
+Il calendario allegato comprende 44 notifiche programmate più N-WELCOME:
+l'utente ha confermato di includere anche il tipo `welcome` (oltre a
+content_engagement e function_engagement), per un totale di 45. Welcome segue
+le medesime regole di date, territorio e stato attivo, non un invio push o un
+nuovo flusso di login. Non importare automaticamente i dati di test su S3.
+
+## Visibilità sezioni e pagine
+
+Lo stato si cambia dal CMS: il server gestisce `config/sections.json` senza
+interventi manuali su S3. La Home non è configurabile. Admin vede tutto;
+Fincantieri/ELIS vede anteprima e pubblicato; standard solo pubblicato.
+Devono essere visibili sia sezione sia pagina.
+
+L'utente ha confermato l'attivazione immediata dei default: Quiz, Notifiche,
+News, Uffici e Libreria Interne; Guide, Analizza documento, Traduttore e Privacy
+Pubblicate. Le pagine legacy senza visibility sono pubblicate, ma non superano
+una sezione Interna. Il CMS separa le sezioni; Altro conserva Libreria e Pages
+e permette di regolare anche Libreria/Privacy.
+
+I filtri richiesti sono nell'interfaccia: le API pubbliche e gli URL dei media
+non sono un archivio riservato. Non confondere visibilità con autorizzazione.
+
 Per la documentazione completa, le route e gli script operativi consultare
 `README.md`.
+
+## Quiz collegati alle guide
+
+I quiz Vero/Falso sono contenuti CMS multilingua collegati alle guide, non dati
+finti. Import Excel in due fasi, solo bozze, nuovi quiz Interni; i record esistenti
+mantengono visibilità e richiedono pubblicazione esplicita delle modifiche.
+Il player legge copie pubblicate anche per gli admin. Il cambio di visibilità
+usa la stessa pubblicazione immediata delle guide.
+Le API quiz sono autenticate e filtrate anche lato server: le API pubbliche
+generiche dei contenuti non espongono i quiz.
+Il server calcola i risultati e aggiorna solo quizResults nei profili esistenti.
+Il primo tentativo è immutabile; le statistiche del CMS sono solo aggregate.
+La validazione V2 usa le guide reali solo in lettura: 28 quiz / 112 domande,
+medico di base 022 ed emergenze 023. Nessun import operativo automatico o
+modifica ai profili reali nei test. README documenta gestione e pubblicazione.

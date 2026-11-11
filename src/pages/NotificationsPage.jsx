@@ -1,20 +1,42 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useNotifications } from '../context/NotificationsContext';
+import { notificationDate, splitNotificationMessage } from '../lib/notificationDisplay';
 
-// ─── MOCK DATA ────────────────────────────────────────────────────────────────
-// Replace with real push notification system (Firebase FCM, AWS SNS, etc.)
-// ─────────────────────────────────────────────────────────────────────────────
-const NOTIFICATIONS = [
-  { id: 1, emoji: '⚓', title: 'Turno di domani cambiato', body: 'Il tuo turno di domani inizia alle 06:00 invece delle 07:00.', time: '2 ore fa', read: false },
-  { id: 2, emoji: '📄', title: 'Permesso in scadenza', body: 'Il tuo permesso di soggiorno scade tra 30 giorni. Rinnova subito.', time: 'Ieri', read: false },
-  { id: 3, emoji: '💰', title: 'Busta paga disponibile', body: 'La busta paga di giugno è disponibile nel portale Fincantieri.', time: '3 giorni fa', read: true },
-  { id: 4, emoji: '🏥', title: 'Visita medica programmata', body: 'Visita medica obbligatoria martedì 30 luglio ore 09:00.', time: '5 giorni fa', read: true },
-];
 
 export default function NotificationsPage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const navigate = useNavigate();
+  const { items, unread, loading, error, markRead, markAllRead, reload } = useNotifications();
+  const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+
+  const openNotification = async (item) => {
+    setBusy(true);
+    setSaveError(false);
+    const external = item.link.startsWith('https://');
+    const tab = external ? window.open('about:blank', '_blank') : null;
+    if (tab) tab.opener = null;
+    try {
+      await markRead([item.id]);
+      if (external) {
+        if (tab) tab.location.href = item.link;
+        else throw new Error('Popup blocked');
+      } else navigate(item.link);
+    } catch {
+      tab?.close();
+      setSaveError(true);
+    } finally { setBusy(false); }
+  };
+
+  const readAll = async () => {
+    setBusy(true);
+    setSaveError(false);
+    try { await markAllRead(); } catch { setSaveError(true); }
+    finally { setBusy(false); }
+  };
 
   return (
     <div className="page-content">
@@ -27,20 +49,34 @@ export default function NotificationsPage() {
       </div>
 
       <div className="notif-list">
-        {NOTIFICATIONS.length === 0 && (
+        <div className="notif-actions">
+          <button type="button" className="notif-read-all" onClick={readAll} disabled={busy || !unread}>
+            {t('markAllNotificationsRead')}
+          </button>
+        </div>
+        {(error || saveError) && <p role="alert" className="notif-error">
+          {t('notificationsError')}{' '}
+          <button type="button" onClick={() => reload().catch(() => {})}>{t('notificationsRetry')}</button>
+        </p>}
+        {loading && <p role="status">{t('notificationsLoading')}</p>}
+        {!loading && !error && items.length === 0 && (
           <p className="empty-state">{t('noNotifications')}</p>
         )}
-        {NOTIFICATIONS.map((n) => (
-          <div key={n.id} className={`notif-card ${n.read ? 'read' : 'unread'}`}>
-            <span className="notif-emoji">{n.emoji}</span>
-            <div className="notif-body">
-              <p className="notif-title">{n.title}</p>
-              <p className="notif-text">{n.body}</p>
-              <p className="notif-time">{n.time}</p>
-            </div>
-            {!n.read && <span className="notif-dot" />}
-          </div>
-        ))}
+        {items.map((item) => {
+          const { emoji, text } = splitNotificationMessage(item.message);
+          return (
+            <button type="button" disabled={busy} key={item.id}
+              className={`notif-card ${item.read ? 'read' : 'unread'}`}
+              onClick={() => openNotification(item)}>
+              {emoji && <span className="notif-emoji" aria-hidden="true">{emoji}</span>}
+              <span className="notif-body">
+                <span className="notif-text">{text}</span>
+                <span className="notif-time">{notificationDate(item.startDate, t, lang)}</span>
+              </span>
+              {!item.read && <span className="notif-dot" aria-label={t('notificationUnread')} />}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

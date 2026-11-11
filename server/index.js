@@ -8,6 +8,7 @@ const adminRoutes     = require('./routes/admin');
 const adminAuthRoutes = require('./routes/adminAuth');
 const userRoutes      = require('./routes/users');
 const registrationOptionsRoutes = require('./routes/registrationOptions');
+const sectionRoutes = require('./routes/sections');
 
 const app  = express();
 // In production Express serves both the API and the Vite-built SPA on port 5000.
@@ -57,6 +58,14 @@ app.use('/api/users',         userRoutes);
 app.use('/api/registration-options', registrationOptionsRoutes);
 app.use('/api/admin/auth',    adminAuthRoutes);
 app.use('/api/admin/content', adminRoutes);
+app.use('/api/sections', sectionRoutes.publicRouter);
+app.use('/api/admin/sections', sectionRoutes.adminRouter);
+const notificationRoutes = require('./routes/notifications');
+app.use('/api/admin/notifications', notificationRoutes.adminRouter);
+app.use('/api/notifications', notificationRoutes.userRouter);
+const quizRoutes = require('./routes/quiz');
+app.use('/api/admin/quiz', quizRoutes.adminRouter);
+app.use('/api/quiz', quizRoutes.userRouter);
 
 // ── HEALTH ────────────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => res.json({ ok: true }));

@@ -11,6 +11,60 @@ supportate sono:
 - inglese (`en`)
 - bengalese (`bn`)
 
+## Da dove iniziare
+
+Questo repository contiene **sia la webapp sia il server e il CMS**. Non è solo
+una raccolta di schermate: notifiche, quiz, risultati e badge hanno API dedicate.
+
+| Se vuoi… | Leggi |
+|---|---|
+| Capire cosa fa ogni pagina | [Mappa delle aree della webapp](#mappa-delle-aree-della-webapp) |
+| Gestire i contenuti senza programmare | [Guida rapida al CMS](#guida-rapida-al-cms) |
+| Creare e programmare notifiche | [Guida operativa notifiche](docs/notifiche-cms.md) |
+| Importare quiz, pubblicarli e gestire i badge | [Guida operativa quiz e badge](docs/quiz-e-badge-cms.md) |
+| Capire chi vede una sezione o un contenuto | [Visibilità](#visibilità-di-sezioni-e-pagine) |
+| Avviare il progetto sul computer o in sviluppo | [Installazione e avvio](#installazione-e-avvio) |
+| Configurare servizi e autorizzazioni AWS | [Configurazione](#configurazione) e [Sicurezza](#sicurezza) |
+| Conoscere le funzioni non ancora disponibili | [Limiti attuali](#limiti-attuali) |
+
+### Guida rapida al CMS
+
+Il **CMS** è il pannello per amministrare la webapp, accessibile da `/admin/login`
+con credenziali amministrative dedicate. Non usa il codice SMS degli utenti.
+
+1. Accedi e scegli la sezione da gestire.
+2. Per guide, news e libreria, apri un contenuto o creane uno nuovo; inserisci
+   testi e media nelle lingue richieste e salva la bozza.
+3. Controlla il contenuto, quindi pubblica le modifiche. Per i quiz puoi anche
+   selezionare più righe, usare **Seleziona tutti** e pubblicare o riportare
+   in bozza i selezionati.
+4. Verifica la **visibilità** della sezione e del singolo contenuto: devono
+   entrambe consentire l’accesso all’utente destinatario.
+5. Per notifiche e quiz puoi partire da Excel: **Importa → Anteprima →
+   Conferma**. L’anteprima non salva nulla. Le notifiche confermate seguono
+   subito calendario e visibilità; i quiz importati restano bozze finché
+   non vengono pubblicati.
+6. In **Quiz → Badge** puoi modificare emoji e titoli nelle tre lingue:
+   il salvataggio è automatico e mostra il proprio stato.
+
+**Due concetti diversi da non confondere:**
+
+- **Bozza / Online** indica se esiste una versione pubblicata del contenuto.
+  Le modifiche salvate in bozza non sostituiscono da sole la versione online.
+- **Interno / Anteprima / Pubblicato** indica il pubblico autorizzato:
+  rispettivamente amministratori, amministratori più Fincantieri/ELIS,
+  oppure tutti gli utenti autenticati. “Pubblicato” non significa accesso anonimo.
+  Scegliere la visibilità di un contenuto editoriale pubblica anche l’ultima
+  bozza: controllare prima i testi.
+
+Le notifiche sono messaggi **dentro la webapp**, non invii push, email o SMS.
+I badge e le letture personali restano associati al profilo dell’utente.
+
+**Dove vengono conservati i dati?** GitHub conserva codice e documentazione;
+S3 conserva contenuti, media e configurazioni del CMS; DynamoDB conserva profili,
+letture, risultati e date dei badge. Aggiornare GitHub non copia i dati privati
+né pubblica automaticamente una nuova versione del sito.
+
 ## Indice
 
 1. [Funzionalità principali](#funzionalità-principali)
@@ -34,6 +88,9 @@ supportate sono:
 19. [Limiti attuali](#limiti-attuali)
 20. [Deploy e repository](#deploy-e-repository)
 21. [Mappa delle aree della webapp](#mappa-delle-aree-della-webapp)
+22. [Visibilità di sezioni e pagine](#visibilità-di-sezioni-e-pagine)
+23. [Calendario notifiche e letture personali](#calendario-notifiche-e-letture-personali)
+24. [Quiz collegati alle guide](#quiz-collegati-alle-guide)
 
 ## Funzionalità principali
 
@@ -56,6 +113,13 @@ supportate sono:
   guide per categoria.
 - Gestione dei ruoli applicativi tramite comando operatore, senza endpoint HTTP
   di promozione pubblici.
+- Notifiche reali con calendario CMS, import/export Excel, traduzioni, campanella
+  e letture personali persistenti.
+- Quiz Vero/Falso collegati alle guide, import/export Excel, editor multilingua,
+  pubblicazione singola o multipla e statistiche aggregate.
+- Raccolta “I miei badge”: sei badge, date di conquista permanenti e titoli
+  modificabili dal CMS nelle tre lingue.
+- Visibilità per ruolo applicata sia alle sezioni sia ai contenuti.
 - Integrazione LivePerson e collegamenti WhatsApp.
 
 ## Stack tecnico
@@ -401,8 +465,10 @@ anche se l’email non esiste, per evitare enumerazione degli account CMS.
 - `pages`
 - `site` (record riservato `app-images` per le immagini globali della webApp)
 
-La scheda riepilogativa `all` dell’admin combina guide, news e library; non è un
-tipo di contenuto S3 separato.
+Il menu CMS è organizzato per sezioni: Guide pratiche, Quiz, Analizza documento,
+Notifiche, News, Traduttore, Trova uffici, Immagini app, Altro.
+Su mobile diventa una barra di tab scorrevoli. Altro permette di gestire
+`library` e le pagine generiche `pages`; l'API legacy `type=all` resta disponibile.
 
 ### Campi
 
@@ -412,6 +478,7 @@ Metadati condivisi:
 - `type`
 - `category`
 - `url`
+- `visibility` per guide, news, library e pages (non per le immagini `site`)
 
 Campi localizzati per `it`, `en` e `bn`:
 
@@ -427,7 +494,7 @@ Il filtro **Immagini app** in `/admin/content` gestisce inoltre, per ogni lingua
 
 - hero della home;
 - hero principale delle guide;
-- hero delle sei categorie guide;
+- hero delle cinque categorie guide;
 - hero della pagina Analizza documento;
 - logo Step2Connect;
 - logo Fincantieri nel menu laterale.
@@ -574,6 +641,7 @@ Tutte le route richiedono JWT CMS:
 | `GET` | `/api/admin/content/{type}/{id}` | Bozza multilingua |
 | `PUT` | `/api/admin/content/{type}/{id}` | Crea o aggiorna bozza |
 | `POST` | `/api/admin/content/{type}/{id}/publish` | Pubblica |
+| `PUT` | `/api/admin/content/{type}/{id}/visibility` | Imposta la visibilità e pubblica subito l'ultima bozza salvata |
 | `DELETE` | `/api/admin/content/{type}/{id}` | Archivia e rimuove |
 | `POST` | `/api/admin/content/{type}/{id}/media` | Carica immagine, audio o video localizzato |
 
@@ -598,6 +666,7 @@ immagine della configurazione `site`; per `site` sono ammessi solo upload immagi
 | `/library` | Libreria |
 | `/library/:id` | Dettaglio elemento libreria |
 | `/quiz` | Quiz |
+| `/quiz/:id` | Quiz Vero/Falso collegato a una guida |
 | `/offices` | Ricerca uffici |
 | `/notifications` | Notifiche |
 | `/translator` | Traduttore WhatsApp |
@@ -614,7 +683,8 @@ Le route applicative richiedono una sessione Cognito o preview valida.
 | `/admin/login` | Login CMS |
 | `/admin/forgot-password` | Richiesta reset |
 | `/admin/reset-password` | Impostazione nuova password |
-| `/admin/content` | Gestione contenuti |
+| `/admin/content` | Redirect a `/admin/content/guide-pratiche` |
+| `/admin/content/:section` | Gestione della sezione, visibilità e contenuti |
 | `/admin/account` | Cambio password |
 
 ## Struttura del repository
@@ -693,6 +763,16 @@ La suite copre:
 - preservazione dei profili durante il login;
 - parsing del CSV di registrazione;
 - validazione dei numeri italiani e bangladesi.
+- visibilità di sezioni e contenuti per ruolo;
+- calendario notifiche, import/export Excel e letture personali;
+- quiz, punteggi calcolati dal server, pubblicazione e ritorno in bozza;
+- configurazione dei badge, sblocco per categoria, Campione e date permanenti.
+
+I controlli browser facoltativi sono in `scripts/check-notifications-browser.cjs`
+e `scripts/check-quiz-browser.cjs`; usano API simulate isolate. I file Excel
+originali della chat non sono distribuiti nel repository: i controlli che
+richiedono tali file devono riceverli separatamente. I test automatici non
+equivalgono a una verifica con un vero account sul sito pubblico.
 
 Dopo modifiche a codice, dipendenze o comandi di avvio, riavviare anche il
 workflow Replit e controllare log e preview.
@@ -748,8 +828,9 @@ hardcoded nel bucket. Non eseguirlo automaticamente in produzione.
   nuovo caricamento.
 - L’invio email di reset richiede `SES_FROM_EMAIL` configurato e verificato in
   AWS SES.
-- Le notifiche push sono ancora dimostrative.
-- Quiz, elenco uffici e schede legacy dei servizi usano dati locali, non un CMS
+- Le notifiche sono esclusivamente interne alla webapp: non vengono inviate
+  notifiche push, SMS o email dal calendario.
+- Elenco uffici e schede legacy dei servizi usano dati locali, non un CMS
   o un servizio aggiornato in tempo reale.
 - Il traduttore apre WhatsApp: non traduce automaticamente il testo nell'app
   e il numero di destinazione nel codice è ancora un segnaposto.
@@ -830,8 +911,14 @@ gestiti dal CMS, dati dimostrativi e integrazioni esterne.
 
 ### Guide
 
-- `/guides`: introduzione al servizio e categorie salute, lavoro, scuola,
-  documenti, casa/bollette e vita in città.
+- `/guides`: introduzione al servizio e cinque categorie: Documenti e permessi,
+  Salute e pronto soccorso, Casa e bollette, Scuola e famiglia, Vivere in città.
+- La categoria Lavoro e busta paga è rimossa: non compare nell'app né nei
+  selettori di categorie/immagini del CMS. I vecchi percorsi `/guides/work`
+  e `/guides/work/:item` mostrano rispettivamente categoria/guida non trovata.
+  Nessun contenuto memorizzato viene cancellato.
+- Controllo browser delle sole categorie, con API simulate:
+  `node --experimental-websocket scripts/test-visibility-browser.cjs --categories-only`.
 - `/guides/:category`: elenco della categoria ordinato secondo i valori CMS.
 - `/guides/:category/:item` e route dirette: dettaglio con testo CMS pubblicato
   e audio quando disponibile. Metadati e struttura delle categorie sono locali.
@@ -862,10 +949,12 @@ gestiti dal CMS, dati dimostrativi e integrazioni esterne.
 
 ### Quiz
 
-- `/quiz`: domande a scelta multipla in tre lingue, risposta corretta,
-  avanzamento, punteggio finale e possibilità di ricominciare.
-- Domande e risposte sono locali; non esistono gestione quiz nel CMS o
-  salvataggio server dei risultati.
+- `/quiz`: categorie delle guide con quiz visibili, avanzamento, stelle e badge.
+- `/quiz/:id`: domande Vero/Falso IT/EN/BN, spiegazioni, audio opzionale e link ai
+  paragrafi della guida, con ritorno al tentativo in corso.
+- `/quiz/badges`: raccolta dei sei badge, progressi, date e dettagli delle conquiste.
+- Gestione CMS, import/export Excel, statistiche aggregate e risultati persistenti:
+  vedere [Quiz collegati alle guide](#quiz-collegati-alle-guide).
 
 ### Cerca uffici
 
@@ -876,8 +965,13 @@ gestiti dal CMS, dati dimostrativi e integrazioni esterne.
 
 ### Notifiche
 
-- `/notifications`: elenco dimostrativo con titolo, testo, data e indicatore
-  letto/non letto. Non è un sistema push né una casella personale persistente.
+- `/notifications`: notifiche reali gestite dal CMS, con testo nella lingua
+  scelta (fallback italiano), emoji iniziale, data relativa e stato di lettura.
+- La campanella mostra il conteggio non letto (`9+` oltre nove); aprire una
+  notifica la segna come letta prima di aprire la destinazione. È disponibile
+  anche “Segna tutte come lette”. Errori di caricamento/salvataggio sono espliciti.
+- Il calendario è su S3; le letture sono nel profilo DynamoDB e restano valide
+  dopo logout/login da un altro browser. La sezione rispetta la visibilità per ruolo.
 
 ### Traduttore e analisi documenti
 
@@ -900,8 +994,8 @@ gestiti dal CMS, dati dimostrativi e integrazioni esterne.
 
 - `/admin/login`, recupero/reset password e `/admin/account`: credenziali CMS
   separate, reset via email e modifica password.
-- `/admin/content`: riepilogo Pages di guide, news e libreria, filtri e gestione
-  bozze/pubblicati/archivio; Pages è una vista riepilogativa, non un tipo separato.
+- `/admin/content/:section`: menu per sezioni con controlli di visibilità,
+  contenuti per tipo e filtro lingua; le pagine generiche si gestiscono in Altro.
 - Editor con testi IT/EN/BN, metadati, immagini, audio e video per lingua,
   ordinamento delle guide e caricamento dei file supportati.
 - Salvataggio bozze, pubblicazione, archiviazione/eliminazione e rinomina dei
@@ -912,3 +1006,402 @@ gestiti dal CMS, dati dimostrativi e integrazioni esterne.
   file privati o dagli strumenti operatore: non esiste un editor whitelist nel CMS.
 - I video possono essere gestiti e caricati nel CMS; la presenza del campo
   non garantisce un player video in ogni pagina pubblica.
+
+## Visibilità di sezioni e pagine
+
+### Regole e prima attivazione
+
+| Stato | Admin | Fincantieri/ELIS (`fincantieri_users`) | Standard |
+|---|---|---|---|
+| Interno (`internal`) | Sì | No | No |
+| Anteprima (`preview`) | Sì | Sì | No |
+| Pubblicato (`published`) | Sì | Sì | Sì |
+
+Una pagina è mostrata soltanto se sono visibili **sia la sezione sia la pagina**.
+La Home rimane sempre disponibile e non ha uno stato configurabile.
+Gli utenti senza un ruolo esplicito sono trattati come standard per la visibilità.
+
+Se `config/sections.json` manca o ha un formato invalido, si usano questi default:
+
+- Pubblicato: Guide, Analizza documento, Traduttore, Privacy.
+- Interno: Quiz, Notifiche, News, Trova uffici, Libreria.
+
+Questi default sono intenzionalmente attivi da subito: le sezioni Interne sono
+nascoste agli utenti standard anche se contengono vecchie pagine pubblicate.
+Il campo `visibility` mancante nelle pagine esistenti equivale a `published`;
+non annulla però la restrizione della sezione. Le pagine nuove nascono `internal`.
+
+### Uso del CMS
+
+- Ogni sezione ha tre pulsanti: Interno, Anteprima, Pubblicato. Il cambio salva
+  subito dal server su S3, con `updatedAt` e `updatedBy`.
+- La conferma è richiesta solo passando a Pubblicato. Il feedback “Salvato”
+  conferma il completamento della richiesta.
+- Ogni riga di guide, news, libreria e pagine generiche ha lo stesso controllo:
+  cambiandolo si pubblica immediatamente l'ultima versione **già salvata**, nelle
+  tre lingue. Una rinomina rimuove i vecchi URL pubblicati come prima.
+- Salvare normalmente una bozza non cambia la sua visibilità e non la pubblica.
+  “Pubblica modifiche” aggiorna la copia online, conservando lo stato scelto.
+- Le sezioni senza contenuti CMS mostrano la pagina e il percorso in sola lettura.
+- In Altro si regolano anche le sezioni Libreria e Privacy. Immagini app e la
+  voce contenitore Altro non hanno un proprio stato.
+- Dopo un cambio dal CMS, ricaricare l'app per rileggere la configurazione.
+  Menu, Home, elenchi e dettagli applicano le stesse regole. Una route di sezione
+  non visibile reindirizza a `/home`; un dettaglio non visibile appare non trovato.
+- Durante il ripristino Cognito le route attendono il profilo applicativo reale:
+  un admin non viene reindirizzato usando il ruolo standard provvisorio.
+
+### API e permessi
+
+- `GET /api/sections`: lettura pubblica, restituisce `{ sections }`, senza scrivere.
+- `PUT /api/admin/sections/{key}`: JWT CMS obbligatorio, body `{ "status": "preview" }`.
+- `PUT /api/admin/content/{type}/{id}/visibility`: JWT CMS obbligatorio,
+  body `{ "visibility": "preview" }`.
+- Il server gestisce `config/sections.json`: non crearlo o modificarlo a mano.
+  La policy `infra/sections-iam.yaml` consente lettura/scrittura sulla sola chiave.
+  Le normali policy contenuti devono consentire le scritture delle bozze e copie online.
+
+**Confine di sicurezza:** per i contenuti CMS generici le regole richieste filtrano navigazione e rendering
+dell'app. Le API di lettura contenuti e gli URL dei media restano pubblici come
+prima: questa funzionalità non rende riservati i file o i JSON contro richieste
+dirette. Non usarla come protezione di documenti o dati confidenziali.
+Le nuove API notifiche fanno eccezione: richiedono la sessione utente verificata
+e applicano anche sul server la visibilità della sezione.
+
+### Verifica
+
+`npm test` include matrice ruoli/sezione/pagina, salvataggi automatici su storage
+simulato, audit, credenziali CMS, default mancanti, contenuti legacy, rinomina e
+attesa del profilo al refresh. Il controllo browser opzionale
+`node --experimental-websocket scripts/test-visibility-browser.cjs` usa Chromium
+e il dominio di sviluppo Replit: tutte le API vengono intercettate con fixture,
+senza modificare utenti o file S3 reali.
+
+## Calendario notifiche e letture personali
+
+Per le istruzioni passo passo dedicate agli amministratori, consultare la
+[Guida operativa Notifiche nel CMS](docs/notifiche-cms.md): creazione, calendario,
+importazione Excel, traduzioni, visibilità e risoluzione dei problemi.
+
+### Calendario e gestione CMS
+
+In **CMS → Notifiche** il selettore di visibilità esistente resta sopra la gestione
+del calendario. Sono disponibili:
+
+- Elenco filtrabile per mese, stato attivo e traduzioni mancanti; stato data,
+  territorio, guida, messaggio IT e indicatori IT/EN/BN.
+- Interruttore attiva/disattiva con salvataggio immediato, nuova notifica,
+  modifica e cancellazione con conferma.
+- Calendario mensile: selezionare una notifica per modificarla.
+- Editor di tutti i campi, selezione guida con compilazione di ID contenuto,
+  ID guida e link, testi IT/EN/BN con contatori e anteprima nell'app.
+  Oltre 180 caratteri il contatore è arancione, non bloccante. L'ID è stabile
+  dopo la creazione; un import con lo stesso ID aggiorna il record.
+- Importa da Excel con anteprima di righe nuove/aggiornate, errori e avvisi;
+  conferma disabilitata finché ci sono errori. L'anteprima non scrive nulla.
+- Esporta Excel per scaricare il calendario corrente e reimportarlo.
+
+Il server gestisce `config/notifications.json` nel bucket configurato. Il file
+mancante equivale a un elenco vuoto. Ogni salvataggio che cambia i dati archivia
+prima la versione precedente in `config/archive/notifications_<timestamp>.json`;
+se l'archivio fallisce, il salvataggio si interrompe. L'import è un'unione per ID:
+i record non presenti nel file restano invariati. Un export reimportato senza
+modifiche non riscrive dati o audit. Non è necessario creare file S3 a mano.
+
+Gli errori server di importazione/salvataggio indicano il passaggio fallito
+(lettura, archivio o scrittura) e un riferimento di diagnosi. I log includono
+quel riferimento e i codici tecnici AWS, senza esporre contenuti o credenziali.
+Il superamento dell’anteprima non garantisce l’autorizzazione a scrivere su S3.
+
+Ogni record contiene `id`, `obiettivo`, `tipo`, `contentId`, `guideId`, `link`,
+`message.{it,en,bn}`, `startDate`, `endDate`, `frequency`, `active`, `territory`,
+`dateStatus`, `hook`, `updatedAt`, `updatedBy`.
+
+I tipi validi sono `content_engagement`, `function_engagement` e **`welcome`**
+(aggiunto su conferma dell'utente per `N-WELCOME`). Una guida indicata deve
+esistere in `content/draft/guides/it/<guideId>.json`; è obbligatoria per
+`content_engagement`. Il messaggio IT è obbligatorio. I link accettano percorsi
+interni o HTTPS, non JavaScript, HTTP o URL relativi a un altro host (`//...`).
+
+### Import Excel
+
+È supportato `.xlsx` fino a 5 MB, massimo 5000 righe; il foglio preferito è
+`Calendario`, altrimenti il primo. Le colonne sono riconosciute per intestazione:
+
+| Colonna | Campo |
+|---|---|
+| `id_notifica` | `id` |
+| `obiettivo`, `tipo_notifica` | `obiettivo`, `tipo` |
+| `ID contenuto`, `ID guida CMS`, `pagina` | `contentId`, `guideId`, `link` |
+| `data_pubblicazione`, `data_fine` | `startDate`, `endDate` |
+| `frequenza`, `notifica_attiva`, `territorio` | `frequency`, `active`, `territory` |
+| `Aggancio (perché quella data)`, `Stato data` | `hook`, `dateStatus` |
+| `Messaggio IT`, `Messaggio EN`, `Messaggio BN` | `message` |
+
+Le colonne proposte (`Messaggio IT proposto`, `Aggancio proposto`, `Stato data
+proposto`) prevalgono se compilate. Le altre colonne sono ignorate.
+`Approvazione = Da eliminare` salta la riga con un avviso.
+Sono gestite date Excel (anche sistema 1904), formule con risultato già
+calcolato e testo `GG/MM/AAAA`. Le formule senza risultato memorizzato non
+vengono eseguite. Senza data fine si usano 14 giorni dopo l'inizio.
+VERO/TRUE/Sì/1 significano attiva. Gli avvisi includono IT oltre 180 caratteri,
+traduzioni mancanti, data passata e più di due notifiche nella stessa settimana
+(lunedì–domenica). Gli ID duplicati e le guide inesistenti bloccano la conferma.
+
+Il calendario V3 allegato contiene **45 righe**, cioè le 44 programmate più
+`N-WELCOME`; tutte sono valide dopo l'aggiunta esplicita del tipo `welcome`.
+Sono verificati N-009 → `gp-registration`, N-011/N-042 → `emergency` e gli avvisi
+lunghi per N-015, N-028, N-034, N-035. Il caricamento dell'allegato per i test
+non effettua un import automatico sul bucket operativo.
+
+### Visibilità e letture
+
+- Le date sono giorni inclusivi del calendario **Europe/Rome**, indipendenti
+  dal fuso del server/browser. Si mostra solo `active=true` nella finestra data.
+  `frequency` è conservata come metadato; non genera nuove date o invii automatici.
+- Territorio Tutti, oppure corrispondenza senza maiuscole con `sede` del profilo
+  DynamoDB. Senza sede sono visibili soltanto le notifiche Tutti.
+- Le API accettano ID token Cognito e le sessioni firmate preview/codice personale.
+  Queste ultime ricontrollano ruolo e credenziali correnti in whitelist/admin.
+  Il token CMS non è una sessione utente.
+- `notificationsRead` è una lista nel record esistente, chiave `userId`. Le
+  modifiche usano una condizione per telefono e versione della lista, ritentando
+  i conflitti, senza modificare altri campi o creare profili. Si conservano gli
+  ultimi 300 ID; con un profilo mancante le notifiche restano non lette.
+- Caricamento dopo login, al cambio lingua e ogni dieci minuti. Al logout/cambio
+  utente o lingua le risposte precedenti non vengono mostrate al nuovo contesto.
+
+### API
+
+| Metodo | Endpoint | Accesso |
+|---|---|---|
+| GET | `/api/admin/notifications` | JWT CMS |
+| PUT / DELETE | `/api/admin/notifications/:id` | JWT CMS |
+| POST | `/api/admin/notifications/import/preview` | JWT CMS; multipart `file` |
+| POST | `/api/admin/notifications/import/confirm` | JWT CMS; `{notifications:[...]}` |
+| GET | `/api/admin/notifications/export` | JWT CMS; download XLSX |
+| GET | `/api/notifications?lang=it|en|bn` | Sessione utente; `{items,unread}` |
+| POST | `/api/notifications/read?lang=...` | Sessione utente; `{ids:[...]}` |
+| POST | `/api/notifications/read-all?lang=...` | Sessione utente |
+
+I record utente restituiti contengono solo `id`, `message` nella lingua richiesta,
+`link`, `startDate`, `read`. La sezione Interna è accessibile solo agli admin anche
+tramite API; Anteprima anche a `fincantieri_users`, Pubblicata anche agli standard.
+
+### Permessi e verifica
+
+`infra/notifications-iam.yaml` documenta lettura/scrittura della configurazione e
+dell'archivio. Occorre inoltre la lettura delle guide draft e la policy DynamoDB
+esistente con Scan/Query e UpdateItem. Un eventuale indice telefono deve proiettare
+anche `sede` e `notificationsRead`. Non sono state applicate modifiche IAM automatiche.
+
+`npm test` copre autenticazione reale firmata con chiavi di prova, letture,
+conflitti, limite 300, date/fuso, territori, fallback lingua, archivio, validazione
+Excel e round trip. Il test dell'allegato V3 si esegue quando il file caricato è
+disponibile; i test Excel sintetici non dipendono dagli allegati.
+`node --experimental-websocket scripts/check-notifications-browser.cjs [file.xlsx]`
+verifica campanella, letture, secondo browser, lingua, CMS, import/export e
+calendario con API simulate. Controlla le guide reali solo in lettura: non
+scrive su S3 o DynamoDB reali.
+
+## Quiz collegati alle guide
+
+Per gestire questa sezione senza conoscere il codice, seguire la
+[Guida operativa quiz e badge nel CMS](docs/quiz-e-badge-cms.md).
+
+### Gestione dal CMS
+
+Aprire **CMS → Quiz**. L'elenco riusa lingua, Modifica,
+Interno/Anteprima/Pubblicato, Pubblica modifiche ed Elimina dei contenuti editoriali.
+La visibilità della sezione e quella del quiz sono controlli distinti:
+entrambe devono consentire l'accesso.
+
+1. **Importa da Excel** → selezionare `.xlsx` → **Anteprima import**.
+2. Controllare quiz nuovi/aggiornati, errori e avvisi. L'anteprima non scrive.
+3. **Conferma import** salva soltanto le bozze nelle tre lingue:
+   nuovi quiz in Interno, quiz esistenti con la visibilità precedente.
+   La versione già pubblicata non cambia automaticamente.
+4. **Pubblica modifiche** rende disponibile la bozza mantenendo la visibilità.
+   Anche un quiz Interno deve avere una copia pubblicata per essere giocato
+   dagli amministratori.
+5. Scegliere Anteprima per `fincantieri_users`, Pubblicato per gli standard.
+   Come per le guide, scegliere una visibilità pubblica subito l'ultima bozza:
+   controllare prima i testi.
+
+### Pubblicazione e ritorno in bozza di più quiz
+
+Nell’elenco **CMS → Quiz** puoi selezionare i singoli quiz con le caselle oppure
+usare **Seleziona tutti** per includere tutti i quiz dell’elenco corrente.
+Le azioni **Pubblica selezionati** e **Riporta in bozza** richiedono conferma
+e si applicano a tutte e tre le lingue, senza cambiare la visibilità
+Interno/Anteprima/Pubblicato.
+
+Riportare in bozza ritira le versioni online: i quiz non sono più disponibili
+nel catalogo o nelle guide, nemmeno agli admin nell’app utente. Le bozze, le
+modifiche non pubblicate e i risultati già registrati restano conservati.
+È possibile pubblicarli nuovamente in seguito.
+Durante l’operazione viene mostrato l’avanzamento; in caso di errore parziale
+sono indicati i quiz non aggiornati, che restano selezionati per riprovare.
+La selezione si riferisce all’elenco corrente e viene azzerata al cambio lingua.
+
+L’API CMS `POST /api/admin/content/quiz/:id/unpublish` ritira un singolo quiz
+in tutte le lingue ed è protetta dalla stessa autenticazione amministrativa
+della pubblicazione. Le azioni multiple richiamano queste API quiz per quiz.
+
+### Editor e statistiche
+
+**Modifica** apre un editor dedicato con guida in sola lettura e link, soglia,
+Vero/Falso e paragrafo per domanda, affermazione/spiegazione e URL audio
+IT/EN/BN, aggiunta, eliminazione e riordino delle domande.
+Il menu paragrafi usa la bozza italiana con inizio del testo.
+I contatori misurano parole: oltre 15 nell'affermazione diventano arancioni,
+senza bloccare il salvataggio. I testi italiani sono obbligatori.
+Il salvataggio resta bozza fino alla pubblicazione.
+
+La scheda **Statistiche** mostra soltanto aggregati: persone che hanno tentato,
+percentuale di persone che hanno superato almeno una volta e correttezza delle
+domande al primo tentativo. Sotto il 60% il dato è rosso con link al paragrafo.
+N/D indica assenza di risposte iniziali per una domanda.
+L'API non restituisce nomi, telefoni o risultati individuali.
+
+### I miei badge
+
+La sezione Quiz presenta le schede **Quiz** e **I miei badge**. La seconda ha
+un indirizzo diretto, `/quiz/badges`, soggetto agli stessi permessi della sezione.
+Mostra sei badge, barra di avanzamento, data di conquista e progresso per
+categoria. I badge bloccati portano ai quiz della rispettiva categoria;
+quelli conquistati aprono una scheda di dettaglio.
+
+| Badge | Categoria |
+|---|---|
+| Esperto burocrate | Documenti e permessi |
+| Pronto all’emergenza | Salute e pronto soccorso |
+| Casa in regola | Casa e bollette |
+| Genitore a pieni voti | Scuola e famiglia |
+| Di casa in città | Vivere in città |
+| Campione Step2Connect | Tutte le categorie con almeno un quiz visibile |
+
+Il server assegna un badge di categoria dopo il superamento di **tutti i quiz
+pubblicati e visibili all’utente** di quella categoria, con almeno un quiz.
+Bozze, quiz ritirati e quiz riservati ad altri ruoli non entrano nel conteggio.
+Il Campione richiede tutti i badge delle categorie con almeno un quiz visibile:
+un catalogo vuoto non assegna alcun badge.
+
+Le date ISO sono conservate nell’attributo DynamoDB `badges`, mappa ID → data,
+senza sostituire gli altri campi del profilo. Gli aggiornamenti condizionali
+preservano le conquiste concorrenti e la prima data: **un badge ottenuto non
+si perde**, anche aggiungendo nuovi quiz o cambiando la visibilità del catalogo.
+Il server riconcilia anche i superamenti già registrati quando si apre la
+pagina badge. Non crea profili mancanti. A fine quiz restituisce i badge appena
+ottenuti, mostrati con animazione e collegamento alla raccolta.
+
+**CMS → Quiz → Badge** consente di cambiare emoji e titoli IT/EN/BN dei sei
+badge, con salvataggio automatico, stato di salvataggio e anteprima. ID,
+categorie e regole di sblocco non sono modificabili. La configurazione è scritta
+solo dal server in `config/quiz-badges.json`; se il file non esiste si usano i
+sei valori predefiniti, senza creare file durante la lettura.
+Le modifiche compaiono al successivo caricamento della pagina utente.
+
+API, tutte senza accesso anonimo:
+
+- `GET /api/quiz/badges`: definizioni multilingua, stato personale, progresso e date.
+- `POST /api/quiz/:id/result`: include `newlyUnlockedBadges` e date conservate.
+- `GET /api/admin/quiz/badges`: configurazione completa, autenticazione CMS.
+- `PUT /api/admin/quiz/badges`: corpo `{ items: [...] }`, esattamente i sei badge;
+  titoli obbligatori nelle tre lingue (massimo 120 caratteri), emoji obbligatoria.
+
+### Excel e dati
+
+Foglio preferito **Quiz 3 lingue**, altrimenti il primo; `.xlsx`, massimo
+5 MB e 5000 righe. Intestazioni riconosciute:
+
+| Colonna | Utilizzo |
+|---|---|
+| ID contenuto | `contentId`, testo con zeri iniziali |
+| ID guida CMS | `guideId`; ID quiz `quiz-<guideId>` |
+| Domanda | `qid` stabile |
+| Risposta | Solo Vero/Falso, convertito in booleano |
+| Paragrafo | `p1`, `p2`, ecc. |
+| Affermazione IT / EN / BN | Affermazioni nelle tre lingue |
+| Spiegazione IT / EN / BN | Spiegazioni nelle tre lingue |
+
+Titolo, Verifica, Note, Modifiche e altre colonne sono ignorate. Categoria,
+ordinamento, URL e titoli vengono dalle guide CMS, non dall'Excel.
+Qid/risposta/ancora sono condivisi nelle tre lingue.
+Le domande importate vengono ordinate per qid; un export inalterato conserva
+l'eventuale ordine riordinato nel CMS.
+
+Errori bloccanti: guida italiana inesistente, risposta non valida, testi IT
+mancanti, qid duplicati e ancora malformata. Avvisi: EN/BN incompleti,
+numero di domande diverso da quattro e ancora oltre i paragrafi della guida.
+La conferma ripete la validazione prima di scrivere.
+
+**Esporta Excel** scarica tutti i quiz correnti. Reimportare senza cambiamenti
+non riscrive file, audit, audio o visibilità. Le soglie esistenti vengono
+conservate; l'import non elimina i quiz assenti dal file.
+Verificato il V2 contro le guide reali CMS in sola lettura: **28 quiz,
+112 domande, nessun errore o avviso**, medico di base `022` e 112 `023` corretti.
+Il test non importa automaticamente l'allegato nel bucket operativo.
+
+I file sono `content/{draft|published|archive}/quiz/{it|en|bn}/...`, con
+pubblicazione, visibilità e archiviazione/eliminazione come gli altri contenuti.
+Le API pubbliche generiche `/api/content` non espongono i quiz.
+
+### Esperienza utente e risultati
+
+- Compaiono solo le categorie con quiz accessibili, con superati/totali,
+  stelle e badge Esperto della categoria.
+- Il player presenta segmenti grigi/verdi/rossi e controlli Vero/Falso grandi.
+  Dopo la risposta mostra sempre la spiegazione; coriandoli per quella corretta,
+  vibrazione breve se supportata per quella errata, nessun suono.
+  L'audio opzionale è disponibile solo quando configurato nella lingua.
+- **Leggi nella guida** apre `guideUrl#pN`: gli elementi HTML di primo livello
+  ricevono ancore in ordine, evidenziate per due secondi. **Torna al quiz**
+  riprende la domanda e la risposta in corso.
+- Il server calcola punteggio, superamento, stelle e badge dalla versione
+  pubblicata: campi score/stelle/superamento inviati dal client sono ignorati.
+  Su quattro domande: 4/4 = 3 stelle, 3/4 = 2, 2/4 = 1, meno = 0.
+  Con altre lunghezze si usano le equivalenti soglie proporzionali.
+  Sono disponibili Rifai e il successivo quiz non superato della categoria.
+- In fondo alla guida, la card Mettiti alla prova compare solo se il quiz
+  ha una versione pubblicata e accessibile.
+- Testi UI IT/EN/BN; testi quiz mancanti con fallback italiano, non audio.
+
+Nel record DynamoDB esistente viene aggiornato solo `quizResults`:
+per ID quiz, `firstAnswers` (correttezza, non scelta Vero/Falso),
+`firstScore`, `bestScore`, `attempts`, `passedAt`, `lastAt`.
+Il primo tentativo non viene mai sovrascritto. Le scritture condizionali
+gestiscono conflitti senza modificare ruolo o altri dati.
+Senza profilo il quiz funziona senza salvare, con avviso nell'interfaccia.
+Le sessioni Cognito e preview/whitelist usano la verifica firmata esistente.
+
+### API, permessi e test
+
+| Metodo | Endpoint | Accesso |
+|---|---|---|
+| GET | `/api/quiz?lang=it|en|bn` | Utente: catalogo visibile, progressi, badge |
+| GET | `/api/quiz/progress` | Utente: propri `quizResults` |
+| GET | `/api/quiz/:id?lang=...` | Utente: quiz pubblicato e visibile |
+| POST | `/api/quiz/:id/result?lang=...` | Utente: `{answers:{qid:boolean}}` |
+| GET / PUT | `/api/admin/content/quiz/:id` | CMS: editor / salvataggio bozza |
+| PUT | `/api/admin/content/quiz/:id/visibility` | CMS: visibilità e pubblicazione |
+| POST | `/api/admin/content/quiz/:id/publish` | CMS: pubblicazione bozze |
+| DELETE | `/api/admin/content/quiz/:id` | CMS: archiviazione e rimozione |
+| POST | `/api/admin/quiz/import/preview` | CMS: multipart `file` |
+| POST | `/api/admin/quiz/import/confirm` | CMS: `{quizzes:[...]}` |
+| GET | `/api/admin/quiz/export` | CMS: XLSX |
+| GET | `/api/admin/quiz/:id/stats` | CMS: aggregati |
+
+Occorrono i permessi S3 di lettura/scrittura/copia/eliminazione sui prefissi
+quiz, lista chiavi e lettura guide. Per DynamoDB servono lettura per telefono,
+Scan per aggregati e UpdateItem sul profilo esistente. Un indice telefono
+deve proiettare anche `quizResults`. Nessuna policy AWS viene modificata
+automaticamente.
+
+`npm test` copre validazione, metadati guida, lingue, visibilità, calcolo
+server, primo tentativo, conflitti, profilo mancante, aggregati ed export/reimport
+senza modifiche. Il test dell'allegato V2 è opzionale se assente nel checkout.
+`node --experimental-websocket scripts/check-quiz-browser.cjs [file.xlsx]`
+verifica categorie, due tentativi, secondo browser, BN, p5 evidenziato e ritorno,
+editor/statistiche/import/export CMS e layout mobile con API simulate.
+Nessun profilo o quiz reale su AWS viene modificato dai test.

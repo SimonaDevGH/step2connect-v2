@@ -259,52 +259,42 @@ router.post('/preview-admin/verify', limitPreviewAttempts, async (req, res) => {
   }
 });
 
-// Ripristina una sessione preview già verificata e ricontrolla il profilo.
-router.get('/preview-admin/session', async (req, res) => {
-  const auth = req.headers.authorization || '';
+// Shared only by authenticated endpoints: never trust a decoded, unverified phone.
+async function resolvePreviewIdentity(token) {
   const secret = getPreviewSecret();
-  if (!secret || !auth.startsWith('Bearer ')) {
-    return res.status(401).json({ isAdmin: false });
-  }
-
-  try {
-    const payload = jwt.verify(auth.slice(7), secret, {
+  if (!secret || !token) throw new Error('Invalid session');
+  const payload = jwt.verify(token, secret, {
       issuer: PREVIEW_TOKEN_ISSUER,
       audience: PREVIEW_TOKEN_AUDIENCE,
-    });
-    if (payload.kind !== 'preview-session' || !payload.phone) {
-      return res.status(401).json({ isAdmin: false });
-    }
-    const profile = await getUserByPhone(payload.phone);
-    if (payload.type === 'fincantieri_users') {
-      if (profile?.type !== 'fincantieri_users') {
-        return res.status(401).json({ isAdmin: false });
-      }
-      const entry = await findWhitelistByPhone(payload.phone);
-      const currentVersion = entry
-        ? whitelistCredentialVersion(secret, payload.phone, entry.accessCode) : '';
-      if (!secureStringEqual(payload.credentialVersion, currentVersion)) {
-        return res.status(401).json({ isAdmin: false });
-      }
-      return res.json(whitelistSessionProfile(profile, entry, payload.phone));
-    }
-    if (payload.type !== 'admin') return res.status(401).json({ isAdmin: false });
-    if (!isPreviewAdminProfile(profile)) {
-      return res.status(401).json({ isAdmin: false });
-    }
-    const csvAdmin = await findAdminByPhone(payload.phone);
-    const currentCredentialVersion = csvAdmin
-      ? previewCredentialVersion(secret, payload.phone, csvAdmin.adminOTP)
-      : '';
-    if (!secureStringEqual(payload.credentialVersion, currentCredentialVersion)) {
-      return res.status(401).json({ isAdmin: false });
-    }
-    res.json({
+  });
+  if (payload.kind !== 'preview-session' || !payload.phone) throw new Error('Invalid session');
+  const profile = await getUserByPhone(payload.phone);
+  if (payload.type === 'fincantieri_users') {
+    if (profile?.type !== 'fincantieri_users') throw new Error('Invalid session');
+    const entry = await findWhitelistByPhone(payload.phone);
+    const version = entry ? whitelistCredentialVersion(secret, payload.phone, entry.accessCode) : '';
+    if (!secureStringEqual(payload.credentialVersion, version)) throw new Error('Invalid session');
+    return { phone: payload.phone, profile, publicProfile: whitelistSessionProfile(profile, entry, payload.phone) };
+  }
+  if (payload.type !== 'admin' || !isPreviewAdminProfile(profile)) throw new Error('Invalid session');
+  const csvAdmin = await findAdminByPhone(payload.phone);
+  const version = csvAdmin ? previewCredentialVersion(secret, payload.phone, csvAdmin.adminOTP) : '';
+  if (!secureStringEqual(payload.credentialVersion, version)) throw new Error('Invalid session');
+  return { phone: payload.phone, profile, publicProfile: {
       isAdmin: true,
       firstName: typeof profile.firstName === 'string' ? profile.firstName : '',
       type: 'admin',
-    });
-  } catch (err) {
+  } };
+}
+
+// Ripristina una sessione preview già verificata e ricontrolla il profilo.
+router.get('/preview-admin/session', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  try {
+    if (!auth.startsWith('Bearer ')) throw new Error('Invalid session');
+    const identity = await resolvePreviewIdentity(auth.slice(7));
+    res.json(identity.publicProfile);
+  } catch {
     res.status(401).json({ isAdmin: false });
   }
 });
@@ -326,3 +316,4 @@ router.get('/me', requireAuth, async (req, res) => {
 });
 
 module.exports = router;
+module.exports.resolvePreviewIdentity = resolvePreviewIdentity;
