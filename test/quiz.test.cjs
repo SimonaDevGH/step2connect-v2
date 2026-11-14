@@ -58,7 +58,7 @@ Module._load = function(request, parent, main) {
     if (request === '../middleware/notificationAuth') return {
       requireNotificationUser: async (req, res, next) => {
         const role = req.headers.authorization?.replace('Bearer ', '');
-        if (!['admin', 'standard', 'fincantieri_users', 'missing'].includes(role)) return res.status(401).json({ error: 'auth' });
+        if (!['admin', 'standard', 'standard_legacy', 'fincantieri_users', 'missing'].includes(role)) return res.status(401).json({ error: 'auth' });
         req.notificationUser = {
           phone: role === 'missing' ? '+missing' : '+fixture',
           profile: role === 'missing' ? null : { ...copy(profiles.get('+fixture')), type: role },
@@ -149,11 +149,18 @@ test('quiz editor writes three internal drafts, guide metadata is authoritative 
   await publish();
   assert.equal((await call('/api/quiz')).data.items.length, 1);
   assert.equal((await call('/api/quiz', { role: 'standard' })).data.items.length, 0);
+  assert.equal((await call('/api/quiz', { role: 'standard_legacy' })).data.items.length, 0);
   assert.equal((await call('/api/quiz/quiz-permit-request', { role: 'standard' })).status, 404);
   const changed = await call('/api/admin/content/quiz/quiz-permit-request/visibility', { cms: true, method: 'PUT', body: { visibility: 'preview' } });
   assert.equal(changed.status, 200);
   assert.equal((await call('/api/quiz', { role: 'fincantieri_users' })).data.items.length, 1);
   assert.equal((await call('/api/quiz', { role: 'standard' })).data.items.length, 0);
+  assert.equal((await call('/api/quiz/quiz-permit-request', { role: 'standard_legacy' })).status, 404);
+  await call('/api/admin/content/quiz/quiz-permit-request/visibility', {
+    cms: true, method: 'PUT', body: { visibility: 'published' },
+  });
+  assert.equal((await call('/api/quiz', { role: 'standard_legacy' })).data.items.length, 1);
+  assert.equal((await call('/api/quiz/quiz-permit-request', { role: 'standard_legacy' })).status, 200);
 });
 test('quiz publication and withdrawal preserve all language drafts, visibility and results', async () => {
   reset();

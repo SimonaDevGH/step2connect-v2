@@ -155,7 +155,7 @@ export default function LoginPage({ legacyRoute = false }) {
   const isLoginValid = phone.trim();
   const isLegacyValid = phone.trim()
     && company && site && registrationOptionsLoaded && !registrationOptionsFailed
-    && !registrationOptionsLoading;
+    && !registrationOptionsLoading && privacyAccepted;
 
   const legacyAuthError = (result) => t({
     CodeMismatchException: 'legacyOtpInvalid',
@@ -174,6 +174,7 @@ export default function LoginPage({ legacyRoute = false }) {
       setLoading(true);
       setError('');
       setPhoneError('');
+      const privacyAcceptedAt = new Date().toISOString();
       try {
         const account = await getPhoneAccountStatus(phone);
         if (!account) {
@@ -195,6 +196,8 @@ export default function LoginPage({ legacyRoute = false }) {
           company,
           site,
           legacyToken,
+          privacy_policy_consent: true,
+          privacyAcceptedAt,
         };
         const result = await requestOTP(phone, userData, flowOverride);
         if (!result?.success) {
@@ -477,6 +480,16 @@ export default function LoginPage({ legacyRoute = false }) {
                     onChange={(e) => { setPhone(e.target.value); setPhoneError(''); }}
                     placeholder={t('phonePlaceholder')} inputMode="tel" required
                     aria-label={t('phoneLabel')} />
+                </div>
+                <div className="login-privacy-consent">
+                  <input id="legacy-privacy-accepted" type="checkbox"
+                    checked={privacyAccepted} onChange={(e) => setPrivacyAccepted(e.target.checked)}
+                    required aria-labelledby="legacy-privacy-accepted-label" />
+                  <div id="legacy-privacy-accepted-label">
+                    <label htmlFor="legacy-privacy-accepted">{t('privacyConsentPrefix')}</label>
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer">{t('privacyPolicyInline')}</a>
+                    <label htmlFor="legacy-privacy-accepted">{t('privacyConsentSuffix')} *</label>
+                  </div>
                 </div>
                 <button className="btn-primary" onClick={handleSendOTP}
                   disabled={loading || !isLegacyValid}>

@@ -129,6 +129,13 @@ test('resolved admin role is exposed to Cognito sessions, while preview needs bo
   }, standardResponse);
   assert.deepEqual(standardResponse.body, { firstName: '', type: 'standard' });
 
+  const legacyRoutes = loadUsersRouter({ type: 'standard_legacy', firstName: 'Legacy' });
+  const legacyResponse = response();
+  await legacyRoutes.get.find(({ path }) => path === '/me').handler({
+    cognitoUser: { phone_number: '+390000000002' },
+  }, legacyResponse);
+  assert.deepEqual(legacyResponse.body, { firstName: 'Legacy', type: 'standard_legacy' });
+
   const standardChallengeResponse = response();
   process.env.SESSION_SECRET = 'test-preview-secret';
   try {

@@ -290,6 +290,12 @@ test('section visibility is respected server-side for standard, preview and admi
   assert.equal((await api('/api/notifications', 'GET', null, previewToken())).data.items.length, 1);
   profiles.get(phone).type = 'standard';
   assert.equal((await api('/api/notifications', 'GET', null, cognitoToken())).data.items.length, 0);
+  profiles.get(phone).type = 'standard_legacy';
+  assert.equal((await api('/api/notifications', 'GET', null, cognitoToken())).data.items.length, 0);
+  objects.set('config/sections.json', { notifications: { status: 'internal' } });
+  assert.equal((await api('/api/notifications', 'GET', null, cognitoToken())).data.items.length, 0);
+  objects.set('config/sections.json', { notifications: { status: 'published' } });
+  assert.equal((await api('/api/notifications', 'GET', null, cognitoToken())).data.items.length, 1);
   profiles.get(phone).type = 'admin';
   objects.set('config/sections.json', { notifications: { status: 'internal' } });
   assert.equal((await api('/api/notifications', 'GET', null, cognitoToken())).data.items.length, 1);

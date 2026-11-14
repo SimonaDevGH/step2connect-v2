@@ -20,7 +20,7 @@ async function harness(t, profile) {
     if (command.constructor.name === 'ScanCommand') return { Items: state.profile ? [state.profile] : [] };
     assert.equal(command.constructor.name, 'UpdateCommand');
     assert.equal(command.input.ConditionExpression,
-      '#phone = :phone AND (attribute_not_exists(#type) OR #type = :empty OR #type = :standard)');
+      '#phone = :phone AND (attribute_not_exists(#type) OR #type = :empty OR #type = :standard OR #type = :legacy)');
     assert.equal(command.input.ExpressionAttributeValues[':empty'], '');
     assert.equal(command.input.ExpressionAttributeValues[':standard'], 'standard');
     if (state.profile?.phone !== command.input.ExpressionAttributeValues[':phone']
@@ -156,6 +156,18 @@ test('registered whitelist user gets a 30-day non-admin session without Cognito 
   });
   assert.equal(failed.kind, 'error');
   assert.equal(smsCalls, 0);
+});
+
+test('standard_legacy uses Cognito off-whitelist and is promoted on personal-code login when enabled', async t => {
+  const { state, api, verify } = await harness(t, { userId: 'test', phone: PHONE, type: 'standard_legacy' });
+  state.users = [];
+  assert.deepEqual((await api('/account-status', { phone: PHONE })).body, { exists: true, flow: 'cognito' });
+  state.users = [{ ...ENTRY }];
+  assert.deepEqual((await api('/account-status', { phone: PHONE })).body, { exists: true, flow: 'personal-code' });
+  const result = await verify();
+  assert.equal(result.status, 200);
+  assert.equal(state.profile.type, 'fincantieri_users');
+  assert.equal(state.promotions, 1);
 });
 
 test('removed, disabled or changed codes revoke sessions and disabled whitelist uses Cognito', async (t) => {
@@ -320,7 +332,7 @@ test('automatic role promotion cannot overwrite admin, including concurrent chan
     return { Attributes: { ...standard, type: 'fincantieri_users' } };
   } };
   assert.equal((await promoteWhitelistUserByPhone(PHONE, client)).type, 'fincantieri_users');
-  for (const initialType of ['standard', undefined, '']) {
+  for (const initialType of ['standard', 'standard_legacy', undefined, '']) {
     for (const concurrentType of ['admin', 'manager']) {
       let reads = 0;
       const initial = { phone: PHONE, userId: 'test' };
@@ -330,7 +342,7 @@ test('automatic role promotion cannot overwrite admin, including concurrent chan
           return { Items: [reads++ ? { ...initial, type: concurrentType } : initial] };
         }
         assert.equal(command.input.ConditionExpression,
-          '#phone = :phone AND (attribute_not_exists(#type) OR #type = :empty OR #type = :standard)');
+          '#phone = :phone AND (attribute_not_exists(#type) OR #type = :empty OR #type = :standard OR #type = :legacy)');
         const err = new Error('Changed');
         err.name = 'ConditionalCheckFailedException';
         throw err;

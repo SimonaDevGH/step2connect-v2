@@ -9,7 +9,7 @@ const sessions = [];
   const { DEFAULT_SECTIONS: sections } = await import('../src/lib/sectionAccess.js');
   const create = async (options = {}) => {
     const b = await chromiumSession(); sessions.push(b);
-    b.flow = { events: [], complete: [], syncPayloads: [], consent: 0, confirmed: false, synced: false, cognito: 0 };
+    b.flow = { events: [], complete: [], syncPayloads: [], consent: 0, confirmed: false, synced: false, cognito: 0, consentSaved: false };
     b.events['Fetch.requestPaused'] = async ({ requestId, request }) => {
       const url = new URL(request.url);
       let data = {}, code = 200;
@@ -71,14 +71,23 @@ const sessions = [];
         b.flow.events.push('sync-end');
       } else if (url.pathname === '/api/legacy/complete') {
         assert.equal(b.flow.synced, true);
+        assert.equal(b.flow.consentSaved, true);
         assert.equal(await b.evaluate(`!!document.querySelector('.app-shell')`), true);
         assert.ok(Object.entries(request.headers).some(([key, value]) =>
           key.toLowerCase() === 'authorization' && value.startsWith('Bearer ')));
         b.flow.complete.push(JSON.parse(request.postData)); b.flow.events.push('complete');
-        if (options.completeFail || b.flow.complete.length === 1) { code = 500; data = { error: 'Fixture temporary error' }; }
+        if (options.typeFail || options.completeFail || b.flow.complete.length === 1) { code = 503; data = { error: 'Fixture temporary error' }; }
         else data = { ok: true };
       } else if (url.pathname === '/api/users/consent') {
-        b.flow.consent++; code = 500;
+        assert.equal(b.flow.confirmed, true); assert.equal(b.flow.synced, true);
+        const consent = JSON.parse(request.postData);
+        assert.equal(consent.privacy_policy_consent, true);
+        assert.ok(Date.parse(consent.privacyAcceptedAt) >= b.flow.clickedAt);
+        assert.ok(Date.parse(consent.privacyAcceptedAt) <= b.flow.otpShownAt,
+          'acceptance timestamp is the continue click, not SMS verification');
+        b.flow.consent++; b.flow.events.push('consent');
+        if (options.consentFail) { code = 500; data = { error: 'Fixture consent failure' }; }
+        else { b.flow.consentSaved = true; data = { ok: true, ...consent }; }
       } else if (url.pathname === '/api/users/me') data = { firstName: 'Fixture', type: 'standard' };
       else if (url.pathname === '/api/sections') data = { sections };
       else if (url.pathname.startsWith('/api/notifications')) data = { items: [], unread: 0 };
@@ -111,6 +120,7 @@ const sessions = [];
   try {
     for (const options of [
       {}, { exists: true }, { exists: true, syncFail: true }, { completeFail: true },
+      { consentFail: true }, { exists: true, consentFail: true }, { typeFail: true },
       { exists: true, missingCognito: true }, { exists: true, dedicated: 'preview' },
       { exists: true, dedicated: 'personal-code', lang: 'en' },
       { exists: true, dedicated: 'personal-code', lang: 'bn' },
@@ -132,6 +142,10 @@ const sessions = [];
         assert.equal(await b.evaluate(`document.querySelector('select').value`), options.unknownOptions ? '' : 'Company');
         assert.equal(await b.evaluate(`document.querySelectorAll('select')[1].value`), options.unknownOptions ? '' : 'Site');
         await b.set('input[type=tel]', PHONE);
+        assert.equal(await b.evaluate(`document.querySelector('.btn-primary').disabled`), true);
+        assert.equal(await b.evaluate(`document.querySelector('#legacy-privacy-accepted').required`), true);
+        assert.equal(await b.evaluate(`document.querySelector('.login-privacy-consent a').getAttribute('href')`), '/privacy');
+        await b.click('#legacy-privacy-accepted');
         if (options.unknownOptions) {
           assert.equal(await b.evaluate(`document.querySelector('.btn-primary').disabled`), true);
           await b.set('select', 'Company'); await b.set('select:nth-of-type(1)', 'Company');
@@ -142,6 +156,7 @@ const sessions = [];
           })()`);
         }
         await b.wait(`!document.querySelector('.btn-primary').disabled`);
+        b.flow.clickedAt = Date.now();
         await b.click('.btn-primary');
         if (options.dedicated) {
           await b.wait(`!!document.querySelector('.account-notice[role=status]')`);
@@ -154,12 +169,17 @@ const sessions = [];
           assert.equal(b.flow.complete.length, 0);
         } else {
           await b.wait(`!!document.querySelector('.otp-input')`);
+          b.flow.otpShownAt = Date.now();
           assert.equal(b.flow.complete.length, 0);
           assert.equal(b.flow.syncPayloads.length, 0);
+          assert.equal(b.flow.consent, 0);
           await b.set('.otp-input', '123456'); await b.click('.btn-primary');
           await b.wait(`location.pathname==='/home' && !!document.querySelector('.app-shell')`);
           for (let i = 0; i < 60 && !b.flow.events.includes('sync-end'); i++) await new Promise(r => setTimeout(r, 100));
-          if (options.syncFail) {
+          if (options.syncFail || options.consentFail) {
+            if (options.consentFail) {
+              for (let i = 0; i < 60 && b.flow.consent < 2; i++) await new Promise(r => setTimeout(r, 100));
+            }
             await new Promise(r => setTimeout(r, 300)); assert.equal(b.flow.complete.length, 0);
           } else {
             for (let i = 0; i < 60 && b.flow.complete.length < 2; i++) await new Promise(r => setTimeout(r, 100));
@@ -171,7 +191,11 @@ const sessions = [];
             email: 'fixture@example.test', company: 'Company', site: 'Site',
           });
           assert.equal(b.flow.events.includes('signup'), !options.exists);
-          assert.equal(b.flow.consent, 0);
+          assert.equal(b.flow.consent, options.syncFail ? 0 : options.consentFail ? 2 : 1);
+          if (b.flow.complete.length) {
+            assert.ok(b.flow.events.indexOf('sync-end') < b.flow.events.indexOf('consent'));
+            assert.ok(b.flow.events.indexOf('consent') < b.flow.events.indexOf('complete'));
+          }
         }
       }
       assert.equal(await b.evaluate(`JSON.stringify({...localStorage,...sessionStorage}).includes(${JSON.stringify(TOKEN)})`), false);
@@ -179,6 +203,6 @@ const sessions = [];
       console.log(`PASS legacy browser: ${JSON.stringify(options)}`);
       await b.close(); sessions.splice(sessions.indexOf(b), 1);
     }
-    console.log('PASS: 11 isolated legacy browser scenarios; no real SMS or persistent writes.');
+    console.log('PASS: 14 isolated legacy browser scenarios; no real SMS or persistent writes.');
   } finally { await Promise.all(sessions.map(b => b.close())); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

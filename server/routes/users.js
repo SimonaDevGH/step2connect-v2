@@ -10,6 +10,7 @@ const {
   promoteWhitelistUserByPhone,
   formatPrivacyAcceptedAt,
   recordPrivacyConsentByPhone,
+  setLegacyTypeByPhone,
 } = require('../lib/userProfiles');
 const {
   findAdminByPhone,
@@ -311,7 +312,7 @@ router.get('/me', requireAuth, async (req, res) => {
     const profile = await getUserByPhone(phone);
     res.json({
       firstName: typeof profile?.firstName === 'string' ? profile.firstName : '',
-      type: ['admin', 'fincantieri_users'].includes(profile?.type) ? profile.type : 'standard',
+      type: ['admin', 'fincantieri_users', 'standard_legacy'].includes(profile?.type) ? profile.type : 'standard',
     });
   } catch (err) {
     console.error('[users] profile lookup error:', err);
@@ -358,9 +359,15 @@ legacyRouter.get('/link', limitAccountStatusAttempts, async (req, res) => {
   }
 });
 legacyRouter.post('/complete', limitAccountStatusAttempts, requireAuth, async (req, res) => {
+  const phone = normalizePhone(req.cognitoUser?.phone_number);
+  if (!phone) return res.status(403).json({ error: 'Verified phone number required' });
   try {
     const record = await legacyUsers.findByToken(req.body?.token);
-    if (!record || !await legacyUsers.markMigrated(record.id)) {
+    if (!record) return res.status(404).json({ error: 'Link unavailable' });
+    if (!await setLegacyTypeByPhone(phone)) {
+      return res.status(409).json({ error: 'User profile not ready for migration' });
+    }
+    if (!await legacyUsers.markMigrated(record.id)) {
       return res.status(404).json({ error: 'Link unavailable' });
     }
     res.json({ ok: true });

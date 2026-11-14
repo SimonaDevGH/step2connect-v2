@@ -179,7 +179,7 @@ test('visibility endpoint rejects unknown states/types, missing records and non-
 test('role matrix enforces BOTH section and page visibility, with published legacy pages', async () => {
   const { canSeeVisibility, canSeeSection, DEFAULT_SECTIONS } = await import('../src/lib/sectionAccess.js');
   const sections = { ...DEFAULT_SECTIONS, quiz: { status: 'preview' } };
-  for (const type of ['admin', 'fincantieri_users', 'standard', undefined, '']) {
+  for (const type of ['admin', 'fincantieri_users', 'standard', 'standard_legacy', undefined, '']) {
     const user = { type };
     assert.equal(canSeeSection('home', user, sections), true);
     assert.equal(canSeeSection('offices', user, sections), type === 'admin');

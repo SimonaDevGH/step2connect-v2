@@ -1,9 +1,11 @@
+import { saveConsentAfterProfileSync } from './registrationConsent.js';
+
 /**
  * Runs after successful Cognito SMS authentication, independently of page lifetime.
  * The token never enters the CRM payload or browser storage.
  */
 export async function syncLegacyProfileAfterLogin({
-  idToken, profile, token, syncProfile, completeLegacyMigration,
+  idToken, profile, token, consent, syncProfile, savePrivacyConsent, completeLegacyMigration,
   warn = message => console.warn(message),
 }) {
   try {
@@ -13,6 +15,7 @@ export async function syncLegacyProfileAfterLogin({
     warn('[legacy] profile sync failed; migration not completed');
     return;
   }
+  if (!await saveConsentAfterProfileSync({ idToken, consent, savePrivacyConsent, warn })) return;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       await completeLegacyMigration(idToken, token);

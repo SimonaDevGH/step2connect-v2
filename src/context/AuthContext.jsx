@@ -55,7 +55,7 @@ function mergeProfileIntoUser(setUser, profile, expectedPhone) {
   setUser((current) => {
     if (!current || current.phone !== expectedPhone) return current;
     const firstName = typeof profile.firstName === 'string' ? profile.firstName.trim() : '';
-    const type = ['admin', 'fincantieri_users'].includes(profile.type) ? profile.type : 'standard';
+    const type = ['admin', 'fincantieri_users', 'standard_legacy'].includes(profile.type) ? profile.type : 'standard';
     return {
       ...current,
       type,
@@ -209,7 +209,7 @@ export function AuthProvider({ children }) {
       if (idToken) {
         const profileSync = userData.legacyToken ? syncLegacyProfileAfterLogin({
           idToken, profile: profileHint, token: userData.legacyToken,
-          syncProfile, completeLegacyMigration,
+          consent: userData, syncProfile, savePrivacyConsent, completeLegacyMigration,
         }) : syncProfileAfterLogin({
           isRegister, idToken, profile: profileHint, consent: userData,
           syncProfile, savePrivacyConsent,

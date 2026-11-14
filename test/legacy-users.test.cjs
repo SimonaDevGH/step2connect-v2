@@ -123,7 +123,8 @@ test('legacy routes return identical generic 404, require real Cognito JWT and r
   const config = { COGNITO_REGION: 'eu-west-2', COGNITO_USER_POOL_ID: 'eu-west-2_fixture', COGNITO_USER_POOL_CLIENT_ID: 'fixture-client' };
   const previous = {};
   for (const key of Object.keys(config)) { previous[key] = process.env[key]; process.env[key] = config[key]; }
-  let used = false, writes = 0;
+  let used = false, writes = 0, typeFailure = null, consentReady = true;
+  const events = [];
   const original = Module._load;
   let router;
   try {
@@ -131,9 +132,18 @@ test('legacy routes return identical generic 404, require real Cognito JWT and r
       if (request === 'jwks-rsa') return () => ({ getSigningKey(_kid, cb) {
         cb(null, { getPublicKey: () => publicKey });
       } });
+      if (request === '../lib/userProfiles') return {
+        ...require('../server/lib/userProfiles'),
+        setLegacyTypeByPhone: async phone => {
+          assert.equal(phone, '+393000000001', 'identity comes from JWT, not body');
+          events.push('type');
+          if (typeFailure) throw typeFailure;
+          return consentReady ? { type: 'standard_legacy' } : null;
+        },
+      };
       if (request === '../lib/legacyUsers') return { ...legacy,
         findByToken: async token => token === TOKEN && !used ? Object.fromEntries(legacy.FIELDS.map((f, i) => [f, row('1')[i]])) : null,
-        markMigrated: async id => { assert.equal(id, '1'); used = true; writes++; return true; },
+        markMigrated: async id => { assert.equal(id, '1'); events.push('csv'); used = true; writes++; return true; },
       };
       return original.call(this, request, parent, isMain);
     };
@@ -157,7 +167,7 @@ test('legacy routes return identical generic 404, require real Cognito JWT and r
   });
   const post = authorization => fetch(`${origin}/complete`, { method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(authorization ? { Authorization: `Bearer ${authorization}` } : {}) },
-    body: JSON.stringify({ token: TOKEN }) });
+    body: JSON.stringify({ token: TOKEN, phone: '+393999999999', type: 'admin' }) });
   const valid = await fetch(`${origin}/link?t=${TOKEN}`);
   assert.equal(valid.status, 200); assert.equal(valid.headers.get('cache-control'), 'no-store');
   assert.deepEqual(Object.keys(await valid.json()), ['firstName', 'lastName', 'email', 'company', 'site']);
@@ -165,7 +175,13 @@ test('legacy routes return identical generic 404, require real Cognito JWT and r
   assert.equal(missing.status, 404); const generic = await missing.json();
   assert.equal((await post()).status, 401);
   assert.equal((await post(jwt.sign({ phone: 'fixture' }, 'preview-secret'))).status, 401);
+  consentReady = false;
+  assert.equal((await post(auth)).status, 409); assert.equal(writes, 0);
+  consentReady = true; typeFailure = new Error('fixture');
+  assert.equal((await post(auth)).status, 503); assert.equal(writes, 0);
+  typeFailure = null; events.length = 0;
   assert.equal((await post(auth)).status, 200); assert.equal(writes, 1);
+  assert.deepEqual(events, ['type', 'csv']);
   const repeat = await post(auth);
   assert.equal(repeat.status, 404); assert.deepEqual(await repeat.json(), generic);
   const invalid = await fetch(`${origin}/link?t=${TOKEN}`);
@@ -222,6 +238,12 @@ test('legacy completion follows successful strict profile sync only, preserves p
   let release;
   const gate = new Promise(resolve => { release = resolve; });
   const options = { idToken: 'jwt-fixture', profile, token: TOKEN, warn: message => warnings.push(message),
+    consent: { privacy_policy_consent: true, privacyAcceptedAt: '2026-11-14T14:00:00.000Z' },
+    savePrivacyConsent: async (jwt, consent) => {
+      assert.equal(jwt, 'jwt-fixture');
+      assert.equal(consent.privacyAcceptedAt, '2026-11-14T14:00:00.000Z');
+      events.push('consent');
+    },
     syncProfile: async (jwt, data, opts) => {
       assert.equal(jwt, 'jwt-fixture'); assert.deepEqual(data, profile);
       assert.deepEqual(opts, { requireSuccess: true }); events.push('sync'); await gate;
@@ -233,10 +255,59 @@ test('legacy completion follows successful strict profile sync only, preserves p
   const pending = syncLegacyProfileAfterLogin(options);
   assert.deepEqual(events, ['sync']);
   release(); await pending;
-  assert.deepEqual(events, ['sync', 'complete', 'complete']); assert.deepEqual(warnings, []);
+  assert.deepEqual(events, ['sync', 'consent', 'complete', 'complete']); assert.deepEqual(warnings, []);
   events.length = 0;
   await syncLegacyProfileAfterLogin({ ...options, syncProfile: async () => { throw new Error(TOKEN); } });
   assert.deepEqual(events, []); assert.equal(warnings.length, 1);
   await syncLegacyProfileAfterLogin({ ...options, completeLegacyMigration: async () => { throw new Error(TOKEN); } });
   assert.equal(warnings.length, 2); assert.ok(!warnings.join('').includes(TOKEN));
+  events.length = 0;
+  await syncLegacyProfileAfterLogin({ ...options, savePrivacyConsent: async () => {
+    events.push('consent-failed'); throw new Error(TOKEN);
+  } });
+  assert.deepEqual(events, ['sync', 'consent-failed', 'consent-failed']);
+  assert.equal(warnings.length, 3);
+});
+
+test('legacy type assignment requires saved consent and atomically preserves other roles and identities', async () => {
+  const { setLegacyTypeByPhone, isStandardProfile } = require('../server/lib/userProfiles');
+  const phone = '+393000000001';
+  for (const type of [undefined, '', 'standard', 'standard_legacy']) {
+    let writes = 0;
+    const profile = { userId: 'crm-id', phone, privacy_policy_consent: true, privacyAcceptedAt: '20261114 14:00' };
+    if (type !== undefined) profile.type = type;
+    assert.equal(isStandardProfile(profile), true);
+    const client = { async send(command) {
+      if (command.constructor.name === 'ScanCommand') return { Items: [profile] };
+      writes++;
+      assert.equal(command.constructor.name, 'UpdateCommand');
+      const { ConditionExpression: condition, ExpressionAttributeValues: values } = command.input;
+      assert.match(condition, /attribute_exists\(userId\).*#phone = :phone/);
+      assert.match(condition, /#consent = :true/);
+      assert.match(condition, /attribute_not_exists\(#type\).*#type = :empty.*#type = :standard.*#type = :legacy/);
+      assert.equal(values[':legacy'], 'standard_legacy');
+      assert.equal(values[':phone'], phone);
+      assert.deepEqual(command.input.Key, { userId: 'crm-id' });
+      return { Attributes: { ...profile, type: 'standard_legacy' } };
+    } };
+    assert.equal((await setLegacyTypeByPhone(phone, client)).type, 'standard_legacy');
+    assert.equal(writes, 1);
+  }
+  for (const overrides of [
+    { type: 'admin' }, { type: 'fincantieri_users' }, { type: 'other' },
+    { privacy_policy_consent: false }, { privacyAcceptedAt: '' }, { userId: undefined },
+  ]) {
+    const profile = { userId: 'crm-id', phone, privacy_policy_consent: true,
+      privacyAcceptedAt: '20261114 14:00', ...overrides };
+    assert.equal(await setLegacyTypeByPhone(phone, { async send(command) {
+      assert.equal(command.constructor.name, 'ScanCommand', 'must not write protected role or missing consent');
+      return { Items: [profile] };
+    } }), null);
+  }
+  assert.equal(await setLegacyTypeByPhone(phone, { async send(command) {
+    if (command.constructor.name === 'ScanCommand') return { Items: [{
+      userId: 'crm-id', phone, privacy_policy_consent: true, privacyAcceptedAt: '20261114 14:00',
+    }] };
+    throw { name: 'ConditionalCheckFailedException' };
+  } }), null, 'a concurrent role/consent change blocks closure');
 });

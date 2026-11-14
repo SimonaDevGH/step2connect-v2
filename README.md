@@ -399,7 +399,7 @@ phone,accessCode,firstName,lastName,company,enabled,notes
 - Gli admin continuano a usare `adminPsw` e il CSV admin; non possono usare
   il codice della whitelist neppure se il loro telefono compare nei due CSV.
 - Al primo codice valido, un aggiornamento DynamoDB condizionale cambia solo
-  il ruolo `standard` (anche `type` assente o stringa vuota) in
+  il ruolo `standard` o `standard_legacy` (anche `type` assente o stringa vuota) in
   `fincantieri_users`, senza sovrascrivere un admin o altri valori.
 - La sessione firmata dura **30 giorni**, usa il tipo `fincantieri_users`
   e viene rifiutata al ripristino se la riga sparisce, è disabilitata o il
@@ -501,22 +501,36 @@ documentazione, non richiede un nuovo deploy automatico.
    cognome. Azienda e cantiere sono modificabili nelle tendine della
    registrazione: confronto senza distinzione maiuscole/minuscole, valore
    sconosciuto da scegliere nuovamente. Il telefono è obbligatorio, con le
-   stesse regole italiane e bangladesi della registrazione.
+   stesse regole italiane e bangladesi della registrazione. È obbligatoria la
+   stessa checkbox privacy della registrazione standard, con testi IT/EN/BN
+   e collegamento pubblico a `/privacy`: senza accettazione «Prosegui» è disabilitato.
 3. «Prosegui» controlla `/api/users/account-status`. Numero nuovo: registrazione
    Cognito. Numero già presente con flusso Cognito: login SMS, **non** una nuova
    registrazione. In entrambi i casi conserva i dati confermati per il profilo.
    Per preview e codice personale mostra invece un messaggio neutro con
    pulsante verso la login standard: non forza SMS e non chiude la migrazione.
-4. Dopo la verifica SMS l’utente entra nella webapp. Solo dopo una risposta di
-   successo della sincronizzazione del profilo, anche per numeri già presenti,
-   parte `POST /api/legacy/complete`, con JWT Cognito e body `{ token }`.
-5. Il server rivalida il link e aggiorna soltanto la sua riga a `used` /
-   `migrated`. Usa l’ETag appena letto e `IfMatch`; in caso di conflitto 412
+4. Dopo la verifica SMS l’utente entra nella webapp. Sia per numeri nuovi sia
+   per numeri già presenti, il browser attende la sincronizzazione riuscita del
+   profilo, poi salva il consenso tramite `/api/users/consent`. Invia
+   `privacy_policy_consent=true` e `privacyAcceptedAt` con l’istante del click su
+   «Prosegui», non quello della verifica SMS. Il server conserva la prima data
+   già presente e la memorizza in UTC nel formato `YYYYMMDD HH:MM`.
+5. Solo dopo il salvataggio riuscito parte `POST /api/legacy/complete`, con JWT
+   Cognito e body `{ token }`. Il server rivalida il link, ricava il telefono
+   esclusivamente dal JWT e controlla profilo e consenso salvati. Imposta
+   `type=standard_legacy` con aggiornamento DynamoDB condizionale soltanto se il
+   tipo è assente, vuoto o `standard`; un `standard_legacy` già impostato è
+   idempotente. Non sovrascrive `admin`, `fincantieri_users` o altri valori e
+   in questi casi non chiude la migrazione.
+6. Solo dopo la scrittura del tipo aggiorna la riga a `used` / `migrated`.
+   Usa l’ETag appena letto e `IfMatch`; in caso di conflitto 412
    rilegge e riprova fino a **5 tentativi totali**, preservando gli aggiornamenti
    degli altri utenti. Una riga già chiusa non viene riscritta.
 
-Se la sincronizzazione fallisce, l’utente entra comunque ma la chiusura non
-parte e il link resta attivo. Se fallisce la chiamata di chiusura, il browser
+Se la sincronizzazione o il salvataggio del consenso falliscono, l’utente entra
+comunque ma la chiusura non parte e il link resta attivo. Il consenso viene
+riprovato una volta. Se fallisce la scrittura del tipo, il CSV non viene chiuso.
+Se fallisce la chiamata di chiusura, il browser
 riprova una sola volta e non blocca l’accesso. Se nessun tentativo scrive, il
 link resta attivo e può essere riusato con il numero ormai registrato.
 Se invece il server ha scritto ma la risposta è andata persa, il link è già
@@ -531,17 +545,22 @@ Risposte API non memorizzabili, referrer disabilitato e monitoraggio LivePerson
 non avviato sulla pagina personale impediscono la diffusione del link tramite
 questi canali. I nuovi log tecnici non includono dati personali o codici.
 
-**CRM v2 invariato:** `syncProfile` salva i cinque dati nel flusso attuale di
-`Step2Connect_Users`, senza nuovi campi legacy. Login ordinario, accessi
-dedicati e consenso privacy esistenti non cambiano. In questo step non sono
-inclusi checkbox/consenso legacy, verifica dell’email nella registrazione
-standard, invio campagne, modifica profilo/numero o archiviazione dopo 12 mesi.
+**CRM v2:** `syncProfile` salva i cinque dati nel flusso attuale di
+`Step2Connect_Users`; consenso e tipo vengono salvati successivamente come
+descritto sopra, senza memorizzare il token nel CRM. `standard_legacy` ha gli
+stessi permessi di `standard`: solo sezioni, pagine, notifiche e quiz pubblicati,
+nessun accesso CMS. `/me` conserva il tipo; il controllo whitelist lo considera
+standard e un successivo login con codice personale può promuoverlo a
+`fincantieri_users`. Login ordinario, accessi dedicati e prima data di consenso
+esistenti non cambiano. In questo step non sono inclusi verifica dell’email nella
+registrazione standard, invio campagne, modifica profilo/numero o archiviazione dopo 12 mesi.
 Il registro non è gestibile dal CMS in questo step.
 
 #### Verifica senza dati reali
 
 `npm test` include i test del CSV, la preparazione, i link, il JWT Cognito,
-le scritture condizionali S3, i conflitti e l’ordine sync/chiusura. Con
+le scritture condizionali S3, i conflitti, i ruoli protetti e l’ordine
+sync/consenso/tipo/chiusura. Con
 l’anteprima avviata si può eseguire anche:
 
 ```bash
@@ -549,7 +568,7 @@ node --experimental-websocket scripts/check-legacy-login-browser.cjs
 ```
 
 Questo controllo usa il browser reale e risposte simulate per Cognito e API:
-copre 11 scenari, senza inviare SMS né modificare S3 o CRM. Non sostituisce una
+copre 14 scenari, senza inviare SMS né modificare S3 o CRM. Non sostituisce una
 prova operativa con un utente di collaudo e i servizi AWS effettivi.
 
 ## Profili e ruoli DynamoDB
@@ -779,7 +798,7 @@ minimo quando l’API non è disponibile.
 | `GET` | `/api/users/me` | JWT Cognito | Legge nome e ruolo applicativo |
 | `GET` | `/api/registration-options` | Pubblica | Aziende e cantieri da CSV S3 |
 | `GET` | `/api/legacy/link?t=<codice>` | Pubblica, rate limited | Dati minimi di un link legacy attivo |
-| `POST` | `/api/legacy/complete` | JWT Cognito, rate limited | Chiude una migrazione dopo il sync, body `{ token }` |
+| `POST` | `/api/legacy/complete` | JWT Cognito, rate limited | Dopo sync e consenso, imposta `standard_legacy` e chiude il CSV; body `{ token }` |
 
 La sincronizzazione estesa del profilo usa il backend configurato in
 `VITE_API_BASE_URL`.

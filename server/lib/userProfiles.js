@@ -22,7 +22,8 @@ function isPreviewAdminProfile(profile) {
 
 function isStandardProfile(profile) {
   return !!profile && (
-    profile.type === 'standard' || profile.type === undefined || profile.type === ''
+    profile.type === 'standard' || profile.type === 'standard_legacy'
+    || profile.type === undefined || profile.type === ''
   );
 }
 
@@ -108,8 +109,8 @@ async function recordPrivacyConsentByPhone(phone, acceptedAt, documentClient = c
 
 async function setUserRoleByPhone(phone, role, documentClient = client) {
   if (!phone) throw new Error('Phone is required');
-  if (!['admin', 'standard', 'fincantieri_users'].includes(role?.type)) {
-    throw new Error('Role type must be admin, standard or fincantieri_users');
+  if (!['admin', 'standard', 'standard_legacy', 'fincantieri_users'].includes(role?.type)) {
+    throw new Error('Role type must be admin, standard, standard_legacy or fincantieri_users');
   }
   if (typeof role?.adminPsw !== 'boolean') {
     throw new Error('adminPsw must be a boolean');
@@ -139,7 +140,7 @@ async function setUserRoleByPhone(phone, role, documentClient = client) {
   return result.Attributes || null;
 }
 
-// Il login con codice può promuovere SOLO standard (anche type assente/vuoto), anche in caso di una
+// Il login con codice può promuovere SOLO standard/standard_legacy (anche type assente/vuoto), anche in caso di una
 // modifica concorrente del ruolo da parte dell'operatore.
 async function promoteWhitelistUserByPhone(phone, documentClient = client) {
   const profile = await getUserByPhone(phone, documentClient);
@@ -150,10 +151,10 @@ async function promoteWhitelistUserByPhone(phone, documentClient = client) {
       TableName: TABLE_NAME,
       Key: { userId: profile.userId },
       UpdateExpression: 'SET #type = :type',
-      ConditionExpression: '#phone = :phone AND (attribute_not_exists(#type) OR #type = :empty OR #type = :standard)',
+      ConditionExpression: '#phone = :phone AND (attribute_not_exists(#type) OR #type = :empty OR #type = :standard OR #type = :legacy)',
       ExpressionAttributeNames: { '#phone': 'phone', '#type': 'type' },
       ExpressionAttributeValues: {
-        ':phone': phone, ':type': 'fincantieri_users', ':standard': 'standard', ':empty': '',
+        ':phone': phone, ':type': 'fincantieri_users', ':standard': 'standard', ':empty': '', ':legacy': 'standard_legacy',
       },
       ReturnValues: 'ALL_NEW',
     }));
@@ -162,6 +163,34 @@ async function promoteWhitelistUserByPhone(phone, documentClient = client) {
     if (err.name !== 'ConditionalCheckFailedException') throw err;
     const current = await getUserByPhone(phone, documentClient);
     return current?.type === 'fincantieri_users' ? current : null;
+  }
+}
+
+// Identity is supplied only by the verified Cognito JWT in /legacy/complete.
+// Consent and role are checked again atomically so a concurrent role change is never overwritten.
+async function setLegacyTypeByPhone(phone, documentClient = client) {
+  const profile = await getUserByPhone(phone, documentClient);
+  if (!isStandardProfile(profile) || !profile.userId
+    || profile.privacy_policy_consent !== true || !profile.privacyAcceptedAt) return null;
+  try {
+    const result = await documentClient.send(new UpdateCommand({
+      TableName: TABLE_NAME,
+      Key: { userId: profile.userId },
+      UpdateExpression: 'SET #type = :legacy',
+      ConditionExpression: 'attribute_exists(userId) AND #phone = :phone AND #consent = :true AND attribute_exists(#acceptedAt) AND #acceptedAt <> :empty AND (attribute_not_exists(#type) OR #type = :empty OR #type = :standard OR #type = :legacy)',
+      ExpressionAttributeNames: {
+        '#phone': 'phone', '#type': 'type',
+        '#consent': 'privacy_policy_consent', '#acceptedAt': 'privacyAcceptedAt',
+      },
+      ExpressionAttributeValues: {
+        ':phone': phone, ':legacy': 'standard_legacy', ':standard': 'standard', ':empty': '', ':true': true,
+      },
+      ReturnValues: 'ALL_NEW',
+    }));
+    return result.Attributes || null;
+  } catch (err) {
+    if (err.name !== 'ConditionalCheckFailedException') throw err;
+    return null;
   }
 }
 
@@ -288,6 +317,7 @@ module.exports = {
   isStandardProfile,
   setUserRoleByPhone,
   promoteWhitelistUserByPhone,
+  setLegacyTypeByPhone,
   markNotificationsReadByPhone,
   saveQuizResultByPhone,
   awardQuizBadgesByPhone,
