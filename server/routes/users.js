@@ -18,6 +18,7 @@ const {
 } = require('../lib/adminUsers');
 const { findWhitelistByPhone, matchesAccessCode } = require('../lib/whitelistUsers');
 const legacyUsers = require('../lib/legacyUsers');
+const { sendLegacyAccessEmail } = require('../lib/legacyEmail');
 
 const router = express.Router();
 const legacyRouter = express.Router();
@@ -356,6 +357,23 @@ legacyRouter.get('/link', limitAccountStatusAttempts, async (req, res) => {
   } catch {
     console.error('[legacy] registry lookup failed');
     res.status(503).json({ error: 'Unable to verify link' });
+  }
+});
+legacyRouter.post('/lookup-email', limitAccountStatusAttempts, async (req, res) => {
+  const email = legacyUsers.normalizeEmail(req.body?.email);
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'Valid email required' });
+  }
+  try {
+    const result = await legacyUsers.lookupEmail(email);
+    if (result.status === 'legacy') {
+      await sendLegacyAccessEmail(result.record);
+      return res.json({ status: 'legacy_email_sent' });
+    }
+    res.json({ status: result.status });
+  } catch {
+    console.error('[legacy] email lookup failed');
+    res.status(503).json({ error: 'Unable to verify account' });
   }
 });
 legacyRouter.post('/complete', limitAccountStatusAttempts, requireAuth, async (req, res) => {

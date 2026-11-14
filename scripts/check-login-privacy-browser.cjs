@@ -57,6 +57,7 @@ const sessions = [];
       } else if (url.pathname === '/api/registration-options') data = { companies: ['Test company'], sites: ['Test site'] };
       else if (url.pathname === '/api/users/me') data = { firstName: 'Test', type: 'standard' };
       else if (url.pathname === '/api/users/account-status') data = { exists: false };
+      else if (url.pathname === '/api/legacy/lookup-email') data = { status: 'none' };
       else if (url.pathname === '/api/users/preview-admin/session') {
         code = signedIn ? 200 : 401;
         data = signedIn ? { type: 'fincantieri_users', phone: '+390000000001', firstName: 'Fixture' } : {};
@@ -101,7 +102,7 @@ const sessions = [];
         el.dispatchEvent(new Event(el.tagName==='SELECT'?'change':'input',{bubbles:true}));
       };
       const inputs=document.querySelectorAll('.input-group input');
-      ['Test','User','+393000000001',''].forEach((v,i)=>set(inputs[i],v));
+      ['Test','User','+393000000001','fixture@example.test'].forEach((v,i)=>set(inputs[i],v));
       document.querySelectorAll('select').forEach(el=>set(el,el.options[1].value));
     })()`);
     await b.wait(`document.querySelector('select').value==='Test company'`);

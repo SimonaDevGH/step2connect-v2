@@ -254,6 +254,7 @@ gestite tramite Replit Secrets.
 | `DYNAMODB_USERS_TABLE` | `Step2Connect_Users` | Nome tabella profili |
 | `DYNAMODB_PHONE_INDEX` | vuoto | Indice DynamoDB con partition key `phone` |
 | `SES_FROM_EMAIL` | nessuno | Mittente verificato SES per reset password |
+| `LEGACY_FROM_EMAIL` | nessuno | Mittente `@step2connect.it` per i link legacy; nessun ripiego su `SES_FROM_EMAIL` |
 
 `VITE_*` viene incorporato nella build client: non usare mai questo prefisso per
 segreti.
@@ -299,7 +300,8 @@ Al click su «Invia codice», il momento dell'accettazione resta temporaneamente
 nello stato del form. **Nessun consenso viene scritto prima della verifica SMS.**
 Dopo la conferma del codice e l'accesso alla home, il client attende la riuscita
 di `/users/sync`, poi chiama `POST /api/users/consent` con l'ID token Cognito.
-Email e flusso SMS rimangono invariati.
+L’email è obbligatoria e deve avere un formato valido. Prima di avviare Cognito,
+il form controlla il registro legacy come descritto nello step 2 qui sotto.
 
 Il consenso è salvato nel profilo CRM `Step2Connect_Users` nei campi:
 
@@ -316,7 +318,7 @@ verificato; il `userId` del CRM è risolto per telefono e non è assunto uguale 
 `sub`. L'endpoint usa esclusivamente `UpdateCommand`, non crea profili mancanti
 e conserva atomicamente la prima accettazione anche in caso di richieste simultanee.
 
-Solo il flusso Registrati chiama l'endpoint: Accedi e codice personale sono
+Registrati e il percorso legacy chiamano l'endpoint: Accedi ordinario e codice personale sono
 invariati. In caso di errore del consenso viene eseguito un solo nuovo tentativo;
 un secondo errore produce un messaggio tecnico senza dati personali e non blocca
 l'accesso. Se la sincronizzazione del profilo fallisce, il consenso non è scritto
@@ -552,8 +554,8 @@ stessi permessi di `standard`: solo sezioni, pagine, notifiche e quiz pubblicati
 nessun accesso CMS. `/me` conserva il tipo; il controllo whitelist lo considera
 standard e un successivo login con codice personale può promuoverlo a
 `fincantieri_users`. Login ordinario, accessi dedicati e prima data di consenso
-esistenti non cambiano. In questo step non sono inclusi verifica dell’email nella
-registrazione standard, invio campagne, modifica profilo/numero o archiviazione dopo 12 mesi.
+esistenti non cambiano. Restano esclusi invio campagne, modifica profilo/numero
+e archiviazione dopo 12 mesi.
 Il registro non è gestibile dal CMS in questo step.
 
 #### Verifica senza dati reali
@@ -568,8 +570,57 @@ node --experimental-websocket scripts/check-legacy-login-browser.cjs
 ```
 
 Questo controllo usa il browser reale e risposte simulate per Cognito e API:
-copre 14 scenari, senza inviare SMS né modificare S3 o CRM. Non sostituisce una
+copre 24 scenari, senza inviare email o SMS né modificare S3 o CRM. Non sostituisce una
 prova operativa con un utente di collaudo e i servizi AWS effettivi.
+
+### Migrazione legacy, step 2: riconoscimento dell’email in Registrati
+
+Nel form **Registrati** l’email è obbligatoria: finché è assente o non valida,
+«Invia codice» rimane disabilitato. Gli avvisi sono disponibili in IT/EN/BN.
+Il login ordinario non richiede l’email e resta invariato.
+
+Prima del controllo del numero e di qualsiasi richiesta Cognito, il browser
+chiama `POST /api/legacy/lookup-email` con il solo body `{ email }`.
+Il server rilegge ogni volta il CSV privato, senza cache, e confronta `user_email`
+in minuscolo eliminando gli spazi.
+
+| Risposta | Cosa vede l’utente |
+| --- | --- |
+| `{ status: "none" }` | Registrazione Cognito normale. Vale anche se l’email compare solo in righe senza link, come i duplicati esclusi dalla preparazione. |
+| `{ status: "legacy_email_sent" }` | Email inviata all’indirizzo normalizzato della riga CSV con il suo link personale originale. Nessun token o dato CSV nella risposta; nessuna chiamata Cognito. Un popup invita ad aprire l’email e «OK» riporta alla login. |
+| `{ status: "migrated" }` | Avviso di accedere con il numero già usato; nessuna richiesta Cognito. |
+| Errore di lettura o di invio SES, HTTP 503 | Errore generico nel form; Cognito non viene avviato. |
+
+Il popup, in IT/EN/BN, dice: «Questa email risulta già registrata in Step2Connect.
+Ti abbiamo inviato un'email con un link personale: aprilo per proseguire.»
+Il browser non riceve il token, non viene portato automaticamente a Bentornato
+e non passa più token o telefono nello stato del router. Il link originale
+`/bentornato?t=…` arriva esclusivamente via email e apre il percorso dello step 1,
+senza banner aggiuntivi: dati CSV, privacy obbligatoria, SMS, consenso,
+`standard_legacy` e chiusura del CSV restano invariati.
+
+L’email contiene nella stessa comunicazione testo italiano, inglese e bengalese,
+saluto con il nome e avviso di non condividere il link. Viene inviata tramite
+`server/lib/sendEmail.js` con AWS SES, **regione esplicita `eu-west-2`** e
+mittente esclusivamente da **`LEGACY_FROM_EMAIL`**, da configurare con l’indirizzo
+`@step2connect.it` scelto. Nessun mittente `b4service.it` è ammesso per le email
+legacy. Il dominio `step2connect.it` non risulta ancora verificato in SES secondo
+quanto indicato dal responsabile del progetto: prima degli invii reali va verificato
+in `eu-west-2`. Se la variabile manca, è vuota o indica un dominio diverso,
+l’endpoint risponde 503 generico, anche durante il periodo di attesa:
+non ci sono mittenti di ripiego e Cognito non parte.
+Il trasporto email accetta un mittente opzionale esplicito; il reset password
+admin non lo passa e continua a usare **`SES_FROM_EMAIL`** come prima.
+Non è necessario cambiare il dominio dei link: si usa esattamente quello già nel CSV.
+
+L’endpoint è pubblico, limitato per IP e restituisce `Cache-Control: no-store`.
+In aggiunta invia **al massimo un’email per riga ogni dieci minuti**; richieste
+entro il periodo ricevono comunque `legacy_email_sent`. Richieste simultanee
+per la stessa riga condividono un unico invio. Un errore SES non consuma il periodo
+di attesa e viene riportato come 503, senza dati personali nei log.
+Questo limite è in memoria nel processo: si azzera al riavvio e non è condiviso
+tra istanze, come consentito dal perimetro richiesto.
+Il controllo non scrive nel CSV e non consegna al richiedente link o dati personali.
 
 ## Profili e ruoli DynamoDB
 
@@ -798,6 +849,7 @@ minimo quando l’API non è disponibile.
 | `GET` | `/api/users/me` | JWT Cognito | Legge nome e ruolo applicativo |
 | `GET` | `/api/registration-options` | Pubblica | Aziende e cantieri da CSV S3 |
 | `GET` | `/api/legacy/link?t=<codice>` | Pubblica, rate limited | Dati minimi di un link legacy attivo |
+| `POST` | `/api/legacy/lookup-email` | Pubblica, rate limited, no-store | `none`, `migrated` oppure `legacy_email_sent` dopo invio SES al destinatario CSV; nessun token nella risposta |
 | `POST` | `/api/legacy/complete` | JWT Cognito, rate limited | Dopo sync e consenso, imposta `standard_legacy` e chiude il CSV; body `{ token }` |
 
 La sincronizzazione estesa del profilo usa il backend configurato in

@@ -9,7 +9,7 @@ const sessions = [];
   const { DEFAULT_SECTIONS: sections } = await import('../src/lib/sectionAccess.js');
   const create = async (options = {}) => {
     const b = await chromiumSession(); sessions.push(b);
-    b.flow = { events: [], complete: [], syncPayloads: [], consent: 0, confirmed: false, synced: false, cognito: 0, consentSaved: false };
+    b.flow = { events: [], complete: [], syncPayloads: [], consent: 0, confirmed: false, synced: false, cognito: 0, consentSaved: false, lookups: 0, accountChecks: 0 };
     b.events['Fetch.requestPaused'] = async ({ requestId, request }) => {
       const url = new URL(request.url);
       let data = {}, code = 200;
@@ -53,6 +53,7 @@ const sessions = [];
           b.flow.confirmed = true; b.flow.events.push('confirmed'); data = auth();
         }
       } else if (url.pathname === '/api/legacy/link') {
+        b.flow.events.push('legacy-link');
         assert.equal(url.searchParams.get('t'), TOKEN);
         if (options.invalid) { code = 404; data = { error: 'Link unavailable' }; }
         else data = { firstName: options.noNames ? '' : 'Fixture', lastName: options.noNames ? '' : "D'Errico",
@@ -61,7 +62,14 @@ const sessions = [];
       } else if (url.pathname === '/api/registration-options') {
         data = { companies: ['Company'], sites: ['Site'] };
       } else if (url.pathname === '/api/users/account-status') {
+        b.flow.accountChecks++; b.flow.events.push('account-status');
         data = options.exists ? { exists: true, flow: options.dedicated || 'cognito' } : { exists: false };
+      } else if (url.pathname === '/api/legacy/lookup-email') {
+        b.flow.lookups++; b.flow.events.push('email-lookup');
+        assert.equal(JSON.parse(request.postData).email, 'fixture@example.test');
+        if (['error', 'ses-error'].includes(options.fromRegistration)) { code = 503; data = { error: 'Fixture delivery/read failure' }; }
+        else data = options.fromRegistration === 'legacy'
+          ? { status: 'legacy_email_sent' } : { status: options.fromRegistration };
       } else if (url.pathname.endsWith('/users/sync')) {
         assert.equal(b.flow.confirmed, true);
         b.flow.events.push('sync-start'); b.flow.syncPayloads.push(JSON.parse(request.postData));
@@ -106,7 +114,9 @@ const sessions = [];
       { urlPattern: '*/api/*' }, { urlPattern: '*cognito-idp.*' }, { urlPattern: '*/users/sync' },
     ] });
     await b.cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-    await b.cdp('Page.addScriptToEvaluateOnNewDocument', { source: `localStorage.setItem('s2c_lang',${JSON.stringify(options.lang || 'it')});` });
+    await b.cdp('Page.addScriptToEvaluateOnNewDocument', { source:
+      `localStorage.setItem('s2c_lang',${JSON.stringify(options.lang || 'it')});${options.stateOnly
+        ? `history.replaceState({usr:{legacyToken:${JSON.stringify(TOKEN)},phone:${JSON.stringify(PHONE)}}},'');` : ''}` });
     b.click = selector => b.cdp('Runtime.evaluate', {
       expression: `document.querySelector(${JSON.stringify(selector)}).click()`, userGesture: true });
     b.set = (selector, value) => b.evaluate(`(() => {
@@ -114,7 +124,8 @@ const sessions = [];
       Object.getOwnPropertyDescriptor(el.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype,'value').set.call(el,${JSON.stringify(value)});
       el.dispatchEvent(new Event(el.tagName==='SELECT'?'change':'input',{bubbles:true}));
     })()`);
-    await b.cdp('Page.navigate', { url: `${origin}/bentornato?t=${TOKEN}` });
+    await b.cdp('Page.navigate', { url: options.fromRegistration ? origin + '/'
+      : options.stateOnly ? origin + '/bentornato' : `${origin}/bentornato?t=${TOKEN}` });
     return b;
   };
   try {
@@ -125,8 +136,82 @@ const sessions = [];
       { exists: true, dedicated: 'personal-code', lang: 'en' },
       { exists: true, dedicated: 'personal-code', lang: 'bn' },
       { invalid: true }, { unknownOptions: true }, { noNames: true },
+      { fromRegistration: 'legacy' }, { fromRegistration: 'legacy', lang: 'en' },
+      { fromRegistration: 'legacy', lang: 'bn', exists: true },
+      { fromRegistration: 'migrated' }, { fromRegistration: 'migrated', lang: 'en' },
+      { fromRegistration: 'migrated', lang: 'bn' },
+      { fromRegistration: 'none' }, { fromRegistration: 'error' },
+      { fromRegistration: 'ses-error' }, { stateOnly: true, invalid: true },
     ]) {
       const b = await create(options);
+      const { default: messages } = await import(`../src/i18n/${options.lang || 'it'}.js`);
+      if (options.fromRegistration) {
+        await b.wait(`!!document.querySelector('.login-tabs')`);
+        await b.click('.login-tab:nth-child(2)');
+        await b.wait(`document.querySelectorAll('select option').length===4`);
+        await b.evaluate(`(() => {
+          const inputs=document.querySelectorAll('.input-group input');
+          ['Input name','Input surname',${JSON.stringify(PHONE)}].forEach((value,i)=>{
+            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(inputs[i],value);
+            inputs[i].dispatchEvent(new Event('input',{bubbles:true}));
+          });
+          document.querySelector('input[type=email]').dispatchEvent(new FocusEvent('focusout',{bubbles:true}));
+        })()`);
+        await b.set('select', 'Company');
+        await b.evaluate(`(() => {
+          const site=document.querySelectorAll('select')[1];
+          Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(site,'Site');
+          site.dispatchEvent(new Event('change',{bubbles:true}));
+        })()`);
+        await b.click('#privacy-accepted');
+        assert.equal(await b.evaluate(`document.querySelector('input[type=email]').required`), true);
+        assert.equal(await b.evaluate(`document.querySelector('.btn-primary').disabled`), true);
+        await b.wait(`!!document.querySelector('#registration-email-error')`);
+        assert.equal(await b.evaluate(`document.querySelector('#registration-email-error').textContent`), messages.emailRequired);
+        await b.set('input[type=email]', 'invalid');
+        assert.equal(await b.evaluate(`document.querySelector('.btn-primary').disabled`), true);
+        assert.equal(await b.evaluate(`document.querySelector('#registration-email-error').textContent`), messages.invalidEmail);
+        assert.equal(b.flow.cognito, 0); assert.equal(b.flow.lookups, 0);
+        await b.set('input[type=email]', 'fixture@example.test');
+        await b.wait(`!document.querySelector('.btn-primary').disabled`);
+        b.flow.clickedAt = Date.now();
+        await b.click('.btn-primary');
+        {
+          if (options.fromRegistration === 'legacy') {
+            await b.wait(`!!document.querySelector('dialog[open]')`);
+            assert.equal(await b.evaluate(`document.querySelector('#legacy-email-sent-message').textContent`), messages.legacyEmailSentNotice);
+            assert.equal(b.flow.cognito, 0); assert.equal(b.flow.accountChecks, 0);
+            assert.equal(b.flow.events.includes('legacy-link'), false);
+            assert.equal(await b.evaluate(`location.pathname`), '/');
+            assert.equal(await b.evaluate(`location.search`), '');
+            assert.ok(await b.evaluate(`document.querySelector('dialog').getBoundingClientRect().width <= innerWidth`));
+            assert.equal(await b.evaluate(`document.querySelector('dialog').contains(document.activeElement)`), true);
+            assert.equal(await b.evaluate(`JSON.stringify({...localStorage,...sessionStorage,...history.state}).includes(${JSON.stringify(TOKEN)})`), false);
+            await b.click('dialog button');
+            await b.wait(`!document.querySelector('dialog') && document.querySelector('.login-tab:first-child').classList.contains('active')`);
+            assert.equal(await b.evaluate(`!!document.querySelector('#privacy-accepted')`), false);
+          } else if (options.fromRegistration === 'migrated') {
+            await b.wait(`!!document.querySelector('.account-notice')`);
+            assert.equal(await b.evaluate(`document.querySelector('.account-notice').textContent`), messages.legacyAlreadyMigratedNotice);
+            assert.equal(b.flow.cognito, 0); assert.equal(b.flow.accountChecks, 0);
+          } else if (['error', 'ses-error'].includes(options.fromRegistration)) {
+            await b.wait(`!!document.querySelector('.error-text')`);
+            assert.equal(await b.evaluate(`document.querySelector('.error-text').textContent`), messages.accountCheckError);
+            assert.equal(b.flow.cognito, 0); assert.equal(b.flow.accountChecks, 0);
+          } else {
+            await b.wait(`!!document.querySelector('.otp-input')`);
+            assert.equal(b.flow.events.includes('signup'), true);
+            assert.ok(b.flow.events.indexOf('email-lookup') < b.flow.events.indexOf('account-status'));
+            assert.ok(b.flow.events.indexOf('account-status') < b.flow.events.indexOf('signup'));
+          }
+          assert.equal(b.flow.lookups, 1);
+          assert.equal(await b.evaluate('location.pathname'), '/');
+          assert.deepEqual(b.failures, []);
+          console.log(`PASS legacy browser: ${JSON.stringify(options)}`);
+          await b.close(); sessions.splice(sessions.indexOf(b), 1);
+          continue;
+        }
+      }
       if (options.invalid) {
         await b.wait(`location.pathname==='/' && !!document.querySelector('.account-notice')`);
         assert.equal(await b.evaluate(`document.querySelector('.account-notice').textContent`),
@@ -135,9 +220,10 @@ const sessions = [];
       } else {
         await b.wait(`document.querySelectorAll('select option').length===4`);
         assert.equal(await b.evaluate(`document.querySelectorAll('input[readonly]').length`), 3);
+        assert.equal(await b.evaluate(`!!document.querySelector('.legacy-login-heading .account-notice')`), false);
         assert.equal(await b.evaluate(`!!document.querySelector('#privacy-accepted') || !!document.querySelector('.login-tabs')`), false);
         assert.equal(await b.evaluate(`location.search`), '');
-        assert.equal(await b.evaluate(`window._lptStop`), true);
+        if (!options.fromRegistration) assert.equal(await b.evaluate(`window._lptStop`), true);
         assert.ok(await b.evaluate(`document.documentElement.scrollWidth <= innerWidth`));
         assert.equal(await b.evaluate(`document.querySelector('select').value`), options.unknownOptions ? '' : 'Company');
         assert.equal(await b.evaluate(`document.querySelectorAll('select')[1].value`), options.unknownOptions ? '' : 'Site');
@@ -203,6 +289,6 @@ const sessions = [];
       console.log(`PASS legacy browser: ${JSON.stringify(options)}`);
       await b.close(); sessions.splice(sessions.indexOf(b), 1);
     }
-    console.log('PASS: 14 isolated legacy browser scenarios; no real SMS or persistent writes.');
+    console.log('PASS: 24 isolated legacy browser scenarios; no real email, SMS or persistent writes.');
   } finally { await Promise.all(sessions.map(b => b.close())); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

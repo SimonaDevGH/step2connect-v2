@@ -7,12 +7,14 @@ import { useSiteImages } from '../context/SiteImagesContext';
 import {
   checkPreviewAdmin,
   getLegacyLink,
+  lookupLegacyEmail,
   getPhoneAccountStatus,
   getRegistrationOptions,
   verifyPreviewAdmin,
 } from '../lib/userApi.js';
 import { beginPhoneLogin } from '../lib/loginFlow.js';
 import { validatePhoneNumber } from '../lib/phoneValidation.js';
+import { isValidEmail } from '../lib/emailValidation.js';
 
 const LANGS = [
   { code: 'it', label: 'IT', flag: '🇮🇹' },
@@ -28,6 +30,7 @@ export default function LoginPage({ legacyRoute = false }) {
   const location = useLocation();
   const legacyReadStarted = useRef(false);
   const legacyLookupStarted = useRef('');
+  const emailSentDialog = useRef(null);
 
   const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [step, setStep] = useState('form');  // 'form' | 'otp'
@@ -44,6 +47,7 @@ export default function LoginPage({ legacyRoute = false }) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  const [emailTouched, setEmailTouched] = useState(false);
   const [company, setCompany] = useState('');
   const [site, setSite] = useState('');
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
@@ -56,21 +60,25 @@ export default function LoginPage({ legacyRoute = false }) {
   const [legacyProfile, setLegacyProfile] = useState(null);
   const [legacyState, setLegacyState] = useState('idle');
   const [legacyAccessNotice, setLegacyAccessNotice] = useState(false);
+  const [legacyEmailSent, setLegacyEmailSent] = useState(false);
 
   // Stato interno per passare dati tra step
   const [otpMeta, setOtpMeta] = useState({ phoneE164: '', isRegister: false, userData: {} });
 
   useEffect(() => {
+    if (!legacyRoute) {
+      legacyReadStarted.current = false;
+      legacyLookupStarted.current = '';
+    }
     if (legacyRoute && !legacyReadStarted.current) {
       legacyReadStarted.current = true;
       const token = new URLSearchParams(window.location.search).get('t') || '';
       setLegacyToken(token);
       setLegacyState(token ? 'loading' : 'invalid');
-      window.history.replaceState(
-        window.history.state,
-        '',
-        `${window.location.pathname}${window.location.hash}`,
-      );
+      setPrivacyAccepted(false);
+      setLegacyAccessNotice(false);
+      // Email links are the only entry point. Keep their token in component memory.
+      navigate(`${location.pathname}${location.hash}`, { replace: true, state: {} });
       return;
     }
 
@@ -79,6 +87,10 @@ export default function LoginPage({ legacyRoute = false }) {
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [legacyRoute, location.pathname, location.state, navigate]);
+
+  useEffect(() => {
+    if (legacyEmailSent && !emailSentDialog.current?.open) emailSentDialog.current?.showModal();
+  }, [legacyEmailSent]);
 
   useEffect(() => {
     if (legacyRoute && legacyState === 'invalid') {
@@ -148,10 +160,12 @@ export default function LoginPage({ legacyRoute = false }) {
     setNoticeKey('');
     setOtp('');
     setPrivacyAccepted(false);
+    setEmailTouched(false);
   };
 
   const isRegisterValid = firstName.trim() && lastName.trim() && phone.trim()
-    && company && site && privacyAccepted && !registrationOptionsFailed && !registrationOptionsLoading;
+    && isValidEmail(email) && company && site && privacyAccepted
+    && !registrationOptionsFailed && !registrationOptionsLoading;
   const isLoginValid = phone.trim();
   const isLegacyValid = phone.trim()
     && company && site && registrationOptionsLoaded && !registrationOptionsFailed
@@ -233,7 +247,7 @@ export default function LoginPage({ legacyRoute = false }) {
 
     const userData = mode === 'register'
       ? {
-        firstName, lastName, email, company, site,
+        firstName, lastName, email: email.trim(), company, site,
         privacy_policy_consent: true,
         privacyAcceptedAt: new Date().toISOString(),
       }
@@ -241,6 +255,19 @@ export default function LoginPage({ legacyRoute = false }) {
 
     let flow;
     try {
+      if (mode === 'register') {
+        const lookup = await lookupLegacyEmail(email.trim());
+        if (lookup.status === 'legacy_email_sent') {
+          setLoading(false);
+          setLegacyEmailSent(true);
+          return;
+        }
+        if (lookup.status === 'migrated') {
+          setLoading(false);
+          setNoticeKey('legacyAlreadyMigratedNotice');
+          return;
+        }
+      }
       flow = await beginPhoneLogin({
         mode,
         phone,
@@ -550,17 +577,27 @@ export default function LoginPage({ legacyRoute = false }) {
                   />
                 </div>
 
-                {/* Email (opzionale) */}
+                {/* Email obbligatoria per il controllo del registro legacy */}
                 <div className="input-group">
                   <Mail size={18} className="input-icon" />
                   <input
                     className="text-input"
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => { setEmail(e.target.value); setNoticeKey(''); }}
+                    onBlur={() => setEmailTouched(true)}
                     placeholder={t('emailPlaceholder')}
+                    required
+                    aria-label={t('legacyEmailLabel')}
+                    aria-invalid={emailTouched && !isValidEmail(email)}
+                    aria-describedby={emailTouched && !isValidEmail(email) ? 'registration-email-error' : undefined}
                   />
                 </div>
+                {emailTouched && !isValidEmail(email) && (
+                  <p className="error-text" id="registration-email-error" role="alert">
+                    {t(email.trim() ? 'invalidEmail' : 'emailRequired')}
+                  </p>
+                )}
 
                 {/* Azienda */}
                 <div className="input-group">
@@ -719,6 +756,19 @@ export default function LoginPage({ legacyRoute = false }) {
           <a href="/privacy" target="_blank" rel="noopener noreferrer">{t('privacyPolicyLink')}</a>
         </p>
       </div>
+      {legacyEmailSent && (
+        <dialog ref={emailSentDialog} className="legacy-email-dialog"
+          aria-describedby="legacy-email-sent-message"
+          aria-label={t('legacyEmailSentTitle')}
+          onCancel={() => { setLegacyEmailSent(false); resetForm('login'); navigate('/', { replace: true }); }}>
+          <p id="legacy-email-sent-message">{t('legacyEmailSentNotice')}</p>
+          <button className="btn-primary" autoFocus onClick={() => {
+            setLegacyEmailSent(false);
+            resetForm('login');
+            navigate('/', { replace: true });
+          }}>{t('legacyEmailSentOk')}</button>
+        </dialog>
+      )}
     </div>
   );
 }

@@ -43,6 +43,30 @@ function validToken(token) {
   return typeof token === 'string' && /^[A-Za-z0-9_-]{43}$/.test(token);
 }
 
+function normalizeEmail(email) {
+  return typeof email === 'string' ? email.replace(/\s/g, '').toLowerCase() : '';
+}
+
+// A fresh read on every lookup, just like link validation. No registry cache.
+async function lookupEmail(email, read = getTextWithETag) {
+  const normalized = normalizeEmail(email);
+  if (!normalized) return { status: 'none' };
+  const { text } = await read(LEGACY_KEY);
+  const { header, rows } = parseLegacyCsv(text);
+  let migrated = false;
+  for (const row of rows) {
+    const record = recordFromRow(header, row);
+    if (normalizeEmail(record.user_email) !== normalized) continue;
+    let token;
+    try { token = new URL(record.link_univoco).searchParams.get('t'); } catch { continue; }
+    if (!validToken(token)) continue; // Rows without a usable personal link cannot redirect.
+    // Server-only record: the route must never serialize this result directly.
+    if (isUsable(record)) return { status: 'legacy', record };
+    if (record.link_univoco_status === 'used' || record.migration_status === 'migrated') migrated = true;
+  }
+  return { status: migrated ? 'migrated' : 'none' };
+}
+
 async function findByToken(token, read = getTextWithETag) {
   if (!validToken(token)) return null;
   let file;
@@ -95,5 +119,5 @@ function publicProfile(record) {
 
 module.exports = {
   LEGACY_KEY, ORIGINAL_FIELDS, EXTRA_FIELDS, FIELDS, serializeCsv, parseLegacyCsv,
-  isUsable, validToken, findByToken, markMigrated, publicProfile,
+  isUsable, validToken, normalizeEmail, lookupEmail, findByToken, markMigrated, publicProfile,
 };

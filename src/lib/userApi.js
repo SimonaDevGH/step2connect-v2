@@ -82,6 +82,23 @@ export async function getLegacyLink(token) {
   return res.json();
 }
 
+export async function lookupLegacyEmail(email) {
+  const res = await fetch('/api/legacy/lookup-email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+    cache: 'no-store',
+    referrerPolicy: 'no-referrer',
+  });
+  if (!res.ok) throw new Error('Legacy email lookup failed');
+  const data = await res.json();
+  if (!['none', 'legacy_email_sent', 'migrated'].includes(data?.status)
+    || Object.keys(data).some(key => key !== 'status')) {
+    throw new Error('Invalid legacy email lookup response');
+  }
+  return data;
+}
+
 export function completeLegacyMigration(idToken, token) {
   return sameOriginApiFetch('/api/legacy/complete', idToken, {
     method: 'POST', body: JSON.stringify({ token }),

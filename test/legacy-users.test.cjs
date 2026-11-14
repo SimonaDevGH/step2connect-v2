@@ -77,6 +77,235 @@ test('findByToken performs fresh reads, handles missing/used/migrated identicall
   assert.equal(await legacy.findByToken(TOKEN, async () => { throw { name: 'NoSuchKey' }; }), null);
 });
 
+test('email lookup normalizes case/whitespace, rereads S3 and skips duplicate rows without links', async () => {
+  const active = row('1', ' Legacy@EXAMPLE.test ');
+  const migrated = row('2', 'migrated@example.test', OTHER);
+  migrated[16] = 'used'; migrated[17] = 'migrated';
+  const duplicate1 = row('3', 'duplicate@example.test');
+  const duplicate2 = row('4', ' DUPLICATE@example.test ');
+  duplicate1.splice(15, 3, '', '', ''); duplicate2.splice(15, 3, '', '', '');
+  let reads = 0;
+  const read = async key => {
+    assert.equal(key, legacy.LEGACY_KEY); reads++;
+    return { text: csv([active, migrated, duplicate1, duplicate2]), etag: '"fixture"' };
+  };
+  assert.deepEqual(await legacy.lookupEmail(' L E G A C Y @example.TEST ', read), {
+    status: 'legacy', record: Object.fromEntries(legacy.FIELDS.map((field, i) => [field, active[i]])),
+  });
+  assert.deepEqual(await legacy.lookupEmail('MIGRATED@example.test', read), { status: 'migrated' });
+  assert.deepEqual(await legacy.lookupEmail('absent@example.test', read), { status: 'none' });
+  assert.deepEqual(await legacy.lookupEmail('duplicate@example.test', read), { status: 'none' });
+  active[16] = 'used'; active[17] = 'migrated';
+  assert.deepEqual(await legacy.lookupEmail('legacy@example.test', read), { status: 'migrated' });
+  assert.equal(reads, 5, 'no cache: immediately sees a completed migration');
+  await assert.rejects(legacy.lookupEmail('valid@example.test', async () => { throw { name: 'NoSuchKey' }; }));
+});
+
+test('registration email validation is mandatory and rejects malformed email without changing phone login', async () => {
+  const { isValidEmail } = await import('../src/lib/emailValidation.js');
+  for (const email of ['', ' ', 'a', 'a@', 'a@b', 'a b@example.test', 'a@@example.test', null]) {
+    assert.equal(isValidEmail(email), false);
+  }
+  for (const email of ['fixture@example.test', "D'Errico+test@EXAMPLE.test", ' fixture@example.test ']) {
+    assert.equal(isValidEmail(email), true);
+  }
+  for (const lang of ['it', 'en', 'bn']) {
+    const { default: messages } = await import(`../src/i18n/${lang}.js`);
+    for (const key of ['emailRequired', 'invalidEmail', 'legacyEmailSentNotice', 'legacyEmailSentOk', 'legacyAlreadyMigratedNotice']) {
+      assert.ok(messages[key], `${lang}: ${key}`);
+    }
+  }
+});
+
+test('public email lookup sends without exposing tokens, throttles per row and fails closed on S3/SES errors', async t => {
+  let failRead = false, failSend = false, reads = 0, sends = 0, clock = 0;
+  let legacyFrom = 'legacy@step2connect.it';
+  const { createLegacyEmailSender, COOLDOWN_MS } = require('../server/lib/legacyEmail');
+  const sender = createLegacyEmailSender({ now: () => clock, getFrom: () => legacyFrom, send: async message => {
+    sends++;
+    assert.equal(message.from, 'legacy@step2connect.it');
+    assert.equal(message.to, 'legacy@example.test');
+    assert.ok(message.text.includes(`https://example.test/bentornato?t=${TOKEN}`));
+    if (failSend) throw new Error(`private SES fixture@example.test ${TOKEN}`);
+  } });
+  const active = row('1', 'legacy@example.test');
+  const migrated = row('2', 'migrated@example.test', OTHER);
+  migrated[16] = 'used'; migrated[17] = 'migrated';
+  const duplicate = row('3', 'duplicate@example.test');
+  duplicate.splice(15, 3, '', '', '');
+  const original = Module._load;
+  let router;
+  try {
+    Module._load = function(request, parent, isMain) {
+      if (request === '../lib/legacyEmail') return { sendLegacyAccessEmail: sender };
+      if (request === '../lib/legacyUsers') return { ...legacy,
+        lookupEmail: email => legacy.lookupEmail(email, async () => {
+          reads++;
+          if (failRead) throw new Error(`private email fixture@example.test ${TOKEN}`);
+          return { text: csv([active, migrated, duplicate]), etag: '"fixture"' };
+        }),
+      };
+      return original.call(this, request, parent, isMain);
+    };
+    delete require.cache[require.resolve('../server/routes/users')];
+    router = require('../server/routes/users').legacyRouter;
+  } finally { Module._load = original; }
+  const app = express(); app.use(express.json()); app.use('/api/legacy', router);
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  t.after(async () => {
+    server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
+  });
+  const post = email => fetch(`http://127.0.0.1:${server.address().port}/api/legacy/lookup-email`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }),
+  });
+  const invalid = await post('not-an-email');
+  assert.equal(invalid.status, 400); assert.equal(reads, 0);
+  for (const [email, expected] of [
+    [' LEGACY @Example.TEST ', { status: 'legacy_email_sent' }],
+    ['migrated@example.test', { status: 'migrated' }],
+    ['absent@example.test', { status: 'none' }],
+    ['duplicate@example.test', { status: 'none' }],
+  ]) {
+    const response = await post(email);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    assert.deepEqual(await response.json(), expected);
+  }
+  assert.equal(sends, 1);
+  const repeated = await post('legacy@example.test');
+  assert.deepEqual(await repeated.json(), { status: 'legacy_email_sent' });
+  assert.equal(sends, 1, 'same row cooldown is independent of request email spelling');
+  clock += COOLDOWN_MS;
+  assert.equal((await post('legacy@example.test')).status, 200);
+  assert.equal(sends, 2, 'delivery resumes after ten minutes');
+  failRead = true;
+  const originalError = console.error, logs = [];
+  try {
+    console.error = message => logs.push(message);
+    const failed = await post('legacy@example.test');
+    assert.equal(failed.status, 503);
+    assert.deepEqual(await failed.json(), { error: 'Unable to verify account' });
+    failRead = false; clock += COOLDOWN_MS; failSend = true;
+    const sesFailure = await post('legacy@example.test');
+    assert.equal(sesFailure.status, 503);
+    assert.deepEqual(await sesFailure.json(), { error: 'Unable to verify account' });
+  } finally { console.error = originalError; }
+  assert.deepEqual(logs, ['[legacy] email lookup failed', '[legacy] email lookup failed']);
+  failSend = false;
+  assert.equal((await post('legacy@example.test')).status, 200, 'failed send does not consume cooldown');
+  legacyFrom = undefined;
+  const previousLog = console.error;
+  try {
+    console.error = () => {};
+    const missingSender = await post('legacy@example.test');
+    assert.equal(missingSender.status, 503, 'missing legacy sender fails even during cooldown');
+    assert.deepEqual(await missingSender.json(), { error: 'Unable to verify account' });
+  } finally { console.error = previousLog; }
+  let limited;
+  for (let i = 0; i < 22; i++) {
+    limited = await post('absent@example.test');
+    if (limited.status === 429) break;
+  }
+  assert.equal(limited.status, 429);
+  assert.equal(limited.headers.get('cache-control'), 'no-store');
+});
+
+test('legacy email is trilingual, escapes CSV values and uses the exact personal link', async () => {
+  const { legacyAccessMessage, createLegacyEmailSender, COOLDOWN_MS } = require('../server/lib/legacyEmail');
+  const record = { id: 'row-1', first_name: '<Nome & "Test">', user_email: ' LEGACY @Example.TEST ',
+    link_univoco: `https://example.test/bentornato?t=${TOKEN}` };
+  const message = legacyAccessMessage(record);
+  assert.equal(message.to, 'legacy@example.test');
+  for (const lang of ['it', 'en', 'bn']) assert.ok(message.html.includes(`lang="${lang}"`));
+  assert.ok(message.html.includes('&lt;Nome &amp; &quot;Test&quot;&gt;'));
+  assert.ok(!message.html.includes(record.first_name));
+  assert.equal(message.text.split(record.link_univoco).length - 1, 3);
+  assert.ok(message.text.includes('Il link è personale e non va condiviso.'));
+  assert.ok(message.text.includes('This link is personal. Do not share it.'));
+  let clock = 0, calls = 0, release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const send = createLegacyEmailSender({ now: () => clock, getFrom: () => 'legacy@step2connect.it',
+    send: async () => { calls++; await gate; } });
+  const first = send(record), concurrent = send(record);
+  await Promise.resolve();
+  assert.equal(calls, 1, 'coalesces concurrent requests for same row');
+  release(); await Promise.all([first, concurrent]);
+  clock = COOLDOWN_MS - 1; await send(record); assert.equal(calls, 1);
+  clock = COOLDOWN_MS; await send(record); assert.equal(calls, 2);
+  await send({ ...record, id: 'row-2' }); assert.equal(calls, 3, 'cooldown is keyed by row ID');
+  const failedSender = createLegacyEmailSender({ getFrom: () => 'legacy@step2connect.it',
+    send: async () => { throw new Error(TOKEN); } });
+  await assert.rejects(failedSender(record), error => error.message === 'Legacy email delivery failed');
+});
+
+test('SES transport uses eu-west-2, configured sender and UTF-8 without sending real mail', async () => {
+  const original = Module._load, modulePath = require.resolve('../server/lib/sendEmail');
+  const cached = require.cache[modulePath], previous = process.env.SES_FROM_EMAIL;
+  const commands = [];
+  let sendEmail, clientConfig;
+  try {
+    Module._load = function(request, parent, isMain) {
+      if (request === '@aws-sdk/client-ses') return {
+        SESClient: class { constructor(config) { clientConfig = config; } async send(command) { commands.push(command); return {}; } },
+        SendEmailCommand: class { constructor(input) { this.input = input; } },
+      };
+      return original.call(this, request, parent, isMain);
+    };
+    delete require.cache[modulePath];
+    ({ sendEmail } = require('../server/lib/sendEmail'));
+    Module._load = original;
+    assert.equal(clientConfig.region, 'eu-west-2');
+    delete process.env.SES_FROM_EMAIL;
+    await assert.rejects(sendEmail({ to: 'recipient@example.test', subject: 'test', html: 'test' }), /SES_FROM_EMAIL/);
+    assert.equal(commands.length, 0);
+    process.env.SES_FROM_EMAIL = 'sender@example.test';
+    await sendEmail({ to: 'recipient@example.test', subject: 'test', html: '<p>বাংলা</p>', text: 'বাংলা' });
+    assert.equal(commands[0].input.Source, 'sender@example.test');
+    assert.deepEqual(commands[0].input.Destination, { ToAddresses: ['recipient@example.test'] });
+    assert.equal(commands[0].input.Message.Body.Text.Charset, 'UTF-8');
+    await sendEmail({ to: 'recipient@example.test', subject: 'legacy', html: '<p>Test</p>',
+      from: 'legacy@step2connect.it' });
+    assert.equal(commands[1].input.Source, 'legacy@step2connect.it');
+    await sendEmail({ to: 'recipient@example.test', subject: 'admin reset', html: '<p>Test</p>' });
+    assert.equal(commands[2].input.Source, 'sender@example.test', 'admin reset keeps SES_FROM_EMAIL');
+  } finally {
+    Module._load = original;
+    if (cached) require.cache[modulePath] = cached; else delete require.cache[modulePath];
+    if (previous === undefined) delete process.env.SES_FROM_EMAIL; else process.env.SES_FROM_EMAIL = previous;
+  }
+});
+
+test('legacy sender requires LEGACY_FROM_EMAIL and never falls back to the admin sender', async () => {
+  const { createLegacyEmailSender } = require('../server/lib/legacyEmail');
+  const previousLegacy = process.env.LEGACY_FROM_EMAIL, previousAdmin = process.env.SES_FROM_EMAIL;
+  const messages = [];
+  const record = { id: 'sender-test', first_name: 'Test', user_email: 'recipient@example.test',
+    link_univoco: `https://example.test/bentornato?t=${TOKEN}` };
+  try {
+    process.env.SES_FROM_EMAIL = 'admin@b4service.it';
+    delete process.env.LEGACY_FROM_EMAIL;
+    const send = createLegacyEmailSender({ send: async message => messages.push(message) });
+    await assert.rejects(send(record), /Legacy sender not configured/);
+    assert.equal(messages.length, 0);
+    process.env.LEGACY_FROM_EMAIL = 'other@b4service.it';
+    await assert.rejects(send(record), /Legacy sender not configured/);
+    assert.equal(messages.length, 0);
+    process.env.LEGACY_FROM_EMAIL = 'legacy@step2connect.it';
+    await send(record);
+    assert.equal(messages.length, 1);
+    assert.equal(messages[0].from, 'legacy@step2connect.it');
+    delete process.env.LEGACY_FROM_EMAIL;
+    await assert.rejects(send(record), /Legacy sender not configured/, 'no false success during cooldown');
+    assert.equal(messages.length, 1);
+  } finally {
+    if (previousLegacy === undefined) delete process.env.LEGACY_FROM_EMAIL;
+    else process.env.LEGACY_FROM_EMAIL = previousLegacy;
+    if (previousAdmin === undefined) delete process.env.SES_FROM_EMAIL;
+    else process.env.SES_FROM_EMAIL = previousAdmin;
+  }
+});
+
 test('markMigrated retries ETag conflict, preserves concurrent changes and modifies only the selected row', async () => {
   const first = row('1'), second = row('2', 'two@example.test', OTHER);
   let text = csv([first, second]), version = 1, writes = 0;
