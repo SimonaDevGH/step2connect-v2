@@ -50,3 +50,4 @@ timeoutMs = 120000
 
 [userenv.shared]
 FROM_EMAIL = "liveperson-team@b4service.it"
+LEGACY_FROM_EMAIL = "noreply-appmail@b4service.it"

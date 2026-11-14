@@ -280,24 +280,33 @@ test('legacy sender requires LEGACY_FROM_EMAIL and never falls back to the admin
   const { createLegacyEmailSender } = require('../server/lib/legacyEmail');
   const previousLegacy = process.env.LEGACY_FROM_EMAIL, previousAdmin = process.env.SES_FROM_EMAIL;
   const messages = [];
+  let clock = 0;
   const record = { id: 'sender-test', first_name: 'Test', user_email: 'recipient@example.test',
     link_univoco: `https://example.test/bentornato?t=${TOKEN}` };
   try {
     process.env.SES_FROM_EMAIL = 'admin@b4service.it';
     delete process.env.LEGACY_FROM_EMAIL;
-    const send = createLegacyEmailSender({ send: async message => messages.push(message) });
+    const send = createLegacyEmailSender({ now: () => clock, send: async message => messages.push(message) });
     await assert.rejects(send(record), /Legacy sender not configured/);
     assert.equal(messages.length, 0);
-    process.env.LEGACY_FROM_EMAIL = 'other@b4service.it';
+    process.env.LEGACY_FROM_EMAIL = ' ';
     await assert.rejects(send(record), /Legacy sender not configured/);
     assert.equal(messages.length, 0);
-    process.env.LEGACY_FROM_EMAIL = 'legacy@step2connect.it';
+    process.env.LEGACY_FROM_EMAIL = 'not-an-email';
+    await assert.rejects(send(record), /Legacy sender not configured/);
+    assert.equal(messages.length, 0);
+    process.env.LEGACY_FROM_EMAIL = 'noreply-appmail@b4service.it';
     await send(record);
     assert.equal(messages.length, 1);
-    assert.equal(messages[0].from, 'legacy@step2connect.it');
+    assert.equal(messages[0].from, 'noreply-appmail@b4service.it');
     delete process.env.LEGACY_FROM_EMAIL;
     await assert.rejects(send(record), /Legacy sender not configured/, 'no false success during cooldown');
     assert.equal(messages.length, 1);
+    process.env.LEGACY_FROM_EMAIL = 'noreply@step2connect.it';
+    clock += 10 * 60 * 1000;
+    await send(record);
+    assert.equal(messages.length, 2);
+    assert.equal(messages[1].from, 'noreply@step2connect.it', 'switching the variable alone changes the sender');
   } finally {
     if (previousLegacy === undefined) delete process.env.LEGACY_FROM_EMAIL;
     else process.env.LEGACY_FROM_EMAIL = previousLegacy;

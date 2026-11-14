@@ -254,7 +254,7 @@ gestite tramite Replit Secrets.
 | `DYNAMODB_USERS_TABLE` | `Step2Connect_Users` | Nome tabella profili |
 | `DYNAMODB_PHONE_INDEX` | vuoto | Indice DynamoDB con partition key `phone` |
 | `SES_FROM_EMAIL` | nessuno | Mittente verificato SES per reset password |
-| `LEGACY_FROM_EMAIL` | nessuno | Mittente `@step2connect.it` per i link legacy; nessun ripiego su `SES_FROM_EMAIL` |
+| `LEGACY_FROM_EMAIL` | nessuno | Mittente dei link legacy, configurato separatamente; nessun ripiego su `SES_FROM_EMAIL` |
 
 `VITE_*` viene incorporato nella build client: non usare mai questo prefisso per
 segreti.
@@ -602,11 +602,12 @@ senza banner aggiuntivi: dati CSV, privacy obbligatoria, SMS, consenso,
 L’email contiene nella stessa comunicazione testo italiano, inglese e bengalese,
 saluto con il nome e avviso di non condividere il link. Viene inviata tramite
 `server/lib/sendEmail.js` con AWS SES, **regione esplicita `eu-west-2`** e
-mittente esclusivamente da **`LEGACY_FROM_EMAIL`**, da configurare con l’indirizzo
-`@step2connect.it` scelto. Nessun mittente `b4service.it` è ammesso per le email
-legacy. Il dominio `step2connect.it` non risulta ancora verificato in SES secondo
-quanto indicato dal responsabile del progetto: prima degli invii reali va verificato
-in `eu-west-2`. Se la variabile manca, è vuota o indica un dominio diverso,
+mittente esclusivamente da **`LEGACY_FROM_EMAIL`**. Per il collaudo il valore
+condiviso tra sviluppo e produzione è `noreply-appmail@b4service.it`, indicato
+come già verificato in SES. Dopo la verifica del dominio `step2connect.it` in
+`eu-west-2`, sarà sufficiente cambiare la variabile in `noreply@step2connect.it`:
+nessuna modifica al codice è necessaria e non esiste un vincolo sul dominio.
+Se la variabile manca, è vuota o non contiene un indirizzo valido,
 l’endpoint risponde 503 generico, anche durante il periodo di attesa:
 non ci sono mittenti di ripiego e Cognito non parte.
 Il trasporto email accetta un mittente opzionale esplicito; il reset password

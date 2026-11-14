@@ -15,9 +15,9 @@ Il controllo email dello step 2 non restituisce mai token o dati CSV al browser.
 
 **How to apply:** email unica con IT/EN/BN, link personale non condivisibile, massimo un invio per riga ogni dieci minuti (memoria ammessa), oltre al limite IP. Fallimento SES: 503, nessuna chiamata Cognito. Nei test non inviare email reali.
 
-Il mittente legacy deve provenire esclusivamente da `LEGACY_FROM_EMAIL`, con dominio `step2connect.it`; mai usare mittenti `b4service.it` né ripiegare sul mittente admin. Il reset password admin resta su `SES_FROM_EMAIL`. Se il mittente legacy manca, restituire 503 generico senza Cognito.
+Il mittente legacy deve provenire esclusivamente da `LEGACY_FROM_EMAIL`, senza vincoli sul dominio e senza ripiegare sul mittente admin. Il reset password admin resta su `SES_FROM_EMAIL`. Se il mittente legacy manca, restituire 503 generico senza Cognito. Il passaggio dal mittente di collaudo a quello definitivo deve richiedere solo un cambio della variabile.
 
-**Why:** l'utente ha corretto esplicitamente la configurazione e ha precisato che il dominio legacy non è ancora verificato in SES.
+**Why:** l'utente ha rimosso esplicitamente il divieto del dominio di collaudo, per consentire i test prima della verifica SES del dominio definitivo.
 
 Il percorso legacy sceglie esplicitamente registrazione o login SMS e conserva i dati per il sync. Gli accessi dedicati preview/admin o whitelist rilevati dal routing vanno rimandati alla login standard, senza forzare SMS. Non convertire profili DynamoDB privi di account Cognito.
 

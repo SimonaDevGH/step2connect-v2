@@ -38,7 +38,7 @@ function createLegacyEmailSender({
   return async function sendLegacyAccessEmail(record) {
     // No fallback to the admin sender, including during the cooldown period.
     const from = String(getFrom() || '').trim();
-    if (!/^[^\s@<>]+@step2connect\.it$/i.test(from)) throw new Error('Legacy sender not configured');
+    if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(from)) throw new Error('Legacy sender not configured');
     const time = now();
     for (const [id, delivery] of deliveries) {
       if (!delivery.pending && time - delivery.sentAt >= COOLDOWN_MS) deliveries.delete(id);
