@@ -30,6 +30,7 @@ function loadUsersRouter(profile, {
   const originalLoad = Module._load;
   const routes = { get: [], post: [] };
   const router = {
+    use() {},
     get(path, ...handlers) {
       routes.get.push({ path, handlers, handler: handlers.at(-1) });
     },

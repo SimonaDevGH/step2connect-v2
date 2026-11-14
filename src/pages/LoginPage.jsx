@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Phone, Hash, User, Mail, Building2, HardHat } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useSiteImages } from '../context/SiteImagesContext';
 import {
   checkPreviewAdmin,
+  getLegacyLink,
   getPhoneAccountStatus,
   getRegistrationOptions,
   verifyPreviewAdmin,
@@ -19,11 +20,14 @@ const LANGS = [
   { code: 'bn', label: 'বাং', flag: '🇧🇩' },
 ];
 
-export default function LoginPage() {
+export default function LoginPage({ legacyRoute = false }) {
   const { t, lang, changeLang } = useLanguage();
   const { login, requestOTP, loginPreviewSession } = useAuth();
   const siteImages = useSiteImages();
   const navigate = useNavigate();
+  const location = useLocation();
+  const legacyReadStarted = useRef(false);
+  const legacyLookupStarted = useRef('');
 
   const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [step, setStep] = useState('form');  // 'form' | 'otp'
@@ -45,24 +49,84 @@ export default function LoginPage() {
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [registrationOptions, setRegistrationOptions] = useState({ companies: [], sites: [] });
   const [registrationOptionsLoading, setRegistrationOptionsLoading] = useState(false);
+  const [registrationOptionsLoaded, setRegistrationOptionsLoaded] = useState(false);
   const [registrationOptionsFailed, setRegistrationOptionsFailed] = useState(false);
   const [registrationOptionsReload, setRegistrationOptionsReload] = useState(0);
+  const [legacyToken, setLegacyToken] = useState('');
+  const [legacyProfile, setLegacyProfile] = useState(null);
+  const [legacyState, setLegacyState] = useState('idle');
+  const [legacyAccessNotice, setLegacyAccessNotice] = useState(false);
 
   // Stato interno per passare dati tra step
   const [otpMeta, setOtpMeta] = useState({ phoneE164: '', isRegister: false, userData: {} });
 
   useEffect(() => {
-    if (mode !== 'register') return undefined;
+    if (legacyRoute && !legacyReadStarted.current) {
+      legacyReadStarted.current = true;
+      const token = new URLSearchParams(window.location.search).get('t') || '';
+      setLegacyToken(token);
+      setLegacyState(token ? 'loading' : 'invalid');
+      window.history.replaceState(
+        window.history.state,
+        '',
+        `${window.location.pathname}${window.location.hash}`,
+      );
+      return;
+    }
+
+    if (!legacyRoute && location.state?.legacyNotice) {
+      setNoticeKey('legacyInvalidLinkNotice');
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [legacyRoute, location.pathname, location.state, navigate]);
+
+  useEffect(() => {
+    if (legacyRoute && legacyState === 'invalid') {
+      navigate('/', { replace: true, state: { legacyNotice: true } });
+    }
+  }, [legacyRoute, legacyState, navigate]);
+
+  useEffect(() => {
+    if (!legacyRoute || !legacyToken || legacyLookupStarted.current === legacyToken) return;
+    legacyLookupStarted.current = legacyToken;
+    getLegacyLink(legacyToken)
+      .then((profile) => {
+        if (!profile) {
+          setLegacyState('invalid');
+          return;
+        }
+        setLegacyProfile(profile);
+        setFirstName(profile.firstName || '');
+        setLastName(profile.lastName || '');
+        setEmail(profile.email || '');
+        setCompany(profile.company || '');
+        setSite(profile.site || '');
+        setLegacyState('ready');
+      })
+      .catch(() => setLegacyState('error'));
+  }, [legacyRoute, legacyToken]);
+
+  useEffect(() => {
+    if (mode !== 'register' && !(legacyRoute && legacyState === 'ready')) return undefined;
 
     let active = true;
     setRegistrationOptionsLoading(true);
+    setRegistrationOptionsLoaded(false);
     setRegistrationOptionsFailed(false);
     getRegistrationOptions()
       .then((options) => {
         if (!active) return;
         setRegistrationOptions(options);
-        setCompany((current) => options.companies.includes(current) ? current : '');
-        setSite((current) => options.sites.includes(current) ? current : '');
+        const matchOption = (choices, value) => choices.find(
+          (choice) => choice.toLocaleLowerCase() === String(value || '').toLocaleLowerCase(),
+        ) || '';
+        setCompany((current) => legacyRoute && legacyProfile
+          ? matchOption(options.companies, legacyProfile.company)
+          : (options.companies.includes(current) ? current : ''));
+        setSite((current) => legacyRoute && legacyProfile
+          ? matchOption(options.sites, legacyProfile.site)
+          : (options.sites.includes(current) ? current : ''));
+        setRegistrationOptionsLoaded(true);
       })
       .catch(() => {
         if (active) setRegistrationOptionsFailed(true);
@@ -74,7 +138,7 @@ export default function LoginPage() {
     return () => {
       active = false;
     };
-  }, [mode, registrationOptionsReload]);
+  }, [mode, legacyRoute, legacyState, legacyProfile, registrationOptionsReload]);
 
   const resetForm = (newMode) => {
     setMode(newMode);
@@ -89,8 +153,70 @@ export default function LoginPage() {
   const isRegisterValid = firstName.trim() && lastName.trim() && phone.trim()
     && company && site && privacyAccepted && !registrationOptionsFailed && !registrationOptionsLoading;
   const isLoginValid = phone.trim();
+  const isLegacyValid = phone.trim()
+    && company && site && registrationOptionsLoaded && !registrationOptionsFailed
+    && !registrationOptionsLoading;
+
+  const legacyAuthError = (result) => t({
+    CodeMismatchException: 'legacyOtpInvalid',
+    ExpiredCodeException: 'legacyOtpExpired',
+    UserNotFoundException: 'legacyAccountMissing',
+  }[result?.errorCode] || 'legacyAuthError');
 
   const handleSendOTP = async () => {
+    if (legacyRoute) {
+      if (!isLegacyValid) return;
+      if (!validatePhoneNumber(phone).valid) {
+        setPhoneError(t('invalidPhoneNumber'));
+        setError('');
+        return;
+      }
+      setLoading(true);
+      setError('');
+      setPhoneError('');
+      try {
+        const account = await getPhoneAccountStatus(phone);
+        if (!account) {
+          setError(t('accountCheckError'));
+          setLoading(false);
+          return;
+        }
+        if (account.flow === 'preview' || account.flow === 'personal-code') {
+          setLegacyAccessNotice(true);
+          setLoading(false);
+          return;
+        }
+
+        const flowOverride = account.exists ? 'login' : 'register';
+        const userData = {
+          firstName,
+          lastName,
+          email,
+          company,
+          site,
+          legacyToken,
+        };
+        const result = await requestOTP(phone, userData, flowOverride);
+        if (!result?.success) {
+          setError(legacyAuthError(result));
+          setLoading(false);
+          return;
+        }
+        setOtpMeta({
+          phoneE164: result.phoneE164 || phone,
+          isRegister: flowOverride === 'register',
+          userData,
+          flowOverride,
+          isLegacy: true,
+        });
+        setStep('otp');
+      } catch {
+        setError(t('accountCheckError'));
+      }
+      setLoading(false);
+      return;
+    }
+
     if (mode === 'register' && !isRegisterValid) return;
     if (!validatePhoneNumber(phone).valid) {
       setPhoneError(t('invalidPhoneNumber'));
@@ -206,7 +332,7 @@ export default function LoginPage() {
     if (result.success) {
       navigate('/home');
     } else {
-      setError(result.error || 'Errore');
+      setError(otpMeta.isLegacy ? legacyAuthError(result) : (result.error || 'Errore'));
     }
   };
 
@@ -214,18 +340,24 @@ export default function LoginPage() {
     if (otpMeta.isPersonalCode) return;
     setLoading(true);
     setError('');
-    const result = await requestOTP(phone, {});
+    const result = await requestOTP(
+      otpMeta.phoneE164 || phone,
+      otpMeta.isLegacy ? otpMeta.userData : {},
+      otpMeta.isLegacy ? otpMeta.flowOverride : undefined,
+    );
     setLoading(false);
     if (!result.success) {
-      setError(result.error || 'Errore invio OTP');
+      setError(otpMeta.isLegacy ? legacyAuthError(result) : (result.error || 'Errore invio OTP'));
       return;
     }
     setOtp('');
     setOtpMeta({
       phoneE164: result.phoneE164,
-      isRegister: result.isRegister,
-      userData: {},
+      isRegister: otpMeta.isLegacy ? otpMeta.isRegister : result.isRegister,
+      userData: otpMeta.isLegacy ? otpMeta.userData : {},
       isPreviewAdmin: false,
+      isLegacy: otpMeta.isLegacy,
+      flowOverride: otpMeta.flowOverride,
     });
   };
 
@@ -244,7 +376,7 @@ export default function LoginPage() {
               className={`lang-pill ${lang === l.code ? 'active' : ''}`}
               onClick={() => changeLang(l.code)}
             >
-              {l.flag} {l.label}
+              {legacyRoute ? l.label : `${l.flag} ${l.label}`}
             </button>
           ))}
         </div>
@@ -252,8 +384,18 @@ export default function LoginPage() {
 
       {/* Card */}
       <div className="login-card">
+        {legacyRoute && (
+          <div className="legacy-login-heading">
+            <h1 style={{ color: 'var(--navy)', fontSize: '1.25rem', lineHeight: 1.25, margin: '0 0 8px', textAlign: 'center' }}>
+              {t('legacyWelcomeTitle')}
+            </h1>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.45, margin: '0 0 20px', textAlign: 'center' }}>
+              {t('legacyWelcomeIntro')}
+            </p>
+          </div>
+        )}
         {/* Mode tabs */}
-        <div className="login-tabs">
+        {!legacyRoute && <div className="login-tabs">
           <button
             className={`login-tab ${mode === 'login' ? 'active' : ''}`}
             onClick={() => resetForm('login')}
@@ -266,12 +408,90 @@ export default function LoginPage() {
           >
             {t('registerTitle')}
           </button>
-        </div>
+        </div>}
 
-        {step === 'form' ? (
+        {legacyRoute && ['idle', 'loading'].includes(legacyState) ? (
+          <p className="account-notice" role="status">{t('legacyLoading')}</p>
+        ) : legacyRoute && (legacyState === 'invalid' || legacyState === 'error') ? (
+          <>
+            <p className="account-notice" role="alert">
+              {t(legacyState === 'invalid' ? 'legacyInvalidLinkNotice' : 'legacyLoadError')}
+            </p>
+            <button className="btn-primary" onClick={() => navigate('/', { replace: true })}>
+              {t('legacyStandardLogin')}
+            </button>
+          </>
+        ) : legacyRoute && legacyAccessNotice ? (
+          <>
+            <p className="account-notice" role="status">{t('legacyDedicatedAccessNotice')}</p>
+            <button className="btn-primary" onClick={() => navigate('/', { replace: true })}>
+              {t('legacyStandardLogin')}
+            </button>
+          </>
+        ) : step === 'form' ? (
           <>
             {noticeKey && <p className="account-notice">{t(noticeKey)}</p>}
-            {mode === 'register' ? (
+            {legacyRoute ? (
+              <>
+                <div className="input-group">
+                  <User size={18} className="input-icon" />
+                  <input className="text-input" type="text" value={firstName} readOnly
+                    aria-label={t('legacyFirstNameLabel')} />
+                </div>
+                <div className="input-group">
+                  <User size={18} className="input-icon" />
+                  <input className="text-input" type="text" value={lastName} readOnly
+                    aria-label={t('legacyLastNameLabel')} />
+                </div>
+                <div className="input-group">
+                  <Mail size={18} className="input-icon" />
+                  <input className="text-input" type="email" value={email} readOnly
+                    aria-label={t('legacyEmailLabel')} />
+                </div>
+                <div className="input-group">
+                  <Building2 size={18} className="input-icon" />
+                  <select className="text-input select-input" value={company}
+                    onChange={(e) => setCompany(e.target.value)} required
+                    aria-label={t('legacyCompanyLabel')} disabled={registrationOptionsLoading}>
+                    <option value="">{t('selectCompany')}</option>
+                    {registrationOptions.companies.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="input-group">
+                  <HardHat size={18} className="input-icon" />
+                  <select className="text-input select-input" value={site}
+                    onChange={(e) => setSite(e.target.value)} required
+                    aria-label={t('legacySiteLabel')} disabled={registrationOptionsLoading}>
+                    <option value="">{t('selectSite')}</option>
+                    {registrationOptions.sites.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+                <p className="login-phone-hint">{t('loginPhoneHint')}</p>
+                <div className="input-group">
+                  <Phone size={18} className="input-icon" />
+                  <input className="text-input" type="tel" value={phone}
+                    onChange={(e) => { setPhone(e.target.value); setPhoneError(''); }}
+                    placeholder={t('phonePlaceholder')} inputMode="tel" required
+                    aria-label={t('phoneLabel')} />
+                </div>
+                <button className="btn-primary" onClick={handleSendOTP}
+                  disabled={loading || !isLegacyValid}>
+                  {loading ? '...' : t('legacyContinue')}
+                </button>
+                {registrationOptionsFailed && (
+                  <>
+                    <p className="error-text">{t('registrationOptionsError')}</p>
+                    <button className="btn-ghost"
+                      onClick={() => setRegistrationOptionsReload((value) => value + 1)}
+                      disabled={registrationOptionsLoading}>{t('retry')}</button>
+                  </>
+                )}
+              </>
+            ) : mode === 'register' ? (
               <>
                 {/* Nome */}
                 <div className="input-group">

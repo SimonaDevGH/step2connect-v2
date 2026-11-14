@@ -239,6 +239,7 @@ gestite tramite Replit Secrets.
 | `VITE_COGNITO_USER_POOL_ID` | User Pool Cognito frontend e verifica backend |
 | `VITE_COGNITO_USER_POOL_CLIENT_ID` | App Client Cognito |
 | `VITE_API_BASE_URL` | Backend esterno usato per la sincronizzazione completa del profilo; `PageResolver` conserva anche un override legacy quando è valorizzato |
+| `PUBLIC_APP_URL` | Origine dei link personali legacy, richiesta dallo script di preparazione; mai esposta come variabile `VITE_*` |
 
 ### Variabili opzionali
 
@@ -424,6 +425,132 @@ la sincronizzazione `/users/sync` e `updateMyProfile` (`PATCH /users/me`
 del backend esterno) richiedono invece Cognito: non possono usare una sessione
 con codice personale. Il login e il ripristino con codice usano il profilo
 restituito dalla verifica server e non chiamano queste API.
+
+### Migrazione utenti WordPress: accesso «Bentornato» (step 1)
+
+Gli utenti della vecchia webapp, registrati con email e senza telefono, possono
+accedere a `/bentornato?t=<codice>` dal proprio link personale. Questa pagina
+riusa la grafica mobile della login e supporta **italiano, inglese e bengalese**.
+Il registro è un **CSV privato**, non un contenuto CMS:
+
+```text
+user_legacy_s2c_v1/user_legacy_s2c_v1.csv
+```
+
+Deve stare nel bucket `S3_BUCKET_NAME`, **mai sotto `content/`, su CloudFront,
+in un repository o in un percorso pubblico**. Il browser riceve soltanto i
+cinque dati necessari al form, mai il CSV, gli ID o gli stati amministrativi.
+
+#### Preparare il registro
+
+Caricare manualmente l’export WordPress in `private/` (cartella ignorata da
+Git). L’export deve contenere queste colonne, in quest’ordine:
+
+```text
+id,user_login,user_email,user_registered,display_name,first_name,last_name,full_name,nickname,aziendadiappartenenza,cantierediappartenenza,use_gdpr_agreement,account_status,ruolo,form_id
+```
+
+Lo script conserva i valori originali e aggiunge in fondo `link_univoco`,
+`link_univoco_status`, `migration_status`. Supporta virgole tra virgolette,
+apostrofi, doppi apici e celle su più righe. Prima verificare il solo report:
+
+```bash
+node scripts/prepare-legacy-users.mjs private/export-wordpress.csv --dry-run
+```
+
+Poi, per creare il registro privato:
+
+```bash
+node scripts/prepare-legacy-users.mjs private/export-wordpress.csv
+```
+
+- Richiede `PUBLIC_APP_URL`: `https://step-2-connect-v-2.replit.app` per i test,
+  **`https://step2connect.it` per la campagna definitiva**, senza `/` finale.
+  Il dominio viene usato durante la preparazione: cambiarlo dopo non modifica
+  i link già scritti nel registro.
+- Per ogni email valida e univoca genera un codice casuale di 32 byte,
+  codificato base64url, e il link completo. Stato iniziale: `active` /
+  `not_migrated`. Non filtra gli account in base a `account_status` o `ruolo`.
+- Il confronto email ignora maiuscole/minuscole e spazi. **Tutte le righe che
+  condividono un’email duplicata** restano senza link, non solo la seconda.
+  Anche email assenti o non valide restano nel file con le tre nuove celle vuote.
+  ID mancanti/duplicati, colonne errate o righe malformate bloccano il caricamento.
+- Il report mostra totali, ID delle righe scartate e conteggi per stato account
+  e ruolo; non stampa email, nomi, codici o link personali.
+- `--dry-run` non legge né scrive S3. Il caricamento normale usa una condizione
+  atomica `IfNoneMatch: *`: se il registro esiste, non lo sovrascrive.
+- **`--force` sostituisce intenzionalmente il registro e rigenera i codici:
+  invalida quindi i link già inviati.** Usarlo solo prima della campagna o per
+  una sostituzione deliberata. Nessun caricamento è eseguito automaticamente.
+
+`infra/legacy-users-iam.yaml` documenta la policy
+`step2connect-legacy-users-rw` per `step2connect-cms-backend`: soltanto
+`s3:GetObject` e `s3:PutObject` sulla singola chiave indicata, con parametro
+`ContentBucketName`. Lo stack **`step2connect-legacy-users-iam` è già stato
+distribuito da CloudShell con bucket `step2connect-content`**: il file è
+documentazione, non richiede un nuovo deploy automatico.
+
+#### Come accede l’utente
+
+1. Il server rilegge il CSV a ogni richiesta, senza cache, confrontando il
+   codice con `crypto.timingSafeEqual`. Sono utilizzabili solo righe `active`
+   **e** `not_migrated`. Link inesistente, usato o migrato ricevono lo stesso
+   errore generico 404. Le richieste sono limitate per IP.
+2. La pagina mostra nome, cognome ed email non modificabili. Se entrambi i nomi
+   mancano, usa la prima parola di `display_name` come nome e il resto come
+   cognome. Azienda e cantiere sono modificabili nelle tendine della
+   registrazione: confronto senza distinzione maiuscole/minuscole, valore
+   sconosciuto da scegliere nuovamente. Il telefono è obbligatorio, con le
+   stesse regole italiane e bangladesi della registrazione.
+3. «Prosegui» controlla `/api/users/account-status`. Numero nuovo: registrazione
+   Cognito. Numero già presente con flusso Cognito: login SMS, **non** una nuova
+   registrazione. In entrambi i casi conserva i dati confermati per il profilo.
+   Per preview e codice personale mostra invece un messaggio neutro con
+   pulsante verso la login standard: non forza SMS e non chiude la migrazione.
+4. Dopo la verifica SMS l’utente entra nella webapp. Solo dopo una risposta di
+   successo della sincronizzazione del profilo, anche per numeri già presenti,
+   parte `POST /api/legacy/complete`, con JWT Cognito e body `{ token }`.
+5. Il server rivalida il link e aggiorna soltanto la sua riga a `used` /
+   `migrated`. Usa l’ETag appena letto e `IfMatch`; in caso di conflitto 412
+   rilegge e riprova fino a **5 tentativi totali**, preservando gli aggiornamenti
+   degli altri utenti. Una riga già chiusa non viene riscritta.
+
+Se la sincronizzazione fallisce, l’utente entra comunque ma la chiusura non
+parte e il link resta attivo. Se fallisce la chiamata di chiusura, il browser
+riprova una sola volta e non blocca l’accesso. Se nessun tentativo scrive, il
+link resta attivo e può essere riusato con il numero ormai registrato.
+Se invece il server ha scritto ma la risposta è andata persa, il link è già
+usato e il tentativo successivo viene correttamente rifiutato.
+Un profilo DynamoDB non garantisce un account Cognito: se quest’ultimo manca,
+il login SMS mostra il normale errore, senza conversioni automatiche.
+
+Il codice resta solo nella memoria del flusso: nessun `localStorage` o
+`sessionStorage`. La query viene rimossa dalla barra degli indirizzi; non
+ricaricare la pagina durante la procedura (riaprire il link originale se serve).
+Risposte API non memorizzabili, referrer disabilitato e monitoraggio LivePerson
+non avviato sulla pagina personale impediscono la diffusione del link tramite
+questi canali. I nuovi log tecnici non includono dati personali o codici.
+
+**CRM v2 invariato:** `syncProfile` salva i cinque dati nel flusso attuale di
+`Step2Connect_Users`, senza nuovi campi legacy. Login ordinario, accessi
+dedicati e consenso privacy esistenti non cambiano. In questo step non sono
+inclusi checkbox/consenso legacy, verifica dell’email nella registrazione
+standard, invio campagne, modifica profilo/numero o archiviazione dopo 12 mesi.
+Il registro non è gestibile dal CMS in questo step.
+
+#### Verifica senza dati reali
+
+`npm test` include i test del CSV, la preparazione, i link, il JWT Cognito,
+le scritture condizionali S3, i conflitti e l’ordine sync/chiusura. Con
+l’anteprima avviata si può eseguire anche:
+
+```bash
+node --experimental-websocket scripts/check-legacy-login-browser.cjs
+```
+
+Questo controllo usa il browser reale e risposte simulate per Cognito e API:
+copre 11 scenari, senza inviare SMS né modificare S3 o CRM. Non sostituisce una
+prova operativa con un utente di collaudo e i servizi AWS effettivi.
 
 ## Profili e ruoli DynamoDB
 
@@ -651,6 +778,8 @@ minimo quando l’API non è disponibile.
 | `GET` | `/api/users/preview-admin/session` | JWT preview | Ripristina e rivalida sessione admin o whitelist |
 | `GET` | `/api/users/me` | JWT Cognito | Legge nome e ruolo applicativo |
 | `GET` | `/api/registration-options` | Pubblica | Aziende e cantieri da CSV S3 |
+| `GET` | `/api/legacy/link?t=<codice>` | Pubblica, rate limited | Dati minimi di un link legacy attivo |
+| `POST` | `/api/legacy/complete` | JWT Cognito, rate limited | Chiude una migrazione dopo il sync, body `{ token }` |
 
 La sincronizzazione estesa del profilo usa il backend configurato in
 `VITE_API_BASE_URL`.

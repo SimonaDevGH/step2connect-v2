@@ -73,6 +73,21 @@ export function savePrivacyConsent(idToken, consent) {
   });
 }
 
+export async function getLegacyLink(token) {
+  const res = await fetch(`/api/legacy/link?t=${encodeURIComponent(token)}`, {
+    cache: 'no-store', referrerPolicy: 'no-referrer',
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error('Legacy link lookup failed');
+  return res.json();
+}
+
+export function completeLegacyMigration(idToken, token) {
+  return sameOriginApiFetch('/api/legacy/complete', idToken, {
+    method: 'POST', body: JSON.stringify({ token }),
+  });
+}
+
 /**
  * Legge il profilo corrente dell'utente.
  * @param {string} idToken

@@ -120,6 +120,7 @@ function AppShell() {
     return (
       <Routes>
         <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/bentornato" element={<LoginPage legacyRoute />} />
         <Route path="/*" element={<LoginPage />} />
       </Routes>
     );
@@ -172,6 +173,7 @@ function AppShell() {
 
       <main className="main-content">
         <Routes>
+          <Route path="/bentornato"          element={<Navigate to="/home" replace />} />
           <Route path="/"                    element={<Navigate to="/home" replace />} />
           <Route path="/home"                element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
           <Route path="/service/:service"    element={<ProtectedRoute><ServiceDetailPage /></ProtectedRoute>} />

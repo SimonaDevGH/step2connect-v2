@@ -13,6 +13,7 @@ dist-ssr
 
 # Replit chat/reference uploads (move runtime assets to public/)
 attached_assets/
+private/
 
 # Local env
 .env

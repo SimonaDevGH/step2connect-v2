@@ -1,0 +1,26 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Private legacy migration registry access for Step2Connect
+
+Parameters:
+  BackendIamUserName:
+    Type: String
+    Default: step2connect-cms-backend
+  ContentBucketName:
+    Type: String
+
+Resources:
+  Step2ConnectLegacyUsersPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: step2connect-legacy-users-rw
+      Users:
+        - !Ref BackendIamUserName
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ReadWriteLegacyRegistry
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+            Resource: !Sub arn:${AWS::Partition}:s3:::${ContentBucketName}/user_legacy_s2c_v1/user_legacy_s2c_v1.csv

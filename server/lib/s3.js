@@ -35,6 +35,23 @@ async function getText(key) {
   return streamToString(res.Body);
 }
 
+/** Lettura fresca per aggiornamenti concorrenti, senza cache. */
+async function getTextWithETag(key) {
+  const res = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
+  if (!res.ETag) throw new Error('Missing object version');
+  return { text: await streamToString(res.Body), etag: res.ETag };
+}
+
+/** IfNoneMatch protegge la prima creazione; IfMatch protegge gli aggiornamenti. */
+async function putTextConditional(key, text, { ifMatch, ifNoneMatch } = {}) {
+  if (!ifMatch && !ifNoneMatch) throw new Error('A write condition is required');
+  await s3.send(new PutObjectCommand({
+    Bucket: BUCKET, Key: key, Body: text, ContentType: 'text/csv; charset=utf-8',
+    ...(ifMatch ? { IfMatch: ifMatch } : {}),
+    ...(ifNoneMatch ? { IfNoneMatch: ifNoneMatch } : {}),
+  }));
+}
+
 /** Scrive un oggetto JSON su S3. */
 async function putJson(key, data) {
   await s3.send(new PutObjectCommand({
@@ -97,4 +114,4 @@ function streamToString(stream) {
   });
 }
 
-module.exports = { getJson, getText, putJson, putBuffer, listKeys, copyObject, deleteObject, BUCKET };
+module.exports = { getJson, getText, getTextWithETag, putTextConditional, putJson, putBuffer, listKeys, copyObject, deleteObject, BUCKET };

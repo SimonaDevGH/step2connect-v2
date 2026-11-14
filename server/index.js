@@ -43,6 +43,7 @@ app.use(express.json({ limit: '1mb' }));
 // ── ROUTES ────────────────────────────────────────────────────────────────────
 app.use('/api/content',       contentRoutes);
 app.use('/api/users',         userRoutes);
+app.use('/api/legacy',        userRoutes.legacyRouter);
 app.use('/api/registration-options', registrationOptionsRoutes);
 app.use('/api/admin/auth',    adminAuthRoutes);
 app.use('/api/admin/content', adminRoutes);

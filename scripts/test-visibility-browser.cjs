@@ -179,7 +179,7 @@ async function main() {
     await evaluate(`document.querySelector('button[aria-label="Menu"]').click()`);
     assert.equal(await evaluate(`document.querySelector('.side-menu').textContent.includes('Trova uffici')`), false);
     await visit('/quiz');
-    await wait(`location.pathname === '/quiz' && !!document.querySelector('.page-hero')`);
+    await wait(`location.pathname === '/quiz' && !!document.querySelector('.quiz-hero')`);
     await checkGuideCategories();
     await visit('/guides/documents');
     await wait(`document.body.textContent.includes('Fixture preview')`);
@@ -196,7 +196,7 @@ async function main() {
     socket?.close();
     chrome.kill('SIGTERM');
     await new Promise((resolve) => chrome.once('exit', resolve));
-    await fs.rm(profile, { recursive: true, force: true });
+    await fs.rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 }
 

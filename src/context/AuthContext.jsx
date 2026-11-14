@@ -11,9 +11,10 @@ import {
   fetchUserAttributes,
 } from 'aws-amplify/auth';
 import '../lib/cognito.js'; // initialise Amplify once
-import { getMyProfile, syncProfile, getPreviewSession, savePrivacyConsent } from '../lib/userApi.js';
+import { getMyProfile, syncProfile, getPreviewSession, savePrivacyConsent, completeLegacyMigration } from '../lib/userApi.js';
 import { buildPreviewUser } from '../lib/previewSession.js';
 import { syncProfileAfterLogin } from '../lib/registrationConsent.js';
+import { syncLegacyProfileAfterLogin } from '../lib/legacyLogin.js';
 
 const AuthContext = createContext(null);
 
@@ -119,10 +120,10 @@ export function AuthProvider({ children }) {
    * Chiama signUp + autoSignIn, poi attende confirmSignUp.
    * Restituisce { success, nextStep } oppure { success: false, error }
    */
-  const requestOTP = async (phone, userData = {}) => {
+  const requestOTP = async (phone, userData = {}, flowOverride) => {
     const phoneE164 = normalizePhone(phone);
     try {
-      if (userData.firstName) {
+      if (flowOverride === 'register' || (flowOverride !== 'login' && userData.firstName)) {
         // ── REGISTER FLOW ──
         const { nextStep } = await signUp({
           username: phoneE164,
@@ -154,8 +155,10 @@ export function AuthProvider({ children }) {
         return { success: true, nextStep, isRegister: false, phoneE164 };
       }
     } catch (err) {
-      console.error('[AUTH] requestOTP error:', err);
-      return { success: false, error: err.message ?? 'Errore invio OTP' };
+      if (flowOverride) console.error('[legacy] SMS authentication request failed');
+      else console.error('[AUTH] requestOTP error:', err);
+      return { success: false, error: err.message ?? 'Errore invio OTP',
+        ...(flowOverride ? { errorCode: err.name } : {}) };
     }
   };
 
@@ -204,7 +207,10 @@ export function AuthProvider({ children }) {
 
       // Sincronizza il profilo con il backend (non-blocking)
       if (idToken) {
-        const profileSync = syncProfileAfterLogin({
+        const profileSync = userData.legacyToken ? syncLegacyProfileAfterLogin({
+          idToken, profile: profileHint, token: userData.legacyToken,
+          syncProfile, completeLegacyMigration,
+        }) : syncProfileAfterLogin({
           isRegister, idToken, profile: profileHint, consent: userData,
           syncProfile, savePrivacyConsent,
         });
@@ -213,18 +219,21 @@ export function AuthProvider({ children }) {
           .catch(() => {})
           .finally(() => setProfileReady(true));
       } else {
-        if (isRegister) console.warn('[privacy-consent] authenticated token unavailable; consent not saved');
+        if (userData.legacyToken) console.warn('[legacy] authenticated token unavailable; migration not completed');
+        else if (isRegister) console.warn('[privacy-consent] authenticated token unavailable; consent not saved');
         setProfileReady(true);
       }
 
       return { success: true };
     } catch (err) {
-      console.error('[AUTH] login/verify error:', err);
+      if (userData.legacyToken) console.error('[legacy] SMS authentication verification failed');
+      else console.error('[AUTH] login/verify error:', err);
       let message = err.message ?? 'Codice non valido';
       if (err.name === 'CodeMismatchException') message = 'Codice OTP errato';
       if (err.name === 'ExpiredCodeException') message = 'Codice scaduto, richiedine uno nuovo';
       if (err.name === 'NotAuthorizedException') message = 'Accesso non autorizzato';
-      return { success: false, error: message };
+      return { success: false, error: message,
+        ...(userData.legacyToken ? { errorCode: err.name } : {}) };
     }
   };
 

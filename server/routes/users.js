@@ -16,8 +16,10 @@ const {
   findAdminByPhoneAndOTP,
 } = require('../lib/adminUsers');
 const { findWhitelistByPhone, matchesAccessCode } = require('../lib/whitelistUsers');
+const legacyUsers = require('../lib/legacyUsers');
 
 const router = express.Router();
+const legacyRouter = express.Router();
 const PREVIEW_CHALLENGE_TTL = '5m';
 const PREVIEW_SESSION_TTL = '8h';
 const USERS_SESSION_TTL = '30d';
@@ -150,7 +152,7 @@ router.post('/account-status', limitAccountStatusAttempts, async (req, res) => {
       flow: isPreviewAdminProfile(profile) ? 'preview' : whitelisted ? 'personal-code' : 'cognito',
     });
   } catch (err) {
-    console.error('[users] account status lookup error:', err);
+    console.error('[users] account status lookup failed');
     res.status(503).json({ error: 'Unable to verify account' });
   }
 });
@@ -338,3 +340,33 @@ router.post('/consent', requireAuth, async (req, res) => {
 
 module.exports = router;
 module.exports.resolvePreviewIdentity = resolvePreviewIdentity;
+
+// No query strings, personal data or provider errors are ever logged here.
+legacyRouter.use((_req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  res.set('Referrer-Policy', 'no-referrer');
+  next();
+});
+legacyRouter.get('/link', limitAccountStatusAttempts, async (req, res) => {
+  try {
+    const record = await legacyUsers.findByToken(req.query.t);
+    if (!record) return res.status(404).json({ error: 'Link unavailable' });
+    res.json(legacyUsers.publicProfile(record));
+  } catch {
+    console.error('[legacy] registry lookup failed');
+    res.status(503).json({ error: 'Unable to verify link' });
+  }
+});
+legacyRouter.post('/complete', limitAccountStatusAttempts, requireAuth, async (req, res) => {
+  try {
+    const record = await legacyUsers.findByToken(req.body?.token);
+    if (!record || !await legacyUsers.markMigrated(record.id)) {
+      return res.status(404).json({ error: 'Link unavailable' });
+    }
+    res.json({ ok: true });
+  } catch {
+    console.error('[legacy] migration completion failed');
+    res.status(503).json({ error: 'Unable to complete migration' });
+  }
+});
+module.exports.legacyRouter = legacyRouter;
