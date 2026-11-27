@@ -991,6 +991,10 @@ la sua assenza in staging non indica necessariamente un errore dell’app.
 
 “Ask Me” nella Home contiene lo stesso widget LivePerson. Il pulsante rapido
 scorre a quel blocco; Ask Me non compare nella barra inferiore.
+In attesa di LivePerson appare un segnaposto non cliccabile, con le stesse
+cinque righe trilingui e le dimensioni dell'engagement reale. Si nasconde al
+primo contenuto inserito da LP, senza spostare il testo; se LP è bloccato
+rimane visibile senza timeout. Il div gestito da LivePerson resta invariato.
 
 I pulsanti rapidi e gli Strumenti della Home aprono le pagine interne
 `/analyze-document` e `/translator`. I pulsanti dedicati presenti in queste

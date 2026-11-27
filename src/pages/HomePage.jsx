@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { BookOpen, Bot, Languages, Puzzle, Sparkles } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
@@ -28,6 +28,22 @@ export default function HomePage() {
   const { featuredGuide } = useFeaturedGuide();
   const visibleSection = (key) => profileReady && sectionsReady && canSeeSection(key, user, sections);
   const tools = TOOLS.filter((tool) => visibleSection(tool.section || tool.key));
+  const lpPlaceholderRef = useRef(null);
+
+  useEffect(() => {
+    const container = document.getElementById('LP_DIV_1785257734021');
+    const placeholder = lpPlaceholderRef.current;
+    if (!container || !placeholder) return;
+    const observer = new MutationObserver(() => {
+      if (container.hasChildNodes()) {
+        placeholder.style.visibility = 'hidden';
+        observer.disconnect();
+      }
+    });
+    if (container.hasChildNodes()) placeholder.style.visibility = 'hidden';
+    else observer.observe(container, { childList: true });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (!location.state?.scrollToAskMe) return;
@@ -100,7 +116,16 @@ export default function HomePage() {
           <h3 className="section-title" style={{ margin: 0 }}>{t('botTitle')}</h3>
         </div>
         <p className="assistant-desc">{t('botDesc')}</p>
-        <div id="LP_DIV_1785257734021" className="lp-engagement-container"></div>
+        <div className="lp-engagement-slot">
+          <div className="lp-placeholder" ref={lpPlaceholderRef} aria-hidden="true">
+            <div>Chiedimi qualsiasi cosa — sono qui per aiutarti</div>
+            <div>-</div>
+            <div>Ask me anything — I’m here to help you</div>
+            <div>-</div>
+            <div>আমাকে যেকোনো কিছু জিজ্ঞাসা করুন — আমি আপনাকে সাহায্য করতে এখানে আছি।</div>
+          </div>
+          <div id="LP_DIV_1785257734021" className="lp-engagement-container"></div>
+        </div>
       </section>
 
       {/* Tools list */}
