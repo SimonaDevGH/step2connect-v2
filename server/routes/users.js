@@ -4,6 +4,10 @@ const jwt = require('jsonwebtoken');
 const { requireAuth } = require('../middleware/auth');
 const {
   getUserByPhone,
+  getUserById,
+  getFullUserByPhone,
+  publicUserProfile,
+  syncUserPhone,
   isAdminProfile,
   isPreviewAdminProfile,
   isStandardProfile,
@@ -19,6 +23,7 @@ const {
 const { findWhitelistByPhone, matchesAccessCode } = require('../lib/whitelistUsers');
 const legacyUsers = require('../lib/legacyUsers');
 const { sendLegacyAccessEmail } = require('../lib/legacyEmail');
+const { createProfilePhoneReference, readProfilePhoneReference } = require('../lib/profilePhoneReference');
 
 const router = express.Router();
 const legacyRouter = express.Router();
@@ -318,6 +323,69 @@ router.get('/me', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('[users] profile lookup error:', err);
     res.status(500).json({ error: 'Unable to load user profile' });
+  }
+});
+
+router.get('/me/profile', requireAuth, async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const phone = normalizePhone(req.cognitoUser?.phone_number);
+  if (!phone) return res.status(403).json({ error: 'Phone identity required' });
+  try {
+    const profile = await getFullUserByPhone(phone);
+    if (!profile) return res.status(404).json({ error: 'Profile not found' });
+    return res.json(publicUserProfile(profile));
+  } catch {
+    console.error('[users] full profile lookup failed');
+    return res.status(503).json({ error: 'Profile unavailable' });
+  }
+});
+
+// Capture a server-signed stable CRM key before Cognito changes the phone.
+// This does not modify CRM, expose the key directly, or trust a client-selected identity.
+router.post('/me/phone-change-context', limitAccountStatusAttempts, requireAuth, async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const { sub, phone_number: phone, phone_number_verified: verified } = req.cognitoUser;
+  const newPhone = normalizePhone(req.body?.newPhone);
+  if (!sub || !phone || verified !== true) return res.status(403).json({ error: 'Verified identity required' });
+  if (!/^(?:\+393\d{9}|\+8801\d{9})$/.test(newPhone) || newPhone === phone) {
+    return res.status(400).json({ error: 'Invalid new phone' });
+  }
+  try {
+    const profile = await getFullUserByPhone(phone);
+    if (!profile) return res.status(404).json({ error: 'Profile not found' });
+    if (profile.type === 'fincantieri_users') return res.status(403).json({ error: 'Dedicated access required' });
+    const profileReference = createProfilePhoneReference({ sub, profileId: profile.userId, oldPhone: phone, newPhone });
+    return res.json({ profileReference });
+  } catch {
+    console.error('[users] phone change preparation failed');
+    return res.status(503).json({ error: 'Phone change unavailable' });
+  }
+});
+
+router.post('/me/phone-sync', limitAccountStatusAttempts, requireAuth, async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const { sub, phone_number: newPhone, phone_number_verified: verified } = req.cognitoUser;
+  if (!sub || verified !== true || !/^(?:\+393\d{9}|\+8801\d{9})$/.test(newPhone || '')) {
+    return res.status(403).json({ error: 'Verified phone identity required' });
+  }
+  try {
+    let profile = await getUserById(sub);
+    let oldPhone = profile?.phone;
+    if (!profile) {
+      const reference = readProfilePhoneReference(req.body?.profileReference, sub, newPhone);
+      profile = await getUserById(reference.profileId);
+      oldPhone = reference.oldPhone;
+    }
+    if (!profile) return res.status(404).json({ error: 'Profile not found' });
+    if (profile.type === 'fincantieri_users') return res.status(403).json({ error: 'Dedicated access required' });
+    const phone = await syncUserPhone({ userId: profile.userId, oldPhone, newPhone });
+    return res.json({ phone });
+  } catch (error) {
+    console.error('[users] verified phone sync failed');
+    return res.status(error.status || 503).json({
+      error: 'Unable to synchronize verified phone',
+      ...(error.code === 'PHONE_IN_USE' ? { code: 'PHONE_IN_USE' } : {}),
+    });
   }
 });
 

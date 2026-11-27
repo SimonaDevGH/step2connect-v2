@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, UserCircle, LogOut, X } from 'lucide-react';
+import { Home, UserCircle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useSections } from '../context/SectionsContext';
@@ -9,48 +8,21 @@ import WhatsAppIcon from './WhatsAppIcon';
 
 export default function BottomBar() {
   const { t } = useLanguage();
-  const { user, logout, profileReady } = useAuth();
+  const { user, profileReady } = useAuth();
   const { sections, sectionsReady } = useSections();
   const navigate = useNavigate();
   const location = useLocation();
-  const [userOpen, setUserOpen] = useState(false);
   const showWhatsApp = profileReady && sectionsReady && canSeeSection('whatsapp', user, sections);
-
-  const handleLogout = async () => {
-    setUserOpen(false);
-    await logout();
-  };
+  const onProfile = location.pathname === '/profile' || location.pathname.startsWith('/profile/');
 
   return (
-    <>
-      {/* User panel */}
-      {userOpen && (
-        <div className="bottom-user-panel">
-          <div className="user-panel-header">
-            <div className="user-panel-avatar">
-              <UserCircle size={32} />
-            </div>
-            <div className="user-panel-info">
-              <span className="user-panel-name">{user?.name || user?.phone}</span>
-              {user?.site && <span className="user-panel-site">{user.site}</span>}
-            </div>
-            <button className="user-panel-close" onClick={() => setUserOpen(false)}>
-              <X size={18} />
-            </button>
-          </div>
-          <button className="user-panel-logout" onClick={handleLogout}>
-            <LogOut size={18} />
-            <span>{t('logout') || 'Esci'}</span>
-          </button>
-        </div>
-      )}
-
       <nav className="bottom-bar">
         {/* Left: User */}
         <button
-          className={`bottom-btn ${userOpen ? 'active' : ''}`}
-          onClick={() => setUserOpen((v) => !v)}
+          className={`bottom-btn ${onProfile ? 'active profile-bottom-active' : ''}`}
+          onClick={() => navigate('/profile')}
           aria-label={t('profile')}
+          aria-current={onProfile ? 'page' : undefined}
         >
           <UserCircle size={24} />
           <span>{t('profile')}</span>
@@ -79,6 +51,5 @@ export default function BottomBar() {
         ) : <div className="bottom-btn-placeholder" aria-hidden="true" />}
         <div className="bottom-btn-placeholder" aria-hidden="true" />
       </nav>
-    </>
   );
 }

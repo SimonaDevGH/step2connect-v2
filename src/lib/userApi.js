@@ -35,6 +35,28 @@ async function apiFetch(path, idToken, options = {}) {
   return res.json();
 }
 
+async function profileApiFetch(path, idToken, body) {
+  const response = await fetch(path, {
+    method: body === undefined ? 'GET' : 'POST',
+    cache: 'no-store',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw Object.assign(new Error('Profile request failed'), {
+      messageKey: payload.code === 'PHONE_IN_USE' ? 'profilePhoneInUse'
+        : path.endsWith('/profile') ? 'profileLoadError'
+          : path.endsWith('/phone-sync') ? 'profileSyncError' : 'profilePhoneError',
+    });
+  }
+  return response.json();
+}
+
+export const getProfileDetails = (idToken) => profileApiFetch('/api/users/me/profile', idToken);
+export const createPhoneChangeContext = (idToken, newPhone) => profileApiFetch('/api/users/me/phone-change-context', idToken, { newPhone });
+export const syncChangedPhone = (idToken, profileReference) => profileApiFetch('/api/users/me/phone-sync', idToken, { profileReference });
+
 /**
  * Crea o aggiorna il profilo utente al primo accesso.
  * @param {string} idToken

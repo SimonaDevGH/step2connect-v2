@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import {
   signUp,
   confirmSignUp,
@@ -9,12 +9,17 @@ import {
   getCurrentUser,
   fetchAuthSession,
   fetchUserAttributes,
+  updateUserAttributes,
+  confirmUserAttribute,
+  sendUserAttributeVerificationCode,
 } from 'aws-amplify/auth';
 import '../lib/cognito.js'; // initialise Amplify once
 import { getMyProfile, syncProfile, getPreviewSession, savePrivacyConsent, completeLegacyMigration } from '../lib/userApi.js';
 import { buildPreviewUser } from '../lib/previewSession.js';
 import { syncProfileAfterLogin } from '../lib/registrationConsent.js';
 import { syncLegacyProfileAfterLogin } from '../lib/legacyLogin.js';
+import { getProfileDetails, getPhoneAccountStatus, createPhoneChangeContext, syncChangedPhone } from '../lib/userApi.js';
+import { preparePhoneChange, readPhoneChange, storePhoneChange, profileError, phoneChangeError } from '../lib/profilePhoneChange.js';
 
 const AuthContext = createContext(null);
 
@@ -39,6 +44,7 @@ async function getIdToken() {
 /** Costruisce un oggetto utente dai Cognito user attributes. */
 function buildUserFromAttributes(attrs) {
   return {
+    sub: attrs.sub ?? '',
     phone: attrs.phone_number ?? attrs['custom:phone'] ?? '',
     firstName: attrs.given_name ?? '',
     lastName: attrs.family_name ?? '',
@@ -71,6 +77,26 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
   const [profileReady, setProfileReady] = useState(false);
+  const [authMethod, setAuthMethod] = useState(null);
+  const [phoneChange, setPhoneChange] = useState(null);
+  const [completedPhone, setCompletedPhone] = useState(null);
+  const userRef = useRef(user);
+  const pendingRef = useRef(phoneChange);
+  userRef.current = user;
+  pendingRef.current = phoneChange;
+  const isCognitoSession = authMethod === 'cognito' && profileReady && user?.type !== 'fincantieri_users';
+
+  const persistPhoneChange = useCallback((pending) => {
+    pendingRef.current = pending;
+    storePhoneChange(pending);
+    setPhoneChange(pending);
+  }, []);
+
+  const clearPhoneChange = useCallback(() => {
+    // Once Cognito is verified, retain the reference until CRM sync succeeds.
+    if (pendingRef.current?.phase !== 'sync') persistPhoneChange(null);
+  }, [persistPhoneChange]);
+  const clearCompletedPhone = useCallback(() => setCompletedPhone(null), []);
 
   // Al mount: controlla prima la sessione preview firmata, poi Amplify
   useEffect(() => {
@@ -80,6 +106,7 @@ export function AuthProvider({ children }) {
         if (previewToken) {
           const previewProfile = await getPreviewSession(previewToken);
           if (previewProfile) {
+            setAuthMethod('personal-code');
             setUser(buildPreviewUser(previewProfile));
             setProfileReady(true);
             setAuthReady(true);
@@ -95,6 +122,8 @@ export function AuthProvider({ children }) {
           getIdToken(),
         ]);
         const userObj = buildUserFromAttributes(attrs);
+        setAuthMethod('cognito');
+        persistPhoneChange(readPhoneChange(userObj.sub));
         setUser(userObj);
         // Il primo render non aspetta DynamoDB: il nome si aggiorna appena
         // la lettura del profilo è disponibile.
@@ -199,6 +228,8 @@ export function AuthProvider({ children }) {
         site: userData.site ?? userObj.site,
       };
       setProfileReady(false);
+      setAuthMethod('cognito');
+      persistPhoneChange(readPhoneChange(userObj.sub));
       setUser({
         ...userObj,
         ...profileHint,
@@ -239,6 +270,9 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     localStorage.removeItem('s2c_preview_session');
+    persistPhoneChange(null);
+    setCompletedPhone(null);
+    setAuthMethod(null);
     try {
       await signOut();
     } catch (err) {
@@ -250,13 +284,92 @@ export function AuthProvider({ children }) {
   };
 
   const loginPreviewSession = (previewSession) => {
+    persistPhoneChange(null);
+    setCompletedPhone(null);
+    setAuthMethod('personal-code');
     localStorage.setItem('s2c_preview_session', previewSession.token);
     setUser(buildPreviewUser(previewSession));
     setProfileReady(true);
   };
 
+  const loadProfileDetails = useCallback(async () => {
+    const owner = userRef.current;
+    if (!owner) throw profileError('profileSessionRequired');
+    if (!isCognitoSession) return Object.fromEntries(
+      ['firstName', 'lastName', 'email', 'phone', 'company', 'site'].map((key) => [key, owner[key] || '']),
+    );
+    try {
+      const idToken = await getIdToken();
+      if (!idToken) throw profileError('profileSessionRequired');
+      const profile = await getProfileDetails(idToken);
+      setUser(current => current?.sub === owner.sub && current.phone === owner.phone
+        ? { ...current, ...profile, name: `${profile.firstName} ${profile.lastName}`.trim() || current.phone } : current);
+      return profile;
+    } catch (error) { throw phoneChangeError(error, 'profileLoadError'); }
+  }, [isCognitoSession]);
+
+  const startPhoneChange = async (currentPhone, newPhone) => {
+    if (!isCognitoSession || !user?.sub) throw profileError('profileSessionRequired');
+    if (pendingRef.current?.phase === 'sync') throw profileError('profileSyncError');
+    try {
+      const idToken = await getIdToken();
+      if (!idToken) throw profileError('profileSessionRequired');
+      const pending = await preparePhoneChange({
+        currentPhone, newPhone, profilePhone: user.phone, subject: user.sub,
+        getAccountStatus: getPhoneAccountStatus,
+        createContext: phone => createPhoneChangeContext(idToken, phone),
+        updateAttributes: updateUserAttributes,
+      });
+      setCompletedPhone(null);
+      persistPhoneChange(pending);
+      return pending;
+    } catch (error) { throw phoneChangeError(error); }
+  };
+
+  const confirmPhoneChange = async (code) => {
+    const pending = pendingRef.current;
+    if (!isCognitoSession || !pending || pending.subject !== user?.sub) throw profileError('profileSessionRequired');
+    try {
+      if (pending.phase !== 'sync') {
+        await confirmUserAttribute({ userAttributeKey: 'phone_number', confirmationCode: code });
+        persistPhoneChange({ ...pending, phase: 'sync' });
+      }
+      const session = await fetchAuthSession({ forceRefresh: true });
+      const token = session?.tokens?.idToken?.toString();
+      if (!token) throw profileError('profileSyncError');
+      const result = await syncChangedPhone(token, pending.profileReference);
+      if (result.phone !== pending.newPhone) throw profileError('profileSyncError');
+      setUser(current => current?.sub === pending.subject
+        ? { ...current, phone: result.phone, ...(current.name === current.phone ? { name: result.phone } : {}) } : current);
+      setCompletedPhone(result.phone);
+      persistPhoneChange(null);
+      return result;
+    } catch (error) {
+      throw phoneChangeError(error, pendingRef.current?.phase === 'sync' ? 'profileSyncError' : 'profilePhoneError');
+    }
+  };
+
+  const resendPhoneChange = async () => {
+    const pending = pendingRef.current;
+    if (!isCognitoSession || !pending || pending.subject !== user?.sub || pending.phase === 'sync') {
+      throw profileError('profileSessionRequired');
+    }
+    if (Date.now() < pending.resendAt) throw profileError('profileResendWait');
+    // Reserve the cooldown before the request, including concurrent clicks.
+    const next = { ...pending, resendAt: Date.now() + 60_000 };
+    persistPhoneChange(next);
+    try {
+      await sendUserAttributeVerificationCode({ userAttributeKey: 'phone_number' });
+      return next;
+    } catch (error) { throw phoneChangeError(error); }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, authReady, profileReady, login, requestOTP, logout, loginPreviewSession }}>
+    <AuthContext.Provider value={{
+      user, authReady, profileReady, login, requestOTP, logout, loginPreviewSession,
+      isCognitoSession, phoneChange, completedPhone, loadProfileDetails,
+      startPhoneChange, confirmPhoneChange, resendPhoneChange, clearPhoneChange, clearCompletedPhone,
+    }}>
       {children}
     </AuthContext.Provider>
   );

@@ -27,6 +27,12 @@ import WhatsAppPage from './pages/WhatsAppPage';
 import AnalyzeDocumentPage from './pages/AnalyzeDocumentPage';
 import TranslatorPage from './pages/TranslatorPage';
 import PageResolver       from './pages/PageResolver';
+import ProfilePage, {
+  ProfileDataPage,
+  ChangePhonePage,
+  PhoneVerificationPage,
+  PhoneConfirmationPage,
+} from './pages/profile';
 
 import AdminLoginPage          from './pages/admin/AdminLoginPage';
 import AdminContentPage        from './pages/admin/AdminContentPage';
@@ -51,6 +57,13 @@ function ProtectedRoute({ children }) {
   const { user, authReady } = useAuth();
   if (!authReady) return null;
   return user ? children : <Navigate to="/" replace />;
+}
+
+function CognitoProfileRoute({ children }) {
+  const { user, authReady, profileReady, isCognitoSession } = useAuth();
+  if (!authReady || !profileReady) return null;
+  if (!user) return <Navigate to="/" replace />;
+  return isCognitoSession ? children : <Navigate to="/profile/my-data" replace />;
 }
 
 // ── Protezione route admin JWT ────────────────────────────────────────────────
@@ -177,6 +190,11 @@ function AppShell() {
           <Route path="/bentornato"          element={<Navigate to="/home" replace />} />
           <Route path="/"                    element={<Navigate to="/home" replace />} />
           <Route path="/home"                element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+          <Route path="/profile/my-data" element={<ProtectedRoute><ProfileDataPage /></ProtectedRoute>} />
+          <Route path="/profile/my-data/change-phone" element={<CognitoProfileRoute><ChangePhonePage /></CognitoProfileRoute>} />
+          <Route path="/profile/my-data/change-phone-verification" element={<CognitoProfileRoute><PhoneVerificationPage /></CognitoProfileRoute>} />
+          <Route path="/profile/my-data/change-phone-confirmation" element={<CognitoProfileRoute><PhoneConfirmationPage /></CognitoProfileRoute>} />
           <Route path="/service/:service"    element={<ProtectedRoute><ServiceDetailPage /></ProtectedRoute>} />
           <Route path="/quiz"                element={<SectionRoute section="quiz"><QuizPage /></SectionRoute>} />
           <Route path="/quiz/badges"         element={<SectionRoute section="quiz"><QuizBadgesPage /></SectionRoute>} />

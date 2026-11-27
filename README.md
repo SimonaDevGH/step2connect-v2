@@ -558,8 +558,9 @@ stessi permessi di `standard`: solo sezioni, pagine, notifiche e quiz pubblicati
 nessun accesso CMS. `/me` conserva il tipo; il controllo whitelist lo considera
 standard e un successivo login con codice personale può promuoverlo a
 `fincantieri_users`. Login ordinario, accessi dedicati e prima data di consenso
-esistenti non cambiano. Restano esclusi invio campagne, modifica profilo/numero
-e archiviazione dopo 12 mesi.
+esistenti non cambiano. Lo step di migrazione non comprende invio campagne
+o archiviazione dopo 12 mesi. La consultazione del profilo e il cambio numero
+sono una funzionalità separata, descritta nella sezione Profilo qui sotto.
 Il registro non è gestibile dal CMS in questo step.
 
 #### Verifica senza dati reali
@@ -1184,6 +1185,49 @@ I contenuti News già presenti su S3 non vengono cancellati: l'eventuale pulizia
 - Le sessioni vengono ripristinate con controlli server; il menu CMS è riservato
   agli utenti admin e non è abilitato per il ruolo `fincantieri_users`.
 
+#### Profilo e cambio numero
+
+Il pulsante **Profilo** della barra inferiore apre direttamente `/profile`,
+con iniziali, nome, cognome, cantiere, **I miei dati**, **I miei badge** ed **Esci**.
+La voce badge compare soltanto se l'utente può vedere la sezione quiz. Resta
+disponibile anche l'uscita dal menu laterale.
+
+**I miei dati** (`/profile/my-data`) mostra, in sola lettura, nome, cognome,
+email, telefono, azienda e cantiere. Per le sessioni Cognito i dati arrivano da
+`GET /api/users/me/profile`, autenticato e senza cache; per gli accessi con
+codice personale sono usati i dati della sessione già verificata.
+
+Solo il telefono ha una matita di modifica, e soltanto per le sessioni
+Cognito abilitate. Preview admin e utenti `fincantieri_users` non vedono la
+matita e non possono aprire le tre pagine del cambio numero:
+
+1. `/profile/my-data/change-phone`: l'utente digita il numero attuale e quello
+   nuovo. Si controllano formato +39/+880, corrispondenza del numero attuale,
+   numero diverso e disponibilità.
+2. `/profile/my-data/change-phone-verification`: Cognito invia il codice al
+   nuovo numero; il reinvio ha un'attesa minima di 60 secondi. Codice errato
+   e codice scaduto hanno messaggi distinti.
+3. `/profile/my-data/change-phone-confirmation`: appare soltanto dopo la
+   verifica, il rinnovo del token e il salvataggio del nuovo telefono nel CRM.
+
+Prima dell'SMS, `/api/users/me/phone-change-context` prepara un riferimento
+firmato al profilo, senza scrivere nel CRM. Serve quando la chiave CRM
+`userId` è diversa dal `sub` Cognito. Dopo la conferma, `/api/users/me/phone-sync`
+legge identità e nuovo telefono **dal token Cognito rinnovato**, richiede
+`phone_number_verified = true`, ricontrolla che il numero non sia occupato
+e aggiorna soltanto `phone` con una scrittura condizionale `UpdateCommand`.
+Non sostituisce il profilo e non modifica ruolo, badge o consenso.
+
+Se il salvataggio CRM fallisce dopo la verifica, la pagina permette di
+riprovarlo senza confermare nuovamente il codice SMS. Lo stato temporaneo è
+in `sessionStorage`, legato al soggetto Cognito; il nuovo numero non compare
+nell'URL. Un cambio interrotto **prima della verifica** non tocca il CRM e
+lascia attivo il vecchio numero, grazie alla configurazione Cognito esistente.
+
+Tutte le pagine e gli errori sono tradotti in IT/EN/BN. I dettagli tecnici,
+i test e le due prove SMS manuali sono in
+[`docs/profile-phone-change.md`](docs/profile-phone-change.md).
+
 ### Home e navigazione
 
 - Il logo Step2Connect nella barra superiore è cliccabile: apre sempre `/home`
@@ -1197,7 +1241,7 @@ I contenuti News già presenti su S3 non vengono cancellati: l'eventuale pulizia
 - Gli Strumenti sono Games, Tutte le guide, Traduttore e Analizza documento,
   ciascuno soggetto alla propria visibilità. Le notifiche restano accessibili
   dalla campanella e non compaiono negli Strumenti.
-- La barra inferiore ha quattro posizioni uguali: Profilo (con logout), Home,
+- La barra inferiore ha quattro posizioni uguali: Profilo (apre la sua pagina), Home,
   WhatsApp e uno spazio vuoto. Se WhatsApp non è visibile, anche la terza
   posizione resta vuota.
 - Il menu laterale include WhatsApp al posto della vecchia pagina di analisi.

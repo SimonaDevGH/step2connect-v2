@@ -63,6 +63,74 @@ async function getUserByPhone(phone, documentClient = client) {
   return null;
 }
 
+async function findFullUserByAttribute(attribute, value, documentClient) {
+  if (!value || typeof value !== 'string') return null;
+  let ExclusiveStartKey;
+  do {
+    // The deployed runtime grants Scan, but not GetItem. Filter by the stable
+    // CRM ID after phone changes; a phone is used only for pre-change JWT lookup.
+    const result = await documentClient.send(new ScanCommand({
+      TableName: TABLE_NAME, ConsistentRead: true,
+      FilterExpression: '#identity = :identity',
+      ExpressionAttributeNames: { '#identity': attribute },
+      ExpressionAttributeValues: { ':identity': value },
+      ExclusiveStartKey,
+    }));
+    if (result.Items?.[0]) return result.Items[0];
+    ExclusiveStartKey = result.LastEvaluatedKey;
+  } while (ExclusiveStartKey);
+  return null;
+}
+
+async function getUserById(userId, documentClient = client) {
+  return findFullUserByAttribute('userId', userId, documentClient);
+}
+
+async function getFullUserByPhone(phone, documentClient = client) {
+  return findFullUserByAttribute('phone', phone, documentClient);
+}
+
+function publicUserProfile(profile) {
+  return Object.fromEntries(['firstName', 'lastName', 'email', 'phone', 'company', 'site'].map((key) => [
+    key, typeof profile?.[key] === 'string' ? profile[key]
+      : key === 'site' && typeof profile?.sede === 'string' ? profile.sede : '',
+  ]));
+}
+
+async function syncUserPhone({ userId, oldPhone, newPhone }, documentClient = client) {
+  let ExclusiveStartKey;
+  do {
+    const result = await documentClient.send(new ScanCommand({
+      TableName: TABLE_NAME, ConsistentRead: true,
+      FilterExpression: '#phone = :phone AND #id <> :id',
+      ProjectionExpression: '#id',
+      ExpressionAttributeNames: { '#phone': 'phone', '#id': 'userId' },
+      ExpressionAttributeValues: { ':phone': newPhone, ':id': userId },
+      ExclusiveStartKey,
+    }));
+    if (result.Items?.length) {
+      throw Object.assign(new Error('Phone unavailable'), { status: 409, code: 'PHONE_IN_USE' });
+    }
+    ExclusiveStartKey = result.LastEvaluatedKey;
+  } while (ExclusiveStartKey);
+  try {
+    const result = await documentClient.send(new UpdateCommand({
+      TableName: TABLE_NAME, Key: { userId },
+      UpdateExpression: 'SET #phone = :newPhone',
+      ConditionExpression: 'attribute_exists(#id) AND (#phone = :oldPhone OR #phone = :newPhone) AND (attribute_not_exists(#type) OR #type <> :personalType)',
+      ExpressionAttributeNames: { '#id': 'userId', '#phone': 'phone', '#type': 'type' },
+      ExpressionAttributeValues: { ':oldPhone': oldPhone, ':newPhone': newPhone, ':personalType': 'fincantieri_users' },
+      ReturnValues: 'ALL_NEW',
+    }));
+    return result.Attributes?.phone || newPhone;
+  } catch (error) {
+    if (error.name === 'ConditionalCheckFailedException') {
+      throw Object.assign(new Error('Profile changed'), { status: 409, code: 'PROFILE_CHANGED' });
+    }
+    throw error;
+  }
+}
+
 // The client supplies the click instant, not an identity. Convert it to UTC here.
 function formatPrivacyAcceptedAt(value) {
   if (typeof value !== 'string'
@@ -310,6 +378,10 @@ async function quizResultAggregates(quiz, documentClient = client) {
 
 module.exports = {
   getUserByPhone,
+  getUserById,
+  getFullUserByPhone,
+  publicUserProfile,
+  syncUserPhone,
   formatPrivacyAcceptedAt,
   recordPrivacyConsentByPhone,
   isAdminProfile,
