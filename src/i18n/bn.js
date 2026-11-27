@@ -274,6 +274,10 @@ export default {
   waTranslateStep2: 'অনুবাদের জন্য লেখাটি লিখুন',
   waTranslateStep3: 'চ্যাটে অনুবাদ পান',
   waTranslateBtn: 'WhatsApp-এ অনুবাদ করুন',
+  waLearnMore: 'আরও জানুন',
+  waBeforeStarting: 'শুরু করার আগে',
+  waAnalyzeDetails: 'নথির একটি স্পষ্ট ছবি বা PDF প্রস্তুত রাখুন। WhatsApp খুলে আগে থেকে লেখা “analizza documento” বার্তাটি পাঠান, তারপর চ্যাটের নির্দেশনা অনুসরণ করুন। নথিটি এই পাতায় নয়, WhatsApp-এ পাঠাতে হবে।',
+  waTranslateDetails: 'WhatsApp খুলে আগে থেকে লেখা “traduci” বার্তাটি পাঠান। তারপর অনুবাদের জন্য লেখাটি লিখুন এবং চ্যাটের নির্দেশনা অনুসরণ করুন। লেখাটি এই পাতায় নয়, WhatsApp-এ লিখতে হবে।',
 
   privacyTitle: 'গোপনীয়তা নীতি',
   notificationsTitle: 'বিজ্ঞপ্তি',

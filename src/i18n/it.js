@@ -274,6 +274,10 @@ export default {
   waTranslateStep2: 'Scrivi il testo da tradurre',
   waTranslateStep3: 'Ricevi la traduzione in chat',
   waTranslateBtn: 'Traduci su WhatsApp',
+  waLearnMore: 'Scopri di più',
+  waBeforeStarting: 'Prima di iniziare',
+  waAnalyzeDetails: 'Prepara una foto leggibile o un PDF del documento. Apri WhatsApp e invia il messaggio precompilato “analizza documento”, poi segui le indicazioni nella chat. Il documento si invia in WhatsApp, non in questa pagina.',
+  waTranslateDetails: 'Apri WhatsApp e invia il messaggio precompilato “traduci”. Poi scrivi il testo da tradurre e segui le indicazioni nella chat. Il testo si inserisce in WhatsApp, non in questa pagina.',
 
   // Privacy
   privacyTitle: 'Privacy Policy',

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { BookOpen, Bot, Languages, Puzzle, Sparkles } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -7,7 +7,6 @@ import { useSiteImages } from '../context/SiteImagesContext';
 import { GUIDE_CATEGORIES } from '../data/guides';
 import { useSections } from '../context/SectionsContext';
 import { canSeeSection } from '../lib/sectionAccess';
-import { WA_ANALYZE_URL, WA_TRANSLATE_URL } from '../lib/whatsapp';
 import FeaturedGuideCard from '../components/FeaturedGuideCard';
 import AskMeButton from '../components/AskMeButton';
 import useFeaturedGuide from '../lib/useFeaturedGuide';
@@ -15,8 +14,8 @@ import useFeaturedGuide from '../lib/useFeaturedGuide';
 const TOOLS = [
   { key: 'quiz', section: 'quiz', icon: Puzzle, color: '#E9C46A', path: '/quiz' },
   { key: 'guidesTitle', section: 'guides', icon: BookOpen, color: '#06A77D', path: '/guides' },
-  { key: 'translator', section: 'translator', icon: Languages, color: '#118AB2', href: WA_TRANSLATE_URL },
-  { key: 'analyzeTitle', section: 'analyze-document', icon: Sparkles, color: '#1E8A4C', href: WA_ANALYZE_URL },
+  { key: 'translator', section: 'translator', icon: Languages, color: '#118AB2', path: '/translator' },
+  { key: 'analyzeTitle', section: 'analyze-document', icon: Sparkles, color: '#1E8A4C', path: '/analyze-document' },
 ];
 
 export default function HomePage() {
@@ -53,20 +52,20 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* One-tap access to the two WhatsApp services and Ask Me */}
+      {/* Access to the dedicated service pages and Ask Me */}
       <section className="quick-actions" aria-label={t('quickActions')}>
         {visibleSection('analyze-document') ? (
-          <a className="quick-action" href={WA_ANALYZE_URL} target="_blank" rel="noreferrer">
+          <Link className="quick-action" to="/analyze-document">
             <span className="quick-action-icon quick-action-analyze"><Sparkles size={25} /></span>
             <span className="quick-action-label">{t('analyzeTitle')}</span>
-          </a>
+          </Link>
         ) : <span className="quick-action-placeholder" aria-hidden="true" />}
         <AskMeButton className="quick-action quick-action-ask" icon={Bot} />
         {visibleSection('translator') ? (
-          <a className="quick-action" href={WA_TRANSLATE_URL} target="_blank" rel="noreferrer">
+          <Link className="quick-action" to="/translator">
             <span className="quick-action-icon quick-action-translate"><Languages size={25} /></span>
             <span className="quick-action-label">{t('translate')}</span>
-          </a>
+          </Link>
         ) : <span className="quick-action-placeholder" aria-hidden="true" />}
       </section>
 

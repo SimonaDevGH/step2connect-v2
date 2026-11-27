@@ -14,3 +14,4 @@
 - [Badge permanenti](quiz-badge-policy.md) — le conquiste restano valide quando cresce il catalogo; lo sblocco considera solo quiz pubblicati e visibili.
 - [Consenso in registrazione](registration-consent-policy.md) — distinguere il momento del click da quello della scrittura, ammessa solo dopo verifica SMS e creazione del profilo.
 - [Migrazione legacy WordPress](legacy-migration-policy.md) — registro privato separato; sync riuscito prima della chiusura, accessi dedicati rinviati alla login standard.
+- [Navigazione WhatsApp](whatsapp-navigation-policy.md) — il riepilogo affianca le pagine dedicate dei due servizi; non deve sostituirle.

@@ -915,6 +915,8 @@ immagine della configurazione `site`; per `site` sono ammessi solo upload immagi
 | `/quiz/:id` | Quiz Vero/Falso collegato a una guida |
 | `/notifications` | Notifiche |
 | `/whatsapp` | Assistenza WhatsApp: analizza documento e traduci |
+| `/analyze-document` | Pagina dedicata all'analisi documenti, con istruzioni approfondite |
+| `/translator` | Pagina dedicata alla traduzione, con istruzioni approfondite |
 | `/privacy` | Privacy |
 | `/*` | Risoluzione pagina CMS, poi fallback |
 
@@ -991,8 +993,10 @@ e quello nella barra inferiore scorrono a quel blocco, anche partendo da un'altr
 pagina. Il pulsante nella barra è separato per poterlo sostituire in seguito
 con la bubble chat senza cambiare il resto della navigazione.
 
-La pagina `/whatsapp` e i collegamenti nella Home aprono il servizio WhatsApp
-in una nuova scheda. Numero e parole chiave sono centralizzati in
+I pulsanti rapidi e gli Strumenti della Home aprono le pagine interne
+`/analyze-document` e `/translator`. I pulsanti dedicati presenti in queste
+pagine e nel riepilogo `/whatsapp` aprono WhatsApp in una nuova scheda.
+Numero e parole chiave sono centralizzati in
 `src/lib/whatsapp.js`: “analizza documento” e “traduci” restano **in italiano
 anche con interfaccia inglese o bengalese**, perché sono comandi riconosciuti
 dal bot. Il numero non è mostrato come testo nella pagina.
@@ -1000,10 +1004,14 @@ dal bot. Il numero non è mostrato come testo nella pagina.
 Nel CMS, **WhatsApp** controlla l'accesso alla pagina; **Analizza documento**
 e **Traduttore** controllano separatamente la rispettiva funzione. Questi
 ultimi interruttori agiscono anche su pulsanti rapidi e Strumenti della Home.
-Tutti e tre i collegamenti “Apri pagina” puntano a `/whatsapp`.
-Le precedenti route `/translator` e `/analyze-document` non hanno redirect
-dedicati: passano al resolver generico, che torna alla Home se non trova una
-pagina CMS. L'immagine CMS `analyzeDocumentHero` è conservata per compatibilità.
+I collegamenti “Apri pagina” del CMS portano alla rispettiva pagina dedicata:
+`/whatsapp`, `/analyze-document` o `/translator`.
+La pagina WhatsApp è un riepilogo aggiuntivo, non sostituisce le due pagine dei
+servizi: devono continuare a coesistere. Ogni scheda del riepilogo contiene
+“Scopri di più”, che apre la pagina dedicata con le stesse istruzioni, indicazioni
+aggiuntive e il proprio pulsante WhatsApp. Le singole pagine dipendono dalla
+visibilità del rispettivo servizio, non da quella del riepilogo WhatsApp.
+L'immagine CMS `analyzeDocumentHero` è usata nella pagina di analisi documenti.
 
 ## Test e controlli
 
@@ -1251,6 +1259,9 @@ lo slug CMS `guide-pratiche` e le chiavi S3, inclusi link e visibilità esistent
 ### WhatsApp: traduttore e analisi documenti
 
 - `/whatsapp`: hero verde, collegamento alla Home e due schede informative.
+- `/analyze-document` e `/translator`: pagine dedicate raggiungibili anche da
+  “Scopri di più”, con le stesse informazioni del riepilogo e un approfondimento
+  su come preparare e inviare il documento o il testo nella chat.
 - Ogni scheda contiene tre passi e un pulsante per avviare la conversazione:
   analisi tramite foto/PDF oppure traduzione del testo scritto nella chat.
 - I testi sono in IT/EN/BN. Ogni funzione può essere nascosta separatamente

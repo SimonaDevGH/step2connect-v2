@@ -266,6 +266,10 @@ export default {
   waTranslateStep2: 'Write the text to translate',
   waTranslateStep3: 'Get the translation in the chat',
   waTranslateBtn: 'Translate on WhatsApp',
+  waLearnMore: 'Learn more',
+  waBeforeStarting: 'Before you start',
+  waAnalyzeDetails: 'Prepare a readable photo or PDF of the document. Open WhatsApp and send the pre-filled message “analizza documento”, then follow the instructions in the chat. Send the document in WhatsApp, not on this page.',
+  waTranslateDetails: 'Open WhatsApp and send the pre-filled message “traduci”. Then write the text to translate and follow the instructions in the chat. Enter the text in WhatsApp, not on this page.',
 
   privacyTitle: 'Privacy Policy',
   notificationsTitle: 'Notifications',

@@ -14,6 +14,7 @@ test('Home and WhatsApp copy exists in all three languages without changing guid
     'waStepTap', 'waAnalyzeStep2', 'waAnalyzeStep3', 'waAnalyzeBtn',
     'waTranslateTitle', 'waTranslateDesc', 'waTranslateStep2', 'waTranslateStep3',
     'waTranslateBtn', 'analyzeTitle', 'translate',
+    'waLearnMore', 'waBeforeStarting', 'waAnalyzeDetails', 'waTranslateDetails',
   ];
   for (const [lang, games, guides] of [
     ['it', 'Games', 'Tutte le guide'],

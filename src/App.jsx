@@ -24,6 +24,8 @@ import ContentDetailPage  from './pages/ContentDetailPage';
 import NotificationsPage  from './pages/NotificationsPage';
 import PrivacyPage        from './pages/PrivacyPage';
 import WhatsAppPage from './pages/WhatsAppPage';
+import AnalyzeDocumentPage from './pages/AnalyzeDocumentPage';
+import TranslatorPage from './pages/TranslatorPage';
 import PageResolver       from './pages/PageResolver';
 
 import AdminLoginPage          from './pages/admin/AdminLoginPage';
@@ -185,6 +187,8 @@ function AppShell() {
           <Route path="/notifications"       element={<SectionRoute section="notifications"><NotificationsPage /></SectionRoute>} />
           <Route path="/privacy"             element={<SectionRoute section="privacy"><PrivacyPage /></SectionRoute>} />
           <Route path="/whatsapp"            element={<SectionRoute section="whatsapp"><WhatsAppPage /></SectionRoute>} />
+          <Route path="/analyze-document"    element={<SectionRoute section="analyze-document"><AnalyzeDocumentPage /></SectionRoute>} />
+          <Route path="/translator"          element={<SectionRoute section="translator"><TranslatorPage /></SectionRoute>} />
           {/* Catch-all: prima prova a risolvere come pagina CMS, poi redirect */}
           <Route path="*"                    element={<ProtectedRoute><PageResolver /></ProtectedRoute>} />
         </Routes>

@@ -118,8 +118,23 @@ async function main() {
         bot: !!document.querySelector('.quick-action-ask .lucide-bot'),
         cityFullRow: getComputedStyle(document.querySelector('.home-guide-grid .guide-cat-card:last-child')).gridColumn
       })`), { circles: [68, 76, 68], bot: true, cityFullRow: '1 / -1' });
-      await assertLinks(WA_ANALYZE_URL, 2);
-      await assertLinks(WA_TRANSLATE_URL, 2);
+      await assertLinks(WA_ANALYZE_URL, 0);
+      await assertLinks(WA_TRANSLATE_URL, 0);
+      for (const [path, href, label] of [
+        ['/analyze-document', WA_ANALYZE_URL, dictionary.analyzeTitle],
+        ['/translator', WA_TRANSLATE_URL, dictionary.translator],
+      ]) {
+        await click(`.quick-actions a[href="${path}"]`);
+        await wait(`location.pathname === ${JSON.stringify(path)} && !!document.querySelector('.whatsapp-service-details')`);
+        await assertLinks(href, 1);
+        await click('.bottom-btn-home');
+        await wait(`location.pathname === '/home' && !!document.querySelector('#ask-me')`);
+        await clickText('.tool-item .tool-label', label);
+        await wait(`location.pathname === ${JSON.stringify(path)} && !!document.querySelector('.whatsapp-service-details')`);
+        await assertLinks(href, 1);
+        await click('.bottom-btn-home');
+        await wait(`location.pathname === '/home' && !!document.querySelector('.guide-featured-card')`);
+      }
       const order = await evaluate(`(() => {
         const root = document.querySelector('.home-page');
         const featured = root.querySelector('.guide-featured-card');
@@ -150,6 +165,23 @@ async function main() {
       await assertLinks(WA_ANALYZE_URL, 1);
       await assertLinks(WA_TRANSLATE_URL, 1);
       assert.ok(await evaluate(`document.body.textContent.includes(${JSON.stringify(dictionary.waAnalyzeStep3)}) && document.body.textContent.includes(${JSON.stringify(dictionary.waTranslateStep3)})`));
+      // The summary supplements the individual service pages; it never replaces them.
+      for (const [path, href, serviceTitle] of [
+        ['/analyze-document', WA_ANALYZE_URL, dictionary.waAnalyzeTitle],
+        ['/translator', WA_TRANSLATE_URL, dictionary.waTranslateTitle],
+      ]) {
+        await click(`.whatsapp-service-more[href="${path}"]`);
+        await wait(`location.pathname === ${JSON.stringify(path)} && !!document.querySelector('.whatsapp-service-details')`);
+        assert.equal(await evaluate(`document.querySelector('h1').textContent`), serviceTitle);
+        assert.ok(await evaluate(`document.querySelector('.whatsapp-service-details').textContent.includes(${JSON.stringify(dictionary.waBeforeStarting)})`));
+        assert.equal(await evaluate(`document.querySelectorAll('.whatsapp-steps li').length`), 3);
+        await assertLinks(href, 1);
+        await assertLinks(href === WA_ANALYZE_URL ? WA_TRANSLATE_URL : WA_ANALYZE_URL, 0);
+        await cdp('Emulation.setDeviceMetricsOverride', { width: 320, height: 844, deviceScaleFactor: 1, mobile: true });
+        assert.ok(await evaluate(`document.documentElement.scrollWidth <= 321`), `${lang} ${path} overflow at 320`);
+        await visit('/whatsapp');
+        await wait(`document.querySelectorAll('.whatsapp-service-more').length === 2`);
+      }
       for (const width of [320, 390, 768]) {
         await cdp('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 1, mobile: true });
         assert.ok(await evaluate(`document.documentElement.scrollWidth <= ${width + 1}`), `${lang} WhatsApp overflow at ${width}`);
@@ -173,7 +205,7 @@ async function main() {
       await clickText('.cms-status-pill', 'Interno');
       await wait(`document.body.textContent.includes('Salvato')`);
       assert.equal(sections[key].status, 'internal');
-      assert.equal(await evaluate(`[...document.querySelectorAll('a')].some(node => node.pathname === '/whatsapp')`), true);
+      assert.equal(await evaluate(`[...document.querySelectorAll('a')].some(node => node.pathname === ${JSON.stringify(key === 'translator' ? '/translator' : '/analyze-document')})`), true);
     }
     assert.deepEqual(writes.sort(), ['analyze-document', 'translator']);
     role = 'fincantieri_users';
@@ -196,10 +228,15 @@ async function main() {
     assert.equal(await evaluate(`document.querySelectorAll('.bottom-bar > *').length`), 4);
     await cdp('Page.navigate', { url: origin + '/whatsapp' });
     await wait(`location.pathname === '/home' && !!document.querySelector('.home-page')`);
-    for (const route of ['/translator', '/analyze-document']) {
-      await cdp('Page.navigate', { url: origin + route });
-      await wait(`location.pathname === '/home' && !!document.querySelector('.home-page')`);
-    }
+    await visit('/translator');
+    await wait(`!!document.querySelector('.whatsapp-service-details')`);
+    await assertLinks(WA_TRANSLATE_URL, 1);
+    await cdp('Page.navigate', { url: origin + '/analyze-document' });
+    await wait(`location.pathname === '/home' && !!document.querySelector('.home-page')`);
+    sections['analyze-document'].status = 'published';
+    await visit('/analyze-document');
+    await wait(`!!document.querySelector('.whatsapp-service-details')`);
+    await assertLinks(WA_ANALYZE_URL, 1);
     featuredVisibility = 'internal';
     await showHome();
     await wait(`!document.querySelector('.guide-featured-card')`);
@@ -212,7 +249,7 @@ async function main() {
     await visit('/guides');
     await wait(`document.querySelector('.guide-featured-title')?.textContent.trim() === 'Guida al servizio'`);
     assert.deepEqual(browser.failures, []);
-    console.log('HOME_WHATSAPP_BROWSER_PASS: IT/EN/BN, five categories, shared CMS featured/fallback/visibility, exact WA links, Ask Me from Home and other routes, four bottom slots, active WhatsApp, mobile 320/390/768, CMS feature controls, hidden section and old-route fallback. All API calls simulated; no WhatsApp messages or AWS writes.');
+    console.log('HOME_WHATSAPP_BROWSER_PASS: IT/EN/BN, five categories, shared CMS featured/fallback/visibility, exact WA links, Ask Me navigation, four bottom slots, mobile 320/390/768, CMS controls, summary and individual service pages with extra details and independent visibility. All API calls simulated; no WhatsApp messages or AWS writes.');
   } catch (error) {
     console.error('Fixture browser state:', await evaluate(`({
       pathname: location.pathname,
