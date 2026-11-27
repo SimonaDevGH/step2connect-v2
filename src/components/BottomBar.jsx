@@ -6,7 +6,6 @@ import { useAuth } from '../context/AuthContext';
 import { useSections } from '../context/SectionsContext';
 import { canSeeSection } from '../lib/sectionAccess';
 import WhatsAppIcon from './WhatsAppIcon';
-import AskMeButton from './AskMeButton';
 
 export default function BottomBar() {
   const { t } = useLanguage();
@@ -66,8 +65,6 @@ export default function BottomBar() {
           <Home size={28} />
         </button>
 
-        <AskMeButton className="bottom-btn-ask" />
-
         {showWhatsApp ? (
           <button
             type="button"
@@ -80,6 +77,7 @@ export default function BottomBar() {
             <span>{t('whatsapp')}</span>
           </button>
         ) : <div className="bottom-btn-placeholder" aria-hidden="true" />}
+        <div className="bottom-btn-placeholder" aria-hidden="true" />
       </nav>
     </>
   );

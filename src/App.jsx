@@ -133,7 +133,9 @@ function AppShell() {
           <Menu size={26} />
         </button>
 
-        <img src={siteImages.appLogo} alt="Step2Connect" className="top-bar-logo" />
+        <a href="/home" className="top-bar-home-link" aria-label={`${t('home')} — Step2Connect`}>
+          <img src={siteImages.appLogo} alt="Step2Connect" className="top-bar-logo" />
+        </a>
 
         {sectionsReady && canSeeSection('notifications', user, sections) && (
           <button type="button" className="icon-btn notif-bell"

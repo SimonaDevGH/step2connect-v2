@@ -989,9 +989,7 @@ Il widget dipende dalla configurazione dell’engagement nella console LivePerso
 la sua assenza in staging non indica necessariamente un errore dell’app.
 
 “Ask Me” nella Home contiene lo stesso widget LivePerson. Il pulsante rapido
-e quello nella barra inferiore scorrono a quel blocco, anche partendo da un'altra
-pagina. Il pulsante nella barra è separato per poterlo sostituire in seguito
-con la bubble chat senza cambiare il resto della navigazione.
+scorre a quel blocco; Ask Me non compare nella barra inferiore.
 
 I pulsanti rapidi e gli Strumenti della Home aprono le pagine interne
 `/analyze-document` e `/translator`. I pulsanti dedicati presenti in queste
@@ -1030,7 +1028,7 @@ node --experimental-websocket scripts/check-home-whatsapp-browser.cjs
 ```
 
 Copre IT/EN/BN, guida in evidenza condivisa con fallback e visibilità, cinque
-categorie, scroll Ask Me anche da altre pagine, barra inferiore, link WhatsApp
+categorie, scroll Ask Me nella Home, barra inferiore, link WhatsApp
 esatti, controlli CMS indipendenti e layout da 320 a 768 pixel.
 
 La suite copre:
@@ -1188,6 +1186,9 @@ I contenuti News già presenti su S3 non vengono cancellati: l'eventuale pulizia
 
 ### Home e navigazione
 
+- Il logo Step2Connect nella barra superiore è cliccabile: apre sempre `/home`
+  con un caricamento completo della pagina, anche quando la Home è già aperta.
+
 - `/home`, nell'ordine: hero, pulsanti rapidi Analizza documento / Ask Me /
   Traduci, Tutte le guide, card Ask Me con LivePerson, Strumenti.
 - Il blocco guide include “Vedi tutte”, la guida al servizio con dati CMS e
@@ -1197,7 +1198,8 @@ I contenuti News già presenti su S3 non vengono cancellati: l'eventuale pulizia
   ciascuno soggetto alla propria visibilità. Le notifiche restano accessibili
   dalla campanella e non compaiono negli Strumenti.
 - La barra inferiore ha quattro posizioni uguali: Profilo (con logout), Home,
-  Ask Me e WhatsApp. Se WhatsApp non è visibile, la sua posizione resta vuota.
+  WhatsApp e uno spazio vuoto. Se WhatsApp non è visibile, anche la terza
+  posizione resta vuota.
 - Il menu laterale include WhatsApp al posto della vecchia pagina di analisi.
 - Logo e immagini principali hanno configurazioni localizzate nel CMS, con
   asset locali quando non esiste un URL pubblicato per la lingua.

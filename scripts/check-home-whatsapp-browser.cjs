@@ -100,6 +100,16 @@ async function main() {
       await wait(`!!document.querySelector('#ask-me') && document.querySelectorAll('.home-page .guide-cat-card').length === 5`);
     };
 
+    // A native logo link must load a new document, even on the Home itself.
+    for (const route of ['/translator', '/home']) {
+      await visit(route);
+      await wait(`!!document.querySelector('.top-bar-home-link')`);
+      assert.equal(await evaluate(`document.querySelector('.top-bar-home-link').getAttribute('href')`), '/home');
+      await evaluate(`window.__logoReloadSentinel = true`);
+      await click('.top-bar-home-link');
+      await wait(`location.pathname === '/home' && !window.__logoReloadSentinel && !!document.querySelector('.home-page')`);
+    }
+
     for (const [lang, games, guides] of [
       ['it', 'Games', 'Tutte le guide'], ['en', 'Games', 'All guides'], ['bn', 'গেমস', 'সব গাইড'],
     ]) {
@@ -112,6 +122,9 @@ async function main() {
         [games, guides, dictionary.translator, dictionary.analyzeTitle]);
       assert.equal(await evaluate(`!!document.querySelector('#ask-me #LP_DIV_1785257734021')`), true);
       assert.equal(await evaluate(`document.querySelectorAll('.bottom-bar > *').length`), 4);
+      assert.equal(await evaluate(`!!document.querySelector('.bottom-bar > :nth-child(3).bottom-btn-whatsapp')`), true);
+      assert.equal(await evaluate(`document.querySelector('.bottom-bar > :last-child').getAttribute('aria-hidden')`), 'true');
+      assert.equal(await evaluate(`!!document.querySelector('.bottom-bar .ask-me-button')`), false);
       assert.equal(await evaluate(`!!document.querySelector('.notif-bell')`), true);
       assert.deepEqual(await evaluate(`({
         circles: [...document.querySelectorAll('.quick-action-icon, .quick-action-ask .ask-me-button-icon')].map(node => Math.round(node.getBoundingClientRect().width)),
@@ -147,12 +160,12 @@ async function main() {
       assert.equal(order, true);
       await clickText('.home-page button', 'Ask Me');
       await wait(`window.__askMeScrolls.some(entry => entry.id === 'ask-me' && entry.behavior === 'smooth')`);
-      await clickText('.bottom-bar button', 'Ask Me');
-      await wait(`window.__askMeScrolls.filter(entry => entry.id === 'ask-me').length >= 2`);
       await click('.guide-featured-card');
       await wait(`location.pathname === '/guides/guida-al-servizio' && document.body.textContent.includes('Featured detail fixture')`);
-      await clickText('.bottom-bar button', 'Ask Me');
-      await wait(`location.pathname === '/home' && window.__askMeScrolls.filter(entry => entry.id === 'ask-me').length >= 3`);
+      await click('.bottom-btn-home');
+      await wait(`location.pathname === '/home' && !!document.querySelector('#ask-me')`);
+      await clickText('.home-page button', 'Ask Me');
+      await wait(`window.__askMeScrolls.filter(entry => entry.id === 'ask-me').length >= 2`);
       await wait(`document.querySelector('.guide-featured-title')?.textContent.trim() === ${JSON.stringify(title)}`);
       await visit('/guides');
       await wait(`document.querySelector('.guide-featured-title')?.textContent.trim() === ${JSON.stringify(title)}`);
@@ -226,6 +239,7 @@ async function main() {
     await showHome();
     assert.equal(await evaluate(`[...document.querySelectorAll('.bottom-bar button, .bottom-bar a')].some(node => node.textContent.trim() === 'WhatsApp')`), false);
     assert.equal(await evaluate(`document.querySelectorAll('.bottom-bar > *').length`), 4);
+    assert.equal(await evaluate(`document.querySelectorAll('.bottom-bar > .bottom-btn-placeholder').length`), 2);
     await cdp('Page.navigate', { url: origin + '/whatsapp' });
     await wait(`location.pathname === '/home' && !!document.querySelector('.home-page')`);
     await visit('/translator');
