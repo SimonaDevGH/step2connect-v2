@@ -224,6 +224,21 @@ avviso, senza far fallire la pipeline.
 Dopo una modifica al `.env` rieseguire `deploy.sh`: le variabili `VITE_*`
 sono incorporate nella build e richiedono una nuova immagine.
 
+### Tracciamento (Google Tag Manager / GA4)
+
+`VITE_GTM_ID` e `VITE_COOKIEYES_ID` nel `.env` attivano, al build, il banner
+CookieYes, Google Consent Mode v2 (tutto negato finché l'utente non sceglie) e
+il contenitore GTM; la CSP in `index.html` viene estesa di conseguenza
+(`vite-plugins/tracking.js`). Vuoti = nessuno script di tracciamento.
+
+- GA4 si configura in GTM (tag "Google tag" con ID `G-...`), non nel codice.
+  Le pagine della SPA vanno misurate con la "misurazione avanzata" di GA4
+  (cambi di pagina basati sulla cronologia del browser).
+- Il dominio dell'app (es. `app-dev.step2connect.it`) va aggiunto al sito
+  CookieYes, altrimenti il banner non compare.
+- Sul DEV conviene lasciare `VITE_GTM_ID` vuoto, oppure filtrare il traffico
+  DEV in GA4, per non sporcare i dati di produzione.
+
 ## 5. Ambiente PROD
 
 Stessa procedura del DEV con questi valori:

@@ -1,10 +1,12 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import trackingPlugin from './vite-plugins/tracking.js'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
+    trackingPlugin({ ...loadEnv(mode, process.cwd(), 'VITE_'), ...process.env }),
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
@@ -33,4 +35,4 @@ export default defineConfig({
       },
     },
   }
-})
+}))
