@@ -67,11 +67,13 @@ export default {
   translate: 'Traduci',
   home: 'Home',
   chat: 'Chat',
+  profile: 'Profilo',
+  whatsapp: 'WhatsApp',
 
   // Side menu
   menu: 'Menu',
   services: 'Servizi',
-  quiz: 'Quiz',
+  quiz: 'Games',
   library: 'Libreria',
   notifications: 'Notifiche',
   translator: 'Traduttore',
@@ -81,12 +83,12 @@ export default {
   // Home
   heroTitle: 'Benvenuto in Italia',
   heroSubtitle: 'Con te, passo dopo passo, in ogni momento della tua vita in Italia.',
-  botTitle: 'Assistente virtuale',
+  botTitle: 'Ask Me',
   botDesc: 'Chiedi all\'AI dove puoi trovare l\'informazione che necessiti, scrivi direttamente la tua domanda.',
   botPlaceholder: 'Scrivi un messaggio...',
   botSend: 'Invia',
   botNote: '(Bot LivePerson — da collegare)',
-  servicesTitle: 'Servizi per te',
+  quickActions: 'Accesso rapido ai servizi',
 
   // Services
   health: 'Sanità',
@@ -102,7 +104,9 @@ export default {
   toolsTitle: 'Strumenti',
 
   // Quiz
-  quizTitle: 'Quiz',
+  quizTitle: 'Games',
+  gamesSectionLabel: 'Sezione Games',
+  gamesGo: 'Vai a Games',
   quizDesc: 'Metti alla prova la tua conoscenza',
   start: 'Inizia',
   next: 'Avanti',
@@ -144,7 +148,7 @@ export default {
   quizRetry: 'Riprova',
   quizRedo: 'Rifai',
   quizNotSaved: 'Risultato non salvato: non è disponibile un profilo utente.',
-  quizBack: 'Torna ai quiz',
+  quizBack: 'Torna a Games',
   quizListen: 'Ascolta',
   quizSaving: 'Salvataggio…',
   quizLearningNote: 'Una risposta alla volta: stai imparando.',
@@ -152,7 +156,7 @@ export default {
   quizStars: 'stelle',
   quizNextQuiz: 'Prossimo quiz',
   quizTryIt: 'Mettiti alla prova',
-  quizReturn: 'Torna al quiz',
+  quizReturn: 'Torna a Games',
   quizImport: 'Importa da Excel',
   quizExport: 'Esporta Excel',
   quizPreviewImport: 'Anteprima import',
@@ -165,6 +169,7 @@ export default {
 
   // Guide pratiche
   guidesTitle: 'Tutte le guide',
+  seeAllGuides: 'Vedi tutte',
   guidesDesc: 'Tutto ciò che ti serve sapere per vivere in Italia',
   comingSoon: 'Contenuti in arrivo',
   comingSoonDesc: 'Stiamo preparando le guide per questa sezione',
@@ -254,11 +259,21 @@ export default {
   'guideItem_mediator_title': 'Un mediatore che parla la tua lingua',
   'guideItem_mediator_desc': 'Aiuto per capirsi meglio',
 
-  // Analizza documento
+  // WhatsApp services
   analyzeTitle: 'Analizza documento',
-  analyzeDesc: 'Il servizio permette di caricare un documento, tradurlo e ottenere un riassunto, in italiano, inglese o bengalese.\n\nPer accedere al servizio, clicca sull\'icona di WhatsApp. Si aprirà l\'app di WhatsApp e la conversazione con Step2Connect. Segui le indicazioni e scopri tutti i dettagli del tuo documento.',
-  analyzeWaBtn: 'Apri WhatsApp',
-  analyzeWaText: 'analizza il documento',
+  waPageTitle: 'Step2Connect su WhatsApp',
+  waPageSub: 'Due servizi utili, direttamente nella chat che usi ogni giorno.',
+  waAnalyzeTitle: 'Analizza un documento',
+  waAnalyzeDesc: 'Hai ricevuto una lettera o un modulo che non capisci? Caricalo direttamente nella chat di WhatsApp e ricevi una spiegazione chiara nella tua lingua.',
+  waStepTap: 'Tocca il pulsante qui sotto',
+  waAnalyzeStep2: 'Invia la foto o il PDF del documento',
+  waAnalyzeStep3: 'Leggi il riassunto nella tua lingua',
+  waAnalyzeBtn: 'Analizza su WhatsApp',
+  waTranslateTitle: 'Traduci un testo',
+  waTranslateDesc: 'Scrivi nella chat il testo che vuoi tradurre e ricevi subito la traduzione, per capire ed essere capito.',
+  waTranslateStep2: 'Scrivi il testo da tradurre',
+  waTranslateStep3: 'Ricevi la traduzione in chat',
+  waTranslateBtn: 'Traduci su WhatsApp',
 
   // Privacy
   privacyTitle: 'Privacy Policy',
@@ -275,12 +290,6 @@ export default {
   notificationsRetry: 'Riprova',
   notificationsLoading: 'Caricamento notifiche…',
 
-  // Translator
-  translatorTitle: 'Traduttore WhatsApp',
-  translatorDesc: 'Invia un messaggio su WhatsApp per tradurre',
-  openWhatsApp: 'Apri WhatsApp',
-  translatorHint: 'Scrivi il testo da tradurre',
-  waMessage: 'Ciao! Puoi tradurmi questo testo: ',
   myBadges: 'I miei badge',
   quizBadgesUnlocked: 'Badge sbloccato!',
   quizViewBadges: 'Vedi i miei badge',

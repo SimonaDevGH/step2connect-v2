@@ -65,10 +65,12 @@ export default {
   translate: 'Translate',
   home: 'Home',
   chat: 'Chat',
+  profile: 'Profile',
+  whatsapp: 'WhatsApp',
 
   menu: 'Menu',
   services: 'Services',
-  quiz: 'Quiz',
+  quiz: 'Games',
   library: 'Library',
   notifications: 'Notifications',
   translator: 'Translator',
@@ -77,12 +79,12 @@ export default {
 
   heroTitle: 'Welcome to Italy',
   heroSubtitle: 'With you, step by step, at every moment of your life in Italy.',
-  botTitle: 'Virtual assistant',
+  botTitle: 'Ask Me',
   botDesc: 'Ask the AI where to find the information you need — type your question directly.',
   botPlaceholder: 'Type a message...',
   botSend: 'Send',
   botNote: '(LivePerson bot — to be connected)',
-  servicesTitle: 'Services for you',
+  quickActions: 'Quick access to services',
 
   health: 'Healthcare',
   healthDesc: 'Doctor, emergency room, pharmacy',
@@ -95,7 +97,9 @@ export default {
 
   toolsTitle: 'Tools',
 
-  quizTitle: 'Quiz',
+  quizTitle: 'Games',
+  gamesSectionLabel: 'Games section',
+  gamesGo: 'Go to Games',
   quizDesc: 'Test your knowledge',
   start: 'Start',
   next: 'Next',
@@ -137,7 +141,7 @@ export default {
   quizRetry: 'Try again',
   quizRedo: 'Retake',
   quizNotSaved: 'Result not saved: no user profile is available.',
-  quizBack: 'Back to quizzes',
+  quizBack: 'Back to Games',
   quizListen: 'Listen',
   quizSaving: 'Saving…',
   quizLearningNote: 'One answer at a time. You’re learning.',
@@ -145,7 +149,7 @@ export default {
   quizStars: 'stars',
   quizNextQuiz: 'Next quiz',
   quizTryIt: 'Test yourself',
-  quizReturn: 'Back to quiz',
+  quizReturn: 'Back to Games',
   quizImport: 'Import from Excel',
   quizExport: 'Export Excel',
   quizPreviewImport: 'Preview import',
@@ -157,6 +161,7 @@ export default {
 
   // Practical Guides
   guidesTitle: 'All guides',
+  seeAllGuides: 'See all',
   guidesDesc: 'Everything you need to know to live in Italy',
   comingSoon: 'Content coming soon',
   comingSoonDesc: 'We are preparing guides for this section',
@@ -246,11 +251,21 @@ export default {
   'guideItem_mediator_title': 'A mediator who speaks your language',
   'guideItem_mediator_desc': 'Help to communicate better',
 
-  // Analizza documento
+  // WhatsApp services
   analyzeTitle: 'Analyze document',
-  analyzeDesc: 'This service lets you upload a document, translate it and get a summary in Italian, English or Bengali.\n\nTo access the service, tap the WhatsApp icon. The WhatsApp app will open and start a conversation with Step2Connect. Follow the instructions to discover all the details of your document.',
-  analyzeWaBtn: 'Open WhatsApp',
-  analyzeWaText: 'analyze the document',
+  waPageTitle: 'Step2Connect on WhatsApp',
+  waPageSub: 'Two useful services, right in the chat you use every day.',
+  waAnalyzeTitle: 'Analyze a document',
+  waAnalyzeDesc: 'Received a letter or form you don\'t understand? Upload it directly in the WhatsApp chat and get a clear explanation in your language.',
+  waStepTap: 'Tap the button below',
+  waAnalyzeStep2: 'Send a photo or PDF of the document',
+  waAnalyzeStep3: 'Read the summary in your language',
+  waAnalyzeBtn: 'Analyze on WhatsApp',
+  waTranslateTitle: 'Translate a text',
+  waTranslateDesc: 'Write the text you want to translate in the chat and get the translation right away, to understand and be understood.',
+  waTranslateStep2: 'Write the text to translate',
+  waTranslateStep3: 'Get the translation in the chat',
+  waTranslateBtn: 'Translate on WhatsApp',
 
   privacyTitle: 'Privacy Policy',
   notificationsTitle: 'Notifications',
@@ -264,11 +279,6 @@ export default {
   notificationsRetry: 'Retry',
   notificationsLoading: 'Loading notifications…',
 
-  translatorTitle: 'WhatsApp Translator',
-  translatorDesc: 'Send a message on WhatsApp to translate',
-  openWhatsApp: 'Open WhatsApp',
-  translatorHint: 'Write the text to translate',
-  waMessage: 'Hello! Can you translate this text for me: ',
   myBadges: 'My badges',
   quizBadgesUnlocked: 'Badge unlocked!',
   quizViewBadges: 'View my badges',

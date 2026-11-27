@@ -127,6 +127,23 @@ test('retired sections are omitted from saved settings and rejected by CMS witho
   assert.deepEqual(writes, []);
 });
 
+test('WhatsApp defaults to published with older settings and has its own CMS visibility without changing the two services', async (t) => {
+  const { objects, api } = await fixture(t);
+  objects.set('config/sections.json', {
+    guides: { status: 'published' },
+    translator: { status: 'preview' },
+    'analyze-document': { status: 'internal' },
+  });
+  const initial = (await api('/api/sections', 'GET', null, null)).body.sections;
+  assert.deepEqual(initial.whatsapp, { status: 'published' });
+  const saved = await api('/api/admin/sections/whatsapp', 'PUT', { status: 'internal' });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.sections.whatsapp.status, 'internal');
+  assert.equal(saved.body.sections.translator.status, 'preview');
+  assert.equal(saved.body.sections['analyze-document'].status, 'internal');
+  assert.equal(objects.get('config/sections.json').whatsapp.status, 'internal');
+});
+
 test('new draft is internal in all languages; ordinary saves preserve visibility and ignore client overrides', async (t) => {
   const { objects, api } = await fixture(t);
   assert.equal((await api('/api/admin/content/guides/page', 'PUT', { ...payload(), visibility: 'published' })).status, 200);
@@ -203,6 +220,8 @@ test('role matrix enforces BOTH section and page visibility, with published lega
   for (const type of ['admin', 'fincantieri_users', 'standard', 'standard_legacy', undefined, '']) {
     const user = { type };
     assert.equal(canSeeSection('home', user, sections), true);
+    assert.equal(canSeeSection('whatsapp', user, sections), true);
+    assert.equal(canSeeSection('whatsapp', user, { ...sections, whatsapp: { status: 'internal' } }), type === 'admin');
     assert.equal(canSeeSection('library', user, sections), type === 'admin');
     assert.equal(canSeeSection('quiz', user, sections), ['admin', 'fincantieri_users'].includes(type));
     assert.equal(canSeeVisibility('internal', user), type === 'admin');

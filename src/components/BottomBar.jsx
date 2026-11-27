@@ -3,13 +3,19 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Home, UserCircle, LogOut, X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { useSections } from '../context/SectionsContext';
+import { canSeeSection } from '../lib/sectionAccess';
+import WhatsAppIcon from './WhatsAppIcon';
+import AskMeButton from './AskMeButton';
 
 export default function BottomBar() {
   const { t } = useLanguage();
-  const { user, logout } = useAuth();
+  const { user, logout, profileReady } = useAuth();
+  const { sections, sectionsReady } = useSections();
   const navigate = useNavigate();
   const location = useLocation();
   const [userOpen, setUserOpen] = useState(false);
+  const showWhatsApp = profileReady && sectionsReady && canSeeSection('whatsapp', user, sections);
 
   const handleLogout = async () => {
     setUserOpen(false);
@@ -45,10 +51,10 @@ export default function BottomBar() {
         <button
           className={`bottom-btn ${userOpen ? 'active' : ''}`}
           onClick={() => setUserOpen((v) => !v)}
-          aria-label="Account"
+          aria-label={t('profile')}
         >
           <UserCircle size={24} />
-          <span>{user?.firstName || 'Account'}</span>
+          <span>{t('profile')}</span>
         </button>
 
         {/* Center: Home */}
@@ -60,8 +66,20 @@ export default function BottomBar() {
           <Home size={28} />
         </button>
 
-        {/* Right: empty placeholder */}
-        <div style={{ width: 56 }} />
+        <AskMeButton className="bottom-btn-ask" />
+
+        {showWhatsApp ? (
+          <button
+            type="button"
+            className={`bottom-btn bottom-btn-whatsapp ${location.pathname === '/whatsapp' ? 'active' : ''}`}
+            onClick={() => navigate('/whatsapp')}
+            aria-label={t('whatsapp')}
+            aria-current={location.pathname === '/whatsapp' ? 'page' : undefined}
+          >
+            <WhatsAppIcon className="bottom-whatsapp-icon" />
+            <span>{t('whatsapp')}</span>
+          </button>
+        ) : <div className="bottom-btn-placeholder" aria-hidden="true" />}
       </nav>
     </>
   );

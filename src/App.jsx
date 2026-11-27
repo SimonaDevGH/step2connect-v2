@@ -22,9 +22,8 @@ import GuideCategoryPage  from './pages/GuideCategoryPage';
 import GuideDetailPage    from './pages/GuideDetailPage';
 import ContentDetailPage  from './pages/ContentDetailPage';
 import NotificationsPage  from './pages/NotificationsPage';
-import TranslatorPage     from './pages/TranslatorPage';
 import PrivacyPage        from './pages/PrivacyPage';
-import AnalyzeDocumentPage from './pages/AnalyzeDocumentPage';
+import WhatsAppPage from './pages/WhatsAppPage';
 import PageResolver       from './pages/PageResolver';
 
 import AdminLoginPage          from './pages/admin/AdminLoginPage';
@@ -184,9 +183,8 @@ function AppShell() {
           <Route path="/guides/:category"    element={<SectionRoute section="guides"><GuideSingleSegmentPage /></SectionRoute>} />
           <Route path="/guides/:category/:item" element={<SectionRoute section="guides"><GuideDetailPage /></SectionRoute>} />
           <Route path="/notifications"       element={<SectionRoute section="notifications"><NotificationsPage /></SectionRoute>} />
-          <Route path="/translator"          element={<SectionRoute section="translator"><TranslatorPage /></SectionRoute>} />
           <Route path="/privacy"             element={<SectionRoute section="privacy"><PrivacyPage /></SectionRoute>} />
-          <Route path="/analyze-document"    element={<SectionRoute section="analyze-document"><AnalyzeDocumentPage /></SectionRoute>} />
+          <Route path="/whatsapp"            element={<SectionRoute section="whatsapp"><WhatsAppPage /></SectionRoute>} />
           {/* Catch-all: prima prova a risolvere come pagina CMS, poi redirect */}
           <Route path="*"                    element={<ProtectedRoute><PageResolver /></ProtectedRoute>} />
         </Routes>

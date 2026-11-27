@@ -36,7 +36,7 @@ export default function QuizPage() {
   };
   useEffect(() => { load(); return () => { sequence.current++; }; }, [lang, user]);
   useEffect(() => { setCategory(searchParams.get('category')); }, [searchParams]);
-  const tabs = <nav className="quiz-page-tabs" aria-label={lang === 'it' ? 'Sezione quiz' : lang === 'bn' ? 'কুইজ বিভাগ' : 'Quiz section'}>
+  const tabs = <nav className="quiz-page-tabs" aria-label={t('gamesSectionLabel')}>
     <button className="active" aria-current="page" onClick={() => { setCategory(null); setSearchParams({}); }}>{t('quizTitle')}</button>
     <button onClick={() => navigate('/quiz/badges')}>{t('myBadges')}</button>
   </nav>;

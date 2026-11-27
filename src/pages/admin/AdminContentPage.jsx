@@ -11,9 +11,10 @@ import './admin-content.css';
 const SECTION_NAV = [
   { slug: 'guide-pratiche', key: 'guides', title: 'Tutte le guide', path: '/guides', types: ['guides'] },
   { slug: 'quiz', key: 'quiz', title: 'Quiz', path: '/quiz', types: ['quiz'] },
-  { slug: 'analizza-documento', key: 'analyze-document', title: 'Analizza documento', path: '/analyze-document' },
+  { slug: 'analizza-documento', key: 'analyze-document', title: 'Analizza documento', path: '/whatsapp' },
   { slug: 'notifiche', key: 'notifications', title: 'Notifiche', path: '/notifications' },
-  { slug: 'traduttore', key: 'translator', title: 'Traduttore', path: '/translator' },
+  { slug: 'traduttore', key: 'translator', title: 'Traduttore', path: '/whatsapp' },
+  { slug: 'whatsapp', key: 'whatsapp', title: 'WhatsApp', path: '/whatsapp' },
   { slug: 'immagini-app', title: 'Immagini app', path: null, types: ['site'] },
   { slug: 'altro', title: 'Altro', path: null, types: ['library', 'pages'] },
 ];

@@ -104,8 +104,8 @@ né pubblica automaticamente una nuova versione del sito.
   whitelist attiva, senza SMS, con promozione condizionale del ruolo.
 - Interfaccia utente in italiano, inglese e bengalese.
 - PWA installabile con manifest e service worker.
-- Tutte le guide, libreria, quiz, notifiche, traduttore e
-  analisi documenti.
+- Tutte le guide, libreria, Games, notifiche e assistenza su WhatsApp per
+  traduzione e analisi documenti.
 - Pannello CMS separato con autenticazione email/password.
 - Contenuti multilingua con bozze, pubblicazione e archiviazione su AWS S3.
 - Immagini, audio e video localizzati per lingua.
@@ -709,7 +709,9 @@ anche se l’email non esiste, per evitare enumerazione degli account CMS.
 - `site` (record riservato `app-images` per le immagini globali della webApp)
 
 Il menu CMS è organizzato per sezioni: Tutte le guide, Quiz, Analizza documento,
-Notifiche, Traduttore, Immagini app, Altro.
+Notifiche, Traduttore, WhatsApp, Immagini app, Altro.
+Il nome “Quiz” resta nel CMS; nell'app la stessa sezione si chiama “Games”
+(“গেমস” in bengalese), con route e dati invariati.
 Su mobile diventa una barra di tab scorrevoli. Altro permette di gestire
 `library` e le pagine generiche `pages`; l'API legacy `type=all` resta disponibile.
 
@@ -909,11 +911,10 @@ immagine della configurazione `site`; per `site` sono ammessi solo upload immagi
 | `/guides/:category/:item` | Dettaglio guida |
 | `/library` | Libreria |
 | `/library/:id` | Dettaglio elemento libreria |
-| `/quiz` | Quiz |
+| `/quiz` | Games |
 | `/quiz/:id` | Quiz Vero/Falso collegato a una guida |
 | `/notifications` | Notifiche |
-| `/translator` | Traduttore WhatsApp |
-| `/analyze-document` | Analisi documento via WhatsApp |
+| `/whatsapp` | Assistenza WhatsApp: analizza documento e traduci |
 | `/privacy` | Privacy |
 | `/*` | Risoluzione pagina CMS, poi fallback |
 
@@ -985,8 +986,24 @@ Il tag LivePerson viene caricato da `index.html`. Il componente
 Il widget dipende dalla configurazione dell’engagement nella console LivePerson;
 la sua assenza in staging non indica necessariamente un errore dell’app.
 
-Le pagine Traduttore e Analizza documento aprono conversazioni WhatsApp con testo
-precompilato. I numeri di destinazione sono configurati nei rispettivi componenti.
+“Ask Me” nella Home contiene lo stesso widget LivePerson. Il pulsante rapido
+e quello nella barra inferiore scorrono a quel blocco, anche partendo da un'altra
+pagina. Il pulsante nella barra è separato per poterlo sostituire in seguito
+con la bubble chat senza cambiare il resto della navigazione.
+
+La pagina `/whatsapp` e i collegamenti nella Home aprono il servizio WhatsApp
+in una nuova scheda. Numero e parole chiave sono centralizzati in
+`src/lib/whatsapp.js`: “analizza documento” e “traduci” restano **in italiano
+anche con interfaccia inglese o bengalese**, perché sono comandi riconosciuti
+dal bot. Il numero non è mostrato come testo nella pagina.
+
+Nel CMS, **WhatsApp** controlla l'accesso alla pagina; **Analizza documento**
+e **Traduttore** controllano separatamente la rispettiva funzione. Questi
+ultimi interruttori agiscono anche su pulsanti rapidi e Strumenti della Home.
+Tutti e tre i collegamenti “Apri pagina” puntano a `/whatsapp`.
+Le precedenti route `/translator` e `/analyze-document` non hanno redirect
+dedicati: passano al resolver generico, che torna alla Home se non trova una
+pagina CMS. L'immagine CMS `analyzeDocumentHero` è conservata per compatibilità.
 
 ## Test e controlli
 
@@ -996,6 +1013,17 @@ Eseguire:
 npm test
 npm run build
 ```
+
+Verifica browser della nuova Home e di WhatsApp (API simulate, nessun messaggio
+reale e nessuna scrittura su AWS):
+
+```bash
+node --experimental-websocket scripts/check-home-whatsapp-browser.cjs
+```
+
+Copre IT/EN/BN, guida in evidenza condivisa con fallback e visibilità, cinque
+categorie, scroll Ask Me anche da altre pagine, barra inferiore, link WhatsApp
+esatti, controlli CMS indipendenti e layout da 320 a 768 pixel.
 
 La suite copre:
 
@@ -1075,9 +1103,8 @@ hardcoded nel bucket. Non eseguirlo automaticamente in produzione.
   notifiche push, SMS o email dal calendario.
 - Le schede legacy dei servizi usano dati locali, non un CMS
   o un servizio aggiornato in tempo reale.
-- Il traduttore apre WhatsApp: non traduce automaticamente il testo nell'app
-  e il numero di destinazione nel codice è ancora un segnaposto.
-- L'analisi documenti apre il canale WhatsApp, non esegue OCR o analisi automatica.
+- Traduzione e analisi documenti aprono il canale WhatsApp configurato:
+  l'app non traduce, non riceve file e non esegue OCR o analisi AI internamente.
 
 ## Deploy e repository
 
@@ -1153,8 +1180,17 @@ I contenuti News già presenti su S3 non vengono cancellati: l'eventuale pulizia
 
 ### Home e navigazione
 
-- `/home`: saluto, accesso rapido ai servizi, guide e strumenti.
-- Barra inferiore e menu laterale collegano le aree della webapp e il logout.
+- `/home`, nell'ordine: hero, pulsanti rapidi Analizza documento / Ask Me /
+  Traduci, Tutte le guide, card Ask Me con LivePerson, Strumenti.
+- Il blocco guide include “Vedi tutte”, la guida al servizio con dati CMS e
+  fallback condivisi con `/guides`, e tutte e cinque le categorie: l'ultima
+  occupa l'intera riga su una griglia a due colonne.
+- Gli Strumenti sono Games, Tutte le guide, Traduttore e Analizza documento,
+  ciascuno soggetto alla propria visibilità. Le notifiche restano accessibili
+  dalla campanella e non compaiono negli Strumenti.
+- La barra inferiore ha quattro posizioni uguali: Profilo (con logout), Home,
+  Ask Me e WhatsApp. Se WhatsApp non è visibile, la sua posizione resta vuota.
+- Il menu laterale include WhatsApp al posto della vecchia pagina di analisi.
 - Logo e immagini principali hanno configurazioni localizzate nel CMS, con
   asset locali quando non esiste un URL pubblicato per la lingua.
 
@@ -1193,7 +1229,7 @@ lo slug CMS `guide-pratiche` e le chiavi S3, inclusi link e visibilità esistent
   allegati non è ancora implementato.
 - Il CMS consente di gestire testi e URL dei materiali, oltre ai media supportati.
 
-### Quiz
+### Games
 
 - `/quiz`: categorie delle guide con quiz visibili, avanzamento, stelle e badge.
 - `/quiz/:id`: domande Vero/Falso IT/EN/BN, spiegazioni, audio opzionale e link ai
@@ -1212,14 +1248,15 @@ lo slug CMS `guide-pratiche` e le chiavi S3, inclusi link e visibilità esistent
 - Il calendario è su S3; le letture sono nel profilo DynamoDB e restano valide
   dopo logout/login da un altro browser. La sezione rispetta la visibilità per ruolo.
 
-### Traduttore e analisi documenti
+### WhatsApp: traduttore e analisi documenti
 
-- `/translator`: inserimento testo e apertura di WhatsApp con messaggio
-  precompilato. Il contatto è ancora un segnaposto da configurare.
-- `/analyze-document`: apertura del contatto WhatsApp configurato per assistenza
-  sui documenti; l'immagine della pagina è personalizzabile dal CMS.
-- Nessuna delle due pagine implementa traduzione automatica, upload di documenti
-  al backend o analisi AI interna.
+- `/whatsapp`: hero verde, collegamento alla Home e due schede informative.
+- Ogni scheda contiene tre passi e un pulsante per avviare la conversazione:
+  analisi tramite foto/PDF oppure traduzione del testo scritto nella chat.
+- I testi sono in IT/EN/BN. Ogni funzione può essere nascosta separatamente
+  nel CMS; la sezione WhatsApp ha un proprio controllo di visibilità.
+- La pagina non mostra il numero di telefono. L'invio di documenti e testi
+  avviene nella chat WhatsApp esterna, non sul backend della webapp.
 
 ### Privacy, pagine generiche e assistenza
 
@@ -1266,8 +1303,8 @@ Gli utenti senza un ruolo esplicito sono trattati come standard per la visibilit
 
 Se `config/sections.json` manca o ha un formato invalido, si usano questi default:
 
-- Pubblicato: Guide, Analizza documento, Traduttore, Privacy.
-- Interno: Quiz, Notifiche, Libreria.
+- Pubblicato: Guide, WhatsApp, Analizza documento, Traduttore, Privacy.
+- Interno: Games (Quiz nel CMS), Notifiche, Libreria.
 
 Questi default sono intenzionalmente attivi da subito: le sezioni Interne sono
 nascoste agli utenti standard anche se contengono vecchie pagine pubblicate.
@@ -1509,7 +1546,7 @@ L'API non restituisce nomi, telefoni o risultati individuali.
 
 ### I miei badge
 
-La sezione Quiz presenta le schede **Quiz** e **I miei badge**. La seconda ha
+La sezione Games presenta le schede **Games** e **I miei badge**. La seconda ha
 un indirizzo diretto, `/quiz/badges`, soggetto agli stessi permessi della sezione.
 Mostra sei badge, barra di avanzamento, data di conquista e progresso per
 categoria. I badge bloccati portano ai quiz della rispettiva categoria;

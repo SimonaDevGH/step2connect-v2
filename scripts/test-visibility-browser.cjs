@@ -147,7 +147,7 @@ async function main() {
     }
     await visit('/admin/content');
     await wait(`location.pathname === '/admin/content/guide-pratiche' && !!document.querySelector('.cms-row-visibility')`);
-    assert.equal(await evaluate(`document.querySelectorAll('.cms-section-tab').length`), 7);
+    assert.equal(await evaluate(`document.querySelectorAll('.cms-section-tab').length`), 8);
     assert.equal(await evaluate(`/News|Trova uffici/.test(document.querySelector('.cms-section-nav').textContent)`), false);
     await click('.cms-section-tab', 'Quiz');
     await wait(`document.querySelector('h1')?.textContent === 'Quiz'`);

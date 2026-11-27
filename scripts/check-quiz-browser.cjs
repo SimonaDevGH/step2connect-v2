@@ -52,7 +52,7 @@ const paragraphs = '<p>Primo paragrafo.</p><ul><li>Secondo paragrafo.</li></ul><
       const body = request.postData?.startsWith('{') ? JSON.parse(request.postData) : null;
       let data = {}, code = 200, mime = 'application/json';
       if (path === '/api/users/preview-admin/session') data = { type: role, phone: '+390000000001', firstName: 'Fixture' };
-      else if (path === '/api/sections') data = { sections: Object.fromEntries(['quiz','guides','notifications','library','privacy','translator','analyze-document'].map((key) => [key,{status:'published'}])) };
+      else if (path === '/api/sections') data = { sections: Object.fromEntries(['quiz','guides','notifications','library','privacy','translator','analyze-document','whatsapp'].map((key) => [key,{status:'published'}])) };
       else if (path === '/api/quiz/progress') data = { quizResults: results };
       else if (path === '/api/quiz/badges') data = badgeState();
       else if (path === '/api/admin/quiz/badges') {
@@ -124,7 +124,7 @@ const paragraphs = '<p>Primo paragrafo.</p><ul><li>Secondo paragrafo.</li></ul><
         await b.wait(`location.hash==='#p5'&&!!document.querySelector('#p5.guide-anchor-highlight')`);
         assert.equal(await b.evaluate(`document.querySelector('#p5').textContent`),'Quinto paragrafo evidenziato.');
         await b.screenshot('s2c-quiz-guide-anchor.png');
-        await b.click('Torna al quiz');
+        await b.click('Torna a Games');
         await b.wait(`document.querySelector('.quiz-question-meta')?.textContent.includes('2 di 4')&&!!document.querySelector('.quiz-feedback')`);
       }
       await b.evaluate(`document.querySelector('.quiz-continue').click()`);

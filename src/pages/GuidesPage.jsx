@@ -1,43 +1,15 @@
-import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useSiteImages } from '../context/SiteImagesContext';
 import { GUIDE_CATEGORIES } from '../data/guides';
-import { useAuth } from '../context/AuthContext';
-import { canSeeVisibility } from '../lib/sectionAccess';
-
-const API = '';
-const FEATURED_GUIDE_ID = 'guida-al-servizio';
+import FeaturedGuideCard from '../components/FeaturedGuideCard';
+import useFeaturedGuide from '../lib/useFeaturedGuide';
 
 export default function GuidesPage() {
-  const { t, lang } = useLanguage();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const siteImages = useSiteImages();
-  const { user } = useAuth();
-  // Track which categories have published content available via the API.
-  // Falls back gracefully: if the API is unreachable every category stays enabled.
-  const [publishedIds, setPublishedIds] = useState(null);
-  const [featuredGuide, setFeaturedGuide] = useState(null);
-
-  useEffect(() => {
-    fetch(`${API}/api/content?type=guides&lang=${lang}`)
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
-      .then((data) => {
-        if (Array.isArray(data)) {
-          // Collect the set of category ids that have at least one published guide
-          const ids = new Set(data.filter((item) => canSeeVisibility(item.visibility, user))
-            .map((item) => item.category).filter(Boolean));
-          setPublishedIds(ids);
-          setFeaturedGuide(data.find((item) => item.id === FEATURED_GUIDE_ID) || null);
-        }
-      })
-      .catch(() => {
-        // API unavailable — keep publishedIds null (no restriction applied)
-      });
-  }, [lang, user?.type]);
+  const { publishedIds, featuredGuide } = useFeaturedGuide();
 
   return (
     <div className="page-content">
@@ -50,27 +22,10 @@ export default function GuidesPage() {
         </div>
       </div>
 
-      {canSeeVisibility(featuredGuide?.visibility, user) && <div className="guides-featured-wrap">
-        <button
-          type="button"
-          className="guide-featured-card"
-          onClick={() => navigate(`/guides/${FEATURED_GUIDE_ID}`)}
-        >
-          <span className="guide-featured-emoji">{featuredGuide?.emoji || '📘'}</span>
-          <span className="guide-featured-text">
-            <span className="guide-featured-title">
-              {featuredGuide?.title || t('featuredGuideTitle')}
-            </span>
-            <span className="guide-featured-desc">
-              {featuredGuide?.metaDesc || t('featuredGuideDesc')}
-            </span>
-          </span>
-          <span className="guide-featured-arrow">›</span>
-        </button>
-      </div>}
+      <FeaturedGuideCard featuredGuide={featuredGuide} />
 
       <div className="guides-grid">
-        {GUIDE_CATEGORIES.map(({ id, icon: Icon, color, emoji }) => {
+        {GUIDE_CATEGORIES.map(({ id, icon: Icon, color }) => {
           // If the API returned data, show a subtle indicator for categories
           // that have published content; otherwise show all categories normally.
           const hasContent = publishedIds === null || publishedIds.has(id);

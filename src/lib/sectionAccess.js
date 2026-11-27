@@ -2,6 +2,7 @@ export const DEFAULT_SECTIONS = {
   guides: { status: 'published' },
   'analyze-document': { status: 'published' },
   translator: { status: 'published' },
+  whatsapp: { status: 'published' },
   privacy: { status: 'published' },
   quiz: { status: 'internal' },
   notifications: { status: 'internal' },

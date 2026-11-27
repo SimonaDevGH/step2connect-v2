@@ -8,9 +8,9 @@ import { quizApi } from '../lib/quizApi';
 import './quiz-badges.css';
 
 const text = {
-  it: { title: 'I miei badge', intro: 'Hai conquistato', of: 'badge su', date: 'Conquistato il', passed: 'quiz superati', go: 'Vai ai quiz', champion: 'Conquista tutti gli altri badge', championEarned: 'Complimenti! Hai conquistato tutti i badge di categoria e il titolo di Campione Step2Connect.', earned: 'Hai superato tutti i quiz di', close: 'Chiudi', quizTab: 'Quiz', section: 'Sezione quiz', retry: 'Riprova', loadError: 'Non è stato possibile caricare i badge.' },
-  en: { title: 'My badges', intro: 'You have earned', of: 'badges out of', date: 'Earned on', passed: 'quizzes passed', go: 'Go to quizzes', champion: 'Earn all the other badges', championEarned: 'Congratulations! You earned every category badge and the Step2Connect Champion title.', earned: 'You passed every quiz in', close: 'Close', quizTab: 'Quizzes', section: 'Quiz section', retry: 'Retry', loadError: 'Badges could not be loaded.' },
-  bn: { title: 'আমার ব্যাজ', intro: 'আপনি অর্জন করেছেন', of: 'টির মধ্যে ব্যাজ', date: 'অর্জনের তারিখ', passed: 'টি কুইজ পাস', go: 'কুইজে যান', champion: 'অন্য সব ব্যাজ অর্জন করুন', championEarned: 'অভিনন্দন! আপনি সব বিভাগের ব্যাজ এবং Step2Connect চ্যাম্পিয়ন খেতাব অর্জন করেছেন।', earned: 'আপনি এই বিভাগের সব কুইজ পাস করেছেন:', close: 'বন্ধ করুন', quizTab: 'কুইজ', section: 'কুইজ বিভাগ', retry: 'আবার চেষ্টা করুন', loadError: 'ব্যাজ লোড করা যায়নি।' },
+  it: { title: 'I miei badge', intro: 'Hai conquistato', of: 'badge su', date: 'Conquistato il', passed: 'quiz superati', champion: 'Conquista tutti gli altri badge', championEarned: 'Complimenti! Hai conquistato tutti i badge di categoria e il titolo di Campione Step2Connect.', earned: 'Hai superato tutti i quiz di', close: 'Chiudi', retry: 'Riprova', loadError: 'Non è stato possibile caricare i badge.' },
+  en: { title: 'My badges', intro: 'You have earned', of: 'badges out of', date: 'Earned on', passed: 'quizzes passed', champion: 'Earn all the other badges', championEarned: 'Congratulations! You earned every category badge and the Step2Connect Champion title.', earned: 'You passed every quiz in', close: 'Close', retry: 'Retry', loadError: 'Badges could not be loaded.' },
+  bn: { title: 'আমার ব্যাজ', intro: 'আপনি অর্জন করেছেন', of: 'টির মধ্যে ব্যাজ', date: 'অর্জনের তারিখ', passed: 'টি কুইজ পাস', champion: 'অন্য সব ব্যাজ অর্জন করুন', championEarned: 'অভিনন্দন! আপনি সব বিভাগের ব্যাজ এবং Step2Connect চ্যাম্পিয়ন খেতাব অর্জন করেছেন।', earned: 'আপনি এই বিভাগের সব কুইজ পাস করেছেন:', close: 'বন্ধ করুন', retry: 'আবার চেষ্টা করুন', loadError: 'ব্যাজ লোড করা যায়নি।' },
 };
 
 export default function QuizBadgesPage() {
@@ -27,8 +27,8 @@ export default function QuizBadgesPage() {
   const closeButtonRef = useRef(null);
   const scope = `${user?.phone || user?.email || user?.sub || 'guest'}:${lang}`;
   const copy = text[lang] || text.it;
-  const tabs = <nav className="quiz-page-tabs" aria-label={copy.section}>
-    <button onClick={() => navigate('/quiz')}>{copy.quizTab}</button>
+  const tabs = <nav className="quiz-page-tabs" aria-label={t('gamesSectionLabel')}>
+    <button onClick={() => navigate('/quiz')}>{t('quizTitle')}</button>
     <button className="active" aria-current="page">{copy.title}</button>
   </nav>;
   const load = useCallback(() => {
@@ -117,7 +117,7 @@ export default function QuizBadgesPage() {
             <span className="quiz-badge-category">{badge.category ? (lang === 'it' ? 'Categoria · ' : lang === 'bn' ? 'বিভাগ · ' : 'Category · ') + (category ? t(`guideCat_${badge.category}`) : badge.category) : 'STEP2CONNECT'}</span>
           </button>
           {unlocked ? <p className="quiz-badge-date">{copy.date} {badge.unlockedAt ? new Intl.DateTimeFormat(lang === 'bn' ? 'bn-BD' : lang === 'en' ? 'en-GB' : 'it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(badge.unlockedAt)) : '—'}</p> :
-            <div className="quiz-badge-locked-info">{badge.id === 'champion' ? <p>{copy.champion}</p> : <><p>{badge.passed || 0} {lang === 'it' ? 'di' : lang === 'bn' ? '/' : 'of'} {badge.total || 0} {copy.passed}</p><div className="quiz-badge-mini-progress"><i style={{ width: `${badge.total ? Math.min(100, (badge.passed || 0) / badge.total * 100) : 0}%` }}/></div><button onClick={() => navigate(`/quiz?category=${encodeURIComponent(badge.category)}`)}>{copy.go}<span aria-hidden="true"> →</span></button></>}</div>}
+            <div className="quiz-badge-locked-info">{badge.id === 'champion' ? <p>{copy.champion}</p> : <><p>{badge.passed || 0} {lang === 'it' ? 'di' : lang === 'bn' ? '/' : 'of'} {badge.total || 0} {copy.passed}</p><div className="quiz-badge-mini-progress"><i style={{ width: `${badge.total ? Math.min(100, (badge.passed || 0) / badge.total * 100) : 0}%` }}/></div><button onClick={() => navigate(`/quiz?category=${encodeURIComponent(badge.category)}`)}>{t('gamesGo')}<span aria-hidden="true"> →</span></button></>}</div>}
         </article>;
       })}
     </section>
