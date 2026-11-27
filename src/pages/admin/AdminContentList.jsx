@@ -55,7 +55,7 @@ function ContentVisibility({ item, disabled, onChange }) {
   );
 }
 
-export default function AdminContentList({ types = ['guides', 'news', 'library', 'pages', 'site'], refreshKey = 0, adminToken, onUnauthorized }) {
+export default function AdminContentList({ types = ['guides', 'library', 'pages', 'site'], refreshKey = 0, adminToken, onUnauthorized }) {
   const [type, setType] = useState(types[0] || 'guides');
   const [lang, setLang] = useState('it');
   const [items, setItems] = useState([]);

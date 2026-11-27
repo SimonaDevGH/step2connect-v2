@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { X, Home, BookOpen, HelpCircle, FileSearch, MapPin, Bell, ShieldCheck, Languages, LogOut, Settings } from 'lucide-react';
+import { X, Home, BookOpen, HelpCircle, FileSearch, Bell, ShieldCheck, Languages, LogOut, Settings } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useSiteImages } from '../context/SiteImagesContext';
@@ -27,7 +27,6 @@ export default function SideMenu({ open, onClose }) {
     { section: 'guides', icon: <BookOpen size={20} />, label: t('guidesTitle'), path: '/guides', color: '#06A77D' },
     { section: 'quiz', icon: <HelpCircle size={20} />, label: t('quiz'), path: '/quiz', color: '#E9C46A' },
     { section: 'analyze-document', icon: <FileSearch size={20} />, label: t('analyzeTitle'), path: '/analyze-document', color: '#457B9D' },
-    { section: 'offices', icon: <MapPin size={20} />, label: t('findOffices'), path: '/offices', color: '#6A4C93' },
     { section: 'notifications', icon: <Bell size={20} />, label: t('notifications'), path: '/notifications', color: '#E76F51' },
   ];
   const visibleSection = (key) => profileReady && sectionsReady && canSeeSection(key, user, sections);

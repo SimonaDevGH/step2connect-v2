@@ -106,6 +106,27 @@ test('CMS saves section status and audit metadata on S3; rejects invalid input a
   assert.equal(objects.get('config/sections.json').guides.status, 'published');
 });
 
+test('retired sections are omitted from saved settings and rejected by CMS without deleting existing content', async (t) => {
+  const { objects, writes, api } = await fixture(t);
+  objects.set('config/sections.json', {
+    guides: { status: 'published' },
+    news: { status: 'published' },
+    offices: { status: 'published' },
+  });
+  const archivedKey = 'content/published/news/it/news-001.json';
+  objects.set(archivedKey, { id: 'news-001', type: 'news', title: 'Existing content' });
+  const sections = (await api('/api/sections', 'GET', null, null)).body.sections;
+  for (const key of ['news', 'offices']) {
+    assert.equal(Object.hasOwn(sections, key), false);
+    assert.equal((await api(`/api/admin/sections/${key}`, 'PUT', { status: 'published' })).status, 400);
+  }
+  assert.equal((await api('/api/admin/content?type=news&lang=it')).status, 400);
+  assert.equal((await api('/api/admin/content/news/news-001/visibility', 'PUT', { visibility: 'published' })).status, 400);
+  assert.deepEqual((await api('/api/admin/content?type=all&lang=it')).body, []);
+  assert.equal(objects.has(archivedKey), true);
+  assert.deepEqual(writes, []);
+});
+
 test('new draft is internal in all languages; ordinary saves preserve visibility and ignore client overrides', async (t) => {
   const { objects, api } = await fixture(t);
   assert.equal((await api('/api/admin/content/guides/page', 'PUT', { ...payload(), visibility: 'published' })).status, 200);
@@ -182,7 +203,7 @@ test('role matrix enforces BOTH section and page visibility, with published lega
   for (const type of ['admin', 'fincantieri_users', 'standard', 'standard_legacy', undefined, '']) {
     const user = { type };
     assert.equal(canSeeSection('home', user, sections), true);
-    assert.equal(canSeeSection('offices', user, sections), type === 'admin');
+    assert.equal(canSeeSection('library', user, sections), type === 'admin');
     assert.equal(canSeeSection('quiz', user, sections), ['admin', 'fincantieri_users'].includes(type));
     assert.equal(canSeeVisibility('internal', user), type === 'admin');
     assert.equal(canSeeVisibility('preview', user), ['admin', 'fincantieri_users'].includes(type));

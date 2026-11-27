@@ -31,7 +31,7 @@ test('direct refresh waits for profile and sections before deciding access; reso
     SectionRoute = componentModule.exports.default;
   } finally { Module._load = originalLoad; }
   const render = () => renderToStaticMarkup(React.createElement(
-    SectionRoute, { section: 'offices' }, React.createElement('p', null, 'Offices'),
+    SectionRoute, { section: 'library' }, React.createElement('p', null, 'Library'),
   ));
   assert.equal(render(), '');
   auth.user = { type: 'admin' };
@@ -40,7 +40,7 @@ test('direct refresh waits for profile and sections before deciding access; reso
   configuration.sectionsReady = false;
   assert.equal(render(), '');
   configuration.sectionsReady = true;
-  assert.equal(render(), '<p>Offices</p>');
+  assert.equal(render(), '<p>Library</p>');
   auth.user = { type: 'fincantieri_users' };
   assert.match(render(), /data-redirect="\/home"/);
   auth.user = { type: 'standard' };

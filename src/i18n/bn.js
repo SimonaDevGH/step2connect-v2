@@ -76,8 +76,6 @@ export default {
 
   menu: 'মেনু',
   services: 'সেবা',
-  findOffices: 'অফিস খুঁজুন',
-  news: 'সংবাদ',
   quiz: 'কুইজ',
   library: 'লাইব্রেরি',
   notifications: 'বিজ্ঞপ্তি',
@@ -104,20 +102,6 @@ export default {
   documentsDesc: 'পারমিট, পরিচয়পত্র, নবায়ন',
 
   toolsTitle: 'সরঞ্জাম',
-  officesCard: 'ভেনেতোতে অফিস খুঁজুন',
-  officesDesc: 'আপনার কাছের কমিউন, পাত্রোনাতো, হাসপাতাল',
-
-  findOfficesTitle: 'ভেনেতোতে অফিস খুঁজুন',
-  searchPlaceholder: 'কমিউন বা সেবা খুঁজুন...',
-  officeType: 'ধরন',
-  all: 'সব',
-  hospital: 'হাসপাতাল',
-  patronato: 'পাত্রোনাতো',
-  municipality: 'কমিউন',
-  police: 'পুলিশ',
-
-  newsTitle: 'সংবাদ',
-  readMore: 'পড়ুন',
 
   quizTitle: 'কুইজ',
   quizDesc: 'আপনার জ্ঞান পরীক্ষা করুন',
@@ -156,7 +140,7 @@ export default {
   quizTopics: 'টি বিষয়',
   quizAllCategories: 'সব বিষয়',
   quizEmptyTitle: 'কুইজ শীঘ্রই আসছে',
-  quizEmptyDesc: 'ব্যবহারিক গাইডের সঙ্গে যুক্ত প্রশ্ন তৈরি হচ্ছে।',
+  quizEmptyDesc: 'গাইডের সঙ্গে যুক্ত প্রশ্ন তৈরি হচ্ছে।',
   quizLoadError: 'কুইজ লোড করা যায়নি।',
   quizRetry: 'আবার চেষ্টা করুন',
   quizRedo: 'আবার করুন',
@@ -180,7 +164,7 @@ export default {
   download: 'ডাউনলোড',
 
   // ব্যবহারিক গাইড
-  guidesTitle: 'ব্যবহারিক গাইড',
+  guidesTitle: 'সব গাইড',
   guidesDesc: 'ইতালিতে বসবাসের জন্য আপনার যা জানা দরকার',
   comingSoon: 'সামগ্রী শীঘ্রই আসছে',
   comingSoonDesc: 'আমরা এই বিভাগের জন্য গাইড প্রস্তুত করছি',

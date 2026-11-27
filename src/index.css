@@ -1393,25 +1393,6 @@ input, textarea { font-family: inherit; }
   line-height: 1.2;
 }
 
-/* ── Offices Section ──────────────────────────────────────────────────── */
-.offices-section { padding: 12px 16px; }
-.offices-card {
-  background: var(--white);
-  border-radius: var(--radius);
-  padding: 18px 16px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  box-shadow: var(--shadow);
-  width: 100%;
-  text-align: left;
-  border: 1.5px solid var(--border);
-  transition: transform 0.15s;
-}
-.offices-card:hover { transform: translateY(-1px); }
-.offices-title { font-weight: 700; font-size: 0.95rem; color: var(--navy); }
-.offices-desc { font-size: 0.82rem; color: var(--text-muted); margin-top: 3px; }
-
 /* ── Tools Section ────────────────────────────────────────────────────── */
 .tools-section { padding: 4px 16px 20px; }
 .tools-list { background: var(--white); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
@@ -1517,86 +1498,8 @@ input, textarea { font-family: inherit; }
 .sdc-title { font-weight: 700; font-size: 0.95rem; color: var(--navy); }
 .sdc-desc { font-size: 0.83rem; color: var(--text-muted); margin-top: 4px; }
 
-/* ── Find Offices ─────────────────────────────────────────────────────── */
-.offices-filters { padding: 16px 16px 0; }
-.search-wrap { position: relative; margin-bottom: 12px; }
-.search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
-.search-input {
-  width: 100%;
-  padding: 12px 14px 12px 44px;
-  border: 1.5px solid var(--border);
-  border-radius: 10px;
-  font-size: 0.95rem;
-  outline: none;
-  background: var(--white);
-  box-shadow: var(--shadow);
-}
-.search-input:focus { border-color: var(--navy); }
-
-.type-pills { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
-.type-pills::-webkit-scrollbar { display: none; }
-.type-pill {
-  flex-shrink: 0;
-  padding: 6px 14px;
-  border-radius: 20px;
-  border: 1.5px solid var(--border);
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  background: var(--white);
-  transition: all 0.15s;
-}
-.type-pill.active { background: var(--navy); color: var(--white); border-color: var(--navy); }
-
-.offices-list { padding: 12px 16px 24px; display: flex; flex-direction: column; gap: 10px; }
-.office-card {
-  background: var(--white);
-  border-radius: var(--radius);
-  padding: 14px;
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  box-shadow: var(--shadow);
-  border-left: 4px solid var(--type-color, var(--navy));
-}
-.office-emoji { font-size: 1.5rem; flex-shrink: 0; margin-top: 2px; }
-.office-info { flex: 1; }
-.office-name { font-weight: 700; font-size: 0.9rem; color: var(--navy); margin-bottom: 2px; }
-.office-city { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 2px; }
-.office-address { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; }
-.office-phone { font-size: 0.85rem; color: #118AB2; font-weight: 600; }
+/* Shared empty state for guides and notifications. */
 .empty-state { text-align: center; color: var(--text-muted); padding: 40px 20px; font-size: 0.95rem; }
-
-/* ── News ─────────────────────────────────────────────────────────────── */
-.news-list { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
-.news-card {
-  background: var(--white);
-  border-radius: var(--radius);
-  padding: 16px;
-  display: flex;
-  gap: 14px;
-  box-shadow: var(--shadow);
-  border: 1.5px solid var(--border);
-}
-.news-card--interactive {
-  width: 100%;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: transform 0.15s ease, border-color 0.15s ease;
-}
-.news-card--interactive:hover,
-.news-card--interactive:focus-visible {
-  border-color: var(--navy);
-  transform: translateY(-1px);
-}
-.news-emoji { font-size: 1.8rem; flex-shrink: 0; }
-.news-content { flex: 1; }
-.news-date { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; }
-.news-title { font-weight: 700; font-size: 0.95rem; color: var(--navy); margin-bottom: 6px; }
-.news-body { font-size: 0.83rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 10px; }
-.news-read { color: var(--navy); font-size: 0.85rem; font-weight: 700; }
 
 /* ── Quiz ─────────────────────────────────────────────────────────────── */
 .quiz-body { padding: 20px 16px; }

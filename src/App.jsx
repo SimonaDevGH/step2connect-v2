@@ -13,8 +13,6 @@ import { useSections } from './context/SectionsContext';
 import LoginPage          from './pages/LoginPage';
 import HomePage           from './pages/HomePage';
 import ServiceDetailPage  from './pages/ServiceDetailPage';
-import FindOfficesPage    from './pages/FindOfficesPage';
-import NewsPage           from './pages/NewsPage';
 import QuizPage           from './pages/QuizPage';
 import QuizPlayer         from './pages/QuizPlayer';
 import QuizBadgesPage     from './pages/QuizBadgesPage';
@@ -177,9 +175,6 @@ function AppShell() {
           <Route path="/"                    element={<Navigate to="/home" replace />} />
           <Route path="/home"                element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
           <Route path="/service/:service"    element={<ProtectedRoute><ServiceDetailPage /></ProtectedRoute>} />
-          <Route path="/offices"             element={<SectionRoute section="offices"><FindOfficesPage /></SectionRoute>} />
-          <Route path="/news"                element={<SectionRoute section="news"><NewsPage /></SectionRoute>} />
-          <Route path="/news/:id"            element={<SectionRoute section="news"><ContentDetailPage contentType="news" /></SectionRoute>} />
           <Route path="/quiz"                element={<SectionRoute section="quiz"><QuizPage /></SectionRoute>} />
           <Route path="/quiz/badges"         element={<SectionRoute section="quiz"><QuizBadgesPage /></SectionRoute>} />
           <Route path="/quiz/:id"            element={<SectionRoute section="quiz"><QuizPlayer /></SectionRoute>} />

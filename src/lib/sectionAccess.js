@@ -5,8 +5,6 @@ export const DEFAULT_SECTIONS = {
   privacy: { status: 'published' },
   quiz: { status: 'internal' },
   notifications: { status: 'internal' },
-  news: { status: 'internal' },
-  offices: { status: 'internal' },
   library: { status: 'internal' },
 };
 

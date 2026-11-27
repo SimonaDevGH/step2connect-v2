@@ -9,13 +9,11 @@ import QuizBadgeEditor from './QuizBadgeEditor';
 import './admin-content.css';
 
 const SECTION_NAV = [
-  { slug: 'guide-pratiche', key: 'guides', title: 'Guide pratiche', path: '/guides', types: ['guides'] },
+  { slug: 'guide-pratiche', key: 'guides', title: 'Tutte le guide', path: '/guides', types: ['guides'] },
   { slug: 'quiz', key: 'quiz', title: 'Quiz', path: '/quiz', types: ['quiz'] },
   { slug: 'analizza-documento', key: 'analyze-document', title: 'Analizza documento', path: '/analyze-document' },
   { slug: 'notifiche', key: 'notifications', title: 'Notifiche', path: '/notifications' },
-  { slug: 'news', key: 'news', title: 'News', path: '/news', types: ['news'] },
   { slug: 'traduttore', key: 'translator', title: 'Traduttore', path: '/translator' },
-  { slug: 'trova-uffici', key: 'offices', title: 'Trova uffici', path: '/offices' },
   { slug: 'immagini-app', title: 'Immagini app', path: null, types: ['site'] },
   { slug: 'altro', title: 'Altro', path: null, types: ['library', 'pages'] },
 ];

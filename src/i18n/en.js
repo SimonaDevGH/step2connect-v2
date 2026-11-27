@@ -68,8 +68,6 @@ export default {
 
   menu: 'Menu',
   services: 'Services',
-  findOffices: 'Find offices',
-  news: 'News',
   quiz: 'Quiz',
   library: 'Library',
   notifications: 'Notifications',
@@ -96,20 +94,6 @@ export default {
   documentsDesc: 'Permit, ID card, renewals',
 
   toolsTitle: 'Tools',
-  officesCard: 'Find offices in Veneto',
-  officesDesc: 'Municipalities, patronatos, hospitals near you',
-
-  findOfficesTitle: 'Find offices in Veneto',
-  searchPlaceholder: 'Search municipality or service...',
-  officeType: 'Type',
-  all: 'All',
-  hospital: 'Hospital',
-  patronato: 'Patronato',
-  municipality: 'Municipality',
-  police: 'Police',
-
-  newsTitle: 'News',
-  readMore: 'Read',
 
   quizTitle: 'Quiz',
   quizDesc: 'Test your knowledge',
@@ -148,7 +132,7 @@ export default {
   quizTopics: 'topics',
   quizAllCategories: 'All topics',
   quizEmptyTitle: 'Quizzes are coming soon',
-  quizEmptyDesc: 'We’re preparing questions linked to the practical guides.',
+  quizEmptyDesc: 'We’re preparing questions linked to the guides.',
   quizLoadError: 'We could not load the quizzes.',
   quizRetry: 'Try again',
   quizRedo: 'Retake',
@@ -172,7 +156,7 @@ export default {
   download: 'Download',
 
   // Practical Guides
-  guidesTitle: 'Practical Guides',
+  guidesTitle: 'All guides',
   guidesDesc: 'Everything you need to know to live in Italy',
   comingSoon: 'Content coming soon',
   comingSoonDesc: 'We are preparing guides for this section',

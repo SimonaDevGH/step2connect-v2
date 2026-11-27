@@ -33,7 +33,7 @@ Il **CMS** è il pannello per amministrare la webapp, accessibile da `/admin/log
 con credenziali amministrative dedicate. Non usa il codice SMS degli utenti.
 
 1. Accedi e scegli la sezione da gestire.
-2. Per guide, news e libreria, apri un contenuto o creane uno nuovo; inserisci
+2. Per guide e libreria, apri un contenuto o creane uno nuovo; inserisci
    testi e media nelle lingue richieste e salva la bozza.
 3. Controlla il contenuto, quindi pubblica le modifiche. Per i quiz puoi anche
    selezionare più righe, usare **Seleziona tutti** e pubblicare o riportare
@@ -104,7 +104,7 @@ né pubblica automaticamente una nuova versione del sito.
   whitelist attiva, senza SMS, con promozione condizionale del ruolo.
 - Interfaccia utente in italiano, inglese e bengalese.
 - PWA installabile con manifest e service worker.
-- Guide pratiche, notizie, libreria, quiz, uffici, notifiche, traduttore e
+- Tutte le guide, libreria, quiz, notifiche, traduttore e
   analisi documenti.
 - Pannello CMS separato con autenticazione email/password.
 - Contenuti multilingua con bozze, pubblicazione e archiviazione su AWS S3.
@@ -423,7 +423,7 @@ deve rimanere **privato**, non va committato né reso pubblico tramite ACL,
 bucket policy, distribuzioni o proxy. Un errore S3/IAM blocca il flusso
 anziché concedere una sessione o inviare un SMS in fallback.
 
-**Compatibilità pagine:** home, servizi, guide, news, library, quiz, uffici,
+**Compatibilità pagine:** home, servizi, guide, library, quiz,
 notifiche, traduttore, analisi documento, privacy e pagine CMS pubbliche
 utilizzano l'utente applicativo oppure API pubbliche, non token Cognito.
 LivePerson e WhatsApp restano integrazioni esterne. `GET /api/users/me`,
@@ -704,13 +704,12 @@ anche se l’email non esiste, per evitare enumerazione degli account CMS.
 ### Tipi di contenuto
 
 - `guides`
-- `news`
 - `library`
 - `pages`
 - `site` (record riservato `app-images` per le immagini globali della webApp)
 
-Il menu CMS è organizzato per sezioni: Guide pratiche, Quiz, Analizza documento,
-Notifiche, News, Traduttore, Trova uffici, Immagini app, Altro.
+Il menu CMS è organizzato per sezioni: Tutte le guide, Quiz, Analizza documento,
+Notifiche, Traduttore, Immagini app, Altro.
 Su mobile diventa una barra di tab scorrevoli. Altro permette di gestire
 `library` e le pagine generiche `pages`; l'API legacy `type=all` resta disponibile.
 
@@ -722,7 +721,7 @@ Metadati condivisi:
 - `type`
 - `category`
 - `url`
-- `visibility` per guide, news, library e pages (non per le immagini `site`)
+- `visibility` per guide, library e pages (non per le immagini `site`)
 
 Campi localizzati per `it`, `en` e `bn`:
 
@@ -820,7 +819,7 @@ della lingua resta `bn`.
 4. **Elimina** archivia la bozza e rimuove le chiavi attive di bozza e
    pubblicazione.
 
-Le liste e i dettagli pubblici di guide, news e library leggono dallo stesso
+Le liste e i dettagli pubblici di guide e library leggono dallo stesso
 origin:
 
 ```text
@@ -832,7 +831,7 @@ direttamente. `PageResolver` mantiene per compatibilità un override tramite
 `VITE_API_BASE_URL` quando la variabile è valorizzata; le nuove letture CMS non
 devono estendere questa dipendenza legacy.
 
-News e libreria conservano dati statici di fallback per mostrare un contenuto
+La libreria conserva dati statici di fallback per mostrare un contenuto
 minimo quando l’API non è disponibile.
 
 ## API disponibili
@@ -908,13 +907,10 @@ immagine della configurazione `site`; per `site` sono ammessi solo upload immagi
 | `/guides` | Categorie guide |
 | `/guides/:category` | Elenco categoria o guida diretta |
 | `/guides/:category/:item` | Dettaglio guida |
-| `/news` | Notizie |
-| `/news/:id` | Dettaglio notizia CMS |
 | `/library` | Libreria |
 | `/library/:id` | Dettaglio elemento libreria |
 | `/quiz` | Quiz |
 | `/quiz/:id` | Quiz Vero/Falso collegato a una guida |
-| `/offices` | Ricerca uffici |
 | `/notifications` | Notifiche |
 | `/translator` | Traduttore WhatsApp |
 | `/analyze-document` | Analisi documento via WhatsApp |
@@ -1070,14 +1066,14 @@ hardcoded nel bucket. Non eseguirlo automaticamente in produzione.
   file PDF non è ancora disponibile.
 - Audio e video possono essere caricati nel CMS per ogni lingua oppure inseriti
   tramite URL.
-- News e libreria mantengono fallback statici se l’API non risponde.
+- La libreria mantiene fallback statici se l’API non risponde.
 - Il cambio lingua può mostrare brevemente il contenuto precedente durante un
   nuovo caricamento.
 - L’invio email di reset richiede `SES_FROM_EMAIL` configurato e verificato in
   AWS SES.
 - Le notifiche sono esclusivamente interne alla webapp: non vengono inviate
   notifiche push, SMS o email dal calendario.
-- Elenco uffici e schede legacy dei servizi usano dati locali, non un CMS
+- Le schede legacy dei servizi usano dati locali, non un CMS
   o un servizio aggiornato in tempo reale.
 - Il traduttore apre WhatsApp: non traduce automaticamente il testo nell'app
   e il numero di destinazione nel codice è ancora un segnaposto.
@@ -1137,6 +1133,12 @@ build: dopo una modifica occorre un nuovo deploy.
 Questa sezione descrive ciò che è implementato, distinguendo contenuti
 gestiti dal CMS, dati dimostrativi e integrazioni esterne.
 
+Le sezioni News e Trova uffici sono state rimosse dall'app e dal CMS, inclusi
+i controlli di visibilità. I vecchi indirizzi passano dal normale risolutore
+delle pagine e, se non esiste una pagina CMS corrispondente, tornano alla Home.
+I contenuti News già presenti su S3 non vengono cancellati: l'eventuale pulizia
+è manuale. La Libreria resta una sezione distinta, con le sue etichette invariate.
+
 ### Accesso, registrazione e profilo
 
 - `/`: form Accedi/Registrati con scelta IT/EN/BN e validazione del telefono.
@@ -1156,7 +1158,11 @@ gestiti dal CMS, dati dimostrativi e integrazioni esterne.
 - Logo e immagini principali hanno configurazioni localizzate nel CMS, con
   asset locali quando non esiste un URL pubblicato per la lingua.
 
-### Guide
+### Tutte le guide
+
+L'etichetta è “Tutte le guide” in italiano, “All guides” in inglese e
+“সব গাইড” in bengalese. Restano invariati `/guides`, la sezione `guides`,
+lo slug CMS `guide-pratiche` e le chiavi S3, inclusi link e visibilità esistenti.
 
 - `/guides`: introduzione al servizio e cinque categorie: Documenti e permessi,
   Salute e pronto soccorso, Casa e bollette, Scuola e famiglia, Vivere in città.
@@ -1179,13 +1185,6 @@ gestiti dal CMS, dati dimostrativi e integrazioni esterne.
 - La sezione è distinta dalle guide pubblicate: non considerarla un editor
   dinamico né un catalogo aggiornato automaticamente.
 
-### News
-
-- `/news`: elenco delle notizie pubblicate dal CMS nella lingua selezionata,
-  con un elenco locale di fallback.
-- `/news/:id`: dettaglio CMS con titolo, immagine, corpo e audio se presenti.
-  I campi mancanti non vengono generati automaticamente.
-
 ### Libreria
 
 - `/library`: elenco per categorie di materiali pubblicati nel CMS, con dati
@@ -1202,13 +1201,6 @@ gestiti dal CMS, dati dimostrativi e integrazioni esterne.
 - `/quiz/badges`: raccolta dei sei badge, progressi, date e dettagli delle conquiste.
 - Gestione CMS, import/export Excel, statistiche aggregate e risultati persistenti:
   vedere [Quiz collegati alle guide](#quiz-collegati-alle-guide).
-
-### Cerca uffici
-
-- `/offices`: ricerca per nome, città o indirizzo e filtro per ospedali,
-  patronati, comuni e polizia, con collegamenti telefonici.
-- L'elenco è locale e dimostrativo, centrato sull'area veneziana; non usa
-  geolocalizzazione, mappe o un servizio di ricerca in tempo reale.
 
 ### Notifiche
 
@@ -1275,7 +1267,7 @@ Gli utenti senza un ruolo esplicito sono trattati come standard per la visibilit
 Se `config/sections.json` manca o ha un formato invalido, si usano questi default:
 
 - Pubblicato: Guide, Analizza documento, Traduttore, Privacy.
-- Interno: Quiz, Notifiche, News, Trova uffici, Libreria.
+- Interno: Quiz, Notifiche, Libreria.
 
 Questi default sono intenzionalmente attivi da subito: le sezioni Interne sono
 nascoste agli utenti standard anche se contengono vecchie pagine pubblicate.
@@ -1288,7 +1280,7 @@ non annulla però la restrizione della sezione. Le pagine nuove nascono `interna
   subito dal server su S3, con `updatedAt` e `updatedBy`.
 - La conferma è richiesta solo passando a Pubblicato. Il feedback “Salvato”
   conferma il completamento della richiesta.
-- Ogni riga di guide, news, libreria e pagine generiche ha lo stesso controllo:
+- Ogni riga di guide, libreria e pagine generiche ha lo stesso controllo:
   cambiandolo si pubblica immediatamente l'ultima versione **già salvata**, nelle
   tre lingue. Una rinomina rimuove i vecchi URL pubblicati come prima.
 - Salvare normalmente una bozza non cambia la sua visibilità e non la pubblica.

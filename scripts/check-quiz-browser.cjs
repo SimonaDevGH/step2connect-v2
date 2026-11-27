@@ -52,7 +52,7 @@ const paragraphs = '<p>Primo paragrafo.</p><ul><li>Secondo paragrafo.</li></ul><
       const body = request.postData?.startsWith('{') ? JSON.parse(request.postData) : null;
       let data = {}, code = 200, mime = 'application/json';
       if (path === '/api/users/preview-admin/session') data = { type: role, phone: '+390000000001', firstName: 'Fixture' };
-      else if (path === '/api/sections') data = { sections: Object.fromEntries(['quiz','guides','notifications','news','offices','library','privacy','translator','analyze-document'].map((key) => [key,{status:'published'}])) };
+      else if (path === '/api/sections') data = { sections: Object.fromEntries(['quiz','guides','notifications','library','privacy','translator','analyze-document'].map((key) => [key,{status:'published'}])) };
       else if (path === '/api/quiz/progress') data = { quizResults: results };
       else if (path === '/api/quiz/badges') data = badgeState();
       else if (path === '/api/admin/quiz/badges') {

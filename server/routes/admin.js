@@ -10,7 +10,7 @@ const { validateContent } = require('../lib/validate');
 const { VISIBILITIES } = require('../lib/sections');
 
 const router = express.Router();
-const CONTENT_TYPES = ['guides', 'news', 'library', 'pages', 'site', 'quiz'];
+const CONTENT_TYPES = ['guides', 'library', 'pages', 'site', 'quiz'];
 const LIST_LANGUAGES = ['it', 'en', 'bn'];
 const FILE_LANGUAGE_CODES = { it: 'it', en: 'en', bn: 'bd' };
 const FEATURED_SERVICE_GUIDE_ID = 'guida-al-servizio';
@@ -59,8 +59,8 @@ const upload = multer({
 router.use(requireAdminJWT);
 
 // ── LIST ─────────────────────────────────────────────────────────────────────
-// GET /api/admin/content?type=guides|news|library|pages|all&lang=it
-// `all` è la vista riepilogativa dell'admin (guide, news e library).
+// GET /api/admin/content?type=guides|library|pages|all&lang=it
+// `all` è la vista riepilogativa dell'admin (guide e library).
 router.get('/', async (req, res) => {
   const { type, lang = 'it' } = req.query;
   if (!CONTENT_TYPES.includes(type) && type !== 'all') {
@@ -71,7 +71,7 @@ router.get('/', async (req, res) => {
   }
 
   try {
-    const typesToList = type === 'all' ? ['guides', 'news', 'library'] : [type];
+    const typesToList = type === 'all' ? ['guides', 'library'] : [type];
     const [draftKeyGroups, publishedKeyGroups] = await Promise.all([
       Promise.all(typesToList.map((contentType) =>
         listKeys(`content/draft/${contentType}/${lang}/`)
@@ -282,7 +282,7 @@ router.put('/:type/:id', async (req, res) => {
 router.put('/:type/:id/visibility', async (req, res) => {
   const { type, id } = req.params;
   const visibility = req.body?.visibility;
-  if (!['guides', 'news', 'library', 'pages', 'quiz'].includes(type)
+  if (!['guides', 'library', 'pages', 'quiz'].includes(type)
     || !/^[a-zA-Z0-9_-]{1,100}$/.test(id) || !VISIBILITIES.includes(visibility)) {
     return res.status(400).json({ error: 'Invalid content or visibility' });
   }

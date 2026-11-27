@@ -6,12 +6,6 @@ import { useAuth } from '../context/AuthContext';
 import { canSeeVisibility } from '../lib/sectionAccess';
 
 const CONTENT_TYPES = {
-  news: {
-    backPath: '/news',
-    titleKey: 'newsTitle',
-    color: '#1D3557',
-    emoji: '📰',
-  },
   library: {
     backPath: '/library',
     titleKey: 'libraryTitle',
@@ -21,7 +15,7 @@ const CONTENT_TYPES = {
 };
 
 /**
- * Dettaglio pubblico per news e library. Mostra esclusivamente il JSON
+ * Dettaglio pubblico per library. Mostra esclusivamente il JSON
  * pubblicato relativo alla lingua attiva; il placeholder appare solo se manca.
  */
 export default function ContentDetailPage({ contentType }) {

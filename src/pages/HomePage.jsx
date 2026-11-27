@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Newspaper, HelpCircle, BookOpen, Bell, Languages, Bot } from 'lucide-react';
+import { HelpCircle, BookOpen, Bell, Languages, Bot } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useSiteImages } from '../context/SiteImagesContext';
@@ -14,7 +14,6 @@ const SERVICES = GUIDE_CATEGORIES.filter((c) => FEATURED_IDS.includes(c.id))
   .sort((a, b) => FEATURED_IDS.indexOf(a.id) - FEATURED_IDS.indexOf(b.id));
 
 const TOOLS = [
-  { key: 'news',          icon: Newspaper,  color: '#1D3557', path: '/news' },
   { key: 'quiz',          icon: HelpCircle, color: '#E9C46A', path: '/quiz' },
   { key: 'guidesTitle', section: 'guides', icon: BookOpen, color: '#06A77D', path: '/guides' },
   { key: 'notifications', icon: Bell,       color: '#E76F51', path: '/notifications' },
@@ -75,17 +74,6 @@ export default function HomePage() {
             </button>
           ))}
         </div>
-      </section>}
-
-      {/* Offices card */}
-      {visibleSection('offices') && <section className="offices-section">
-        <button className="offices-card" onClick={() => navigate('/offices')}>
-          <MapPin size={28} color="#6A4C93" />
-          <div>
-            <p className="offices-title">{t('officesCard')}</p>
-            <p className="offices-desc">{t('officesDesc')}</p>
-          </div>
-        </button>
       </section>}
 
       {/* Tools list */}

@@ -71,8 +71,6 @@ export default {
   // Side menu
   menu: 'Menu',
   services: 'Servizi',
-  findOffices: 'Trova uffici',
-  news: 'Notizie',
   quiz: 'Quiz',
   library: 'Libreria',
   notifications: 'Notifiche',
@@ -102,22 +100,6 @@ export default {
 
   // Tools
   toolsTitle: 'Strumenti',
-  officesCard: 'Trova uffici in Veneto',
-  officesDesc: 'Comuni, patronati, ospedali vicino a te',
-
-  // Find offices
-  findOfficesTitle: 'Trova uffici in Veneto',
-  searchPlaceholder: 'Cerca comune o servizio...',
-  officeType: 'Tipo',
-  all: 'Tutti',
-  hospital: 'Ospedale',
-  patronato: 'Patronato',
-  municipality: 'Comune',
-  police: 'Questura',
-
-  // News
-  newsTitle: 'Notizie',
-  readMore: 'Leggi',
 
   // Quiz
   quizTitle: 'Quiz',
@@ -157,7 +139,7 @@ export default {
   quizTopics: 'argomenti',
   quizAllCategories: 'Tutti gli argomenti',
   quizEmptyTitle: 'I quiz arriveranno presto',
-  quizEmptyDesc: 'Stiamo preparando domande collegate alle guide pratiche.',
+  quizEmptyDesc: 'Stiamo preparando domande collegate alle guide.',
   quizLoadError: 'Non è stato possibile caricare i quiz.',
   quizRetry: 'Riprova',
   quizRedo: 'Rifai',
@@ -182,7 +164,7 @@ export default {
   download: 'Scarica',
 
   // Guide pratiche
-  guidesTitle: 'Guide pratiche',
+  guidesTitle: 'Tutte le guide',
   guidesDesc: 'Tutto ciò che ti serve sapere per vivere in Italia',
   comingSoon: 'Contenuti in arrivo',
   comingSoonDesc: 'Stiamo preparando le guide per questa sezione',

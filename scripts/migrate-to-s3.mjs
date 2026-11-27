@@ -83,14 +83,6 @@ const GUIDE_ITEMS = [
   { id: 'mediator',        category: 'cityLife', emoji: '🤝', it: 'Mediatore culturale',  en: 'Cultural mediator', bn: 'সাংস্কৃতিক মধ্যস্থতাকারী' },
 ];
 
-// ─── NEWS ──────────────────────────────────────────────────────────────────────
-const NEWS = [
-  { id: 'news-001', emoji: '⚓', it: { title: 'Nuove turnazioni cantiere luglio', body: 'Fincantieri ha aggiornato le turnazioni per il mese di luglio. Consulta il tabellone in cantiere.' }, en: { title: 'New shipyard shifts July', body: 'Fincantieri has updated shifts for July. Check the board at the shipyard.' }, bn: { title: 'জুলাই মাসের নতুন শিফট', body: 'ফিনক্যান্টিয়েরি জুলাই মাসের শিফট আপডেট করেছে।' } },
-  { id: 'news-002', emoji: '🏥', it: { title: 'Vaccinazione influenzale: prenotazioni aperte', body: 'Dal 15 luglio è possibile prenotare la vaccinazione antinfluenzale presso il medico di base.' }, en: { title: 'Flu vaccination: bookings open', body: 'From 15 July you can book flu vaccination at your GP.' }, bn: { title: 'ফ্লু টিকা: বুকিং খোলা', body: '১৫ জুলাই থেকে ফ্লু টিকা বুক করতে পারবেন।' } },
-  { id: 'news-003', emoji: '📄', it: { title: 'Rinnovo permessi: nuova procedura online', body: 'La questura di Venezia ha attivato il nuovo portale per il rinnovo del permesso di soggiorno.' }, en: { title: 'Permit renewal: new online procedure', body: 'The Venice police headquarters has activated a new portal for residence permit renewal.' }, bn: { title: 'পারমিট নবায়ন: নতুন অনলাইন পদ্ধতি', body: 'ভেনিস পুলিশ হেডকোয়ার্টার্স নতুন পোর্টাল চালু করেছে।' } },
-  { id: 'news-004', emoji: '🎓', it: { title: 'Corsi di italiano gratuiti — iscrizioni aperte', body: 'Il CPIA di Venezia apre le iscrizioni per i corsi serali di italiano per stranieri.' }, en: { title: 'Free Italian courses — enrolments open', body: 'CPIA Venice opens enrolments for evening Italian courses for foreigners.' }, bn: { title: 'বিনামূল্যে ইতালিয়ান কোর্স', body: 'ভেনিসের CPIA বিদেশিদের জন্য সন্ধ্যাকালীন কোর্সে ভর্তি শুরু করেছে।' } },
-];
-
 // ─── LIBRARY ───────────────────────────────────────────────────────────────────
 const LIBRARY = [
   { id: 'lib-001', category: 'documents', emoji: '📄', it: { title: 'Guida al permesso di soggiorno', body: '' }, en: { title: 'Residence permit guide', body: '' }, bn: { title: 'বাসস্থান পারমিট গাইড', body: '' } },
@@ -117,21 +109,6 @@ async function migrate() {
       };
       await upload(`content/published/guides/${lang}/${item.id}.json`, obj);
       await upload(`content/draft/guides/${lang}/${item.id}.json`,     obj);
-    }
-  }
-
-  // News
-  console.log('\n📰 News…');
-  for (const item of NEWS) {
-    for (const lang of ['it', 'en', 'bn']) {
-      const obj = {
-        id: item.id, type: 'news', lang, category: 'news', emoji: item.emoji,
-        title: item[lang].title, body: item[lang].body,
-        audioUrl: '', imageUrl: '',
-        updatedBy: AUTHOR, updatedAt: NOW,
-      };
-      await upload(`content/published/news/${lang}/${item.id}.json`, obj);
-      await upload(`content/draft/news/${lang}/${item.id}.json`,     obj);
     }
   }
 

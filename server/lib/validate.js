@@ -51,7 +51,7 @@ const translationSchema = z.object({
 
 const contentSchema = z.object({
   id:       z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/),
-  type:     z.enum(['guides', 'news', 'library', 'pages', 'site']),
+  type:     z.enum(['guides', 'library', 'pages', 'site']),
   category: z.string().max(100).default(''),
   sortOrder: optionalSortOrder,
   emoji:    z.string().max(10).default('📄'),

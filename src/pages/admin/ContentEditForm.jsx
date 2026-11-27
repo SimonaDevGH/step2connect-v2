@@ -15,11 +15,11 @@ const LANGS = [
   { code: 'en', label: 'English 🇬🇧' },
   { code: 'bn', label: 'বাংলা 🇧🇩' },
 ];
-const TYPES = ['guides', 'news', 'library', 'pages', 'site'];
+const TYPES = ['guides', 'library', 'pages', 'site'];
 const MEDIA_UPLOAD_LIMIT_MB = { img: 5, audio: 25, video: 100 };
 
 const GUIDE_CATEGORIES = [
-  { value: 'guides',    label: '📖 Guide pratiche — pagina principale' },
+  { value: 'guides',    label: '📖 Tutte le guide — pagina principale' },
   { value: 'documents', label: '📄 Documenti e permessi' },
   { value: 'health',    label: '❤️ Salute' },
   { value: 'homeBills', label: '🏠 Casa e bollette' },
@@ -352,7 +352,7 @@ export default function ContentEditForm({ contentType, contentId, onClose }) {
             className={`admin-input${fieldErrors.id ? ' admin-input--error' : ''}`}
             value={form.id}
             onChange={(e) => setBaseField('id', e.target.value)}
-            placeholder={isGuides ? 'es. permesso-di-soggiorno' : 'es. news-001'}
+            placeholder={isGuides ? 'es. permesso-di-soggiorno' : 'es. library-001'}
             aria-invalid={Boolean(fieldErrors.id)}
           />
           <FieldError fieldErrors={fieldErrors} path="id" />

@@ -17,6 +17,8 @@ async function main() {
     '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
   let socket;
+  let closing = false;
+  const pending = new Map();
   try {
     const browserUrl = await new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('Chromium startup timeout')), 20000);
@@ -31,7 +33,6 @@ async function main() {
     socket = new WebSocket(targets.find((target) => target.type === 'page').webSocketDebuggerUrl);
     await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject; });
     let sequence = 0;
-    const pending = new Map();
     const events = {};
     const cdp = (method, params = {}) => new Promise((resolve, reject) => {
       const id = ++sequence;
@@ -49,6 +50,7 @@ async function main() {
         value.error ? entry.reject(new Error(JSON.stringify(value.error))) : entry.resolve(value.result);
       } else if (events[value.method]) {
         Promise.resolve(events[value.method](value.params)).catch((err) => {
+          if (closing) return;
           // Page.navigate can cancel an old document's paused request before
           // Fetch.fulfillRequest reaches Chromium. This is not a failed API call.
           if (err.message.includes('Invalid InterceptionId.')) return;
@@ -145,13 +147,14 @@ async function main() {
     }
     await visit('/admin/content');
     await wait(`location.pathname === '/admin/content/guide-pratiche' && !!document.querySelector('.cms-row-visibility')`);
-    assert.equal(await evaluate(`document.querySelectorAll('.cms-section-tab').length`), 9);
+    assert.equal(await evaluate(`document.querySelectorAll('.cms-section-tab').length`), 7);
+    assert.equal(await evaluate(`/News|Trova uffici/.test(document.querySelector('.cms-section-nav').textContent)`), false);
     await click('.cms-section-tab', 'Quiz');
     await wait(`document.querySelector('h1')?.textContent === 'Quiz'`);
     await click('.cms-status-pill', 'Anteprima');
     await wait(`document.body.textContent.includes('Salvato')`);
     assert.equal(sections.quiz.status, 'preview');
-    await click('.cms-section-tab', 'Guide pratiche');
+    await click('.cms-section-tab', 'Tutte le guide');
     await wait(`!!document.querySelector('.cms-row-visibility')`);
     await evaluate(`document.querySelectorAll('.cms-row-visibility')[0].querySelectorAll('button')[1].click()`);
     await wait(`document.body.textContent.includes('Salvato')`);
@@ -166,16 +169,34 @@ async function main() {
     assert.equal(await evaluate(`document.querySelectorAll('.cms-section-status').length`), 2);
     await cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
     assert.equal(await evaluate(`document.documentElement.scrollWidth <= 391`), true);
-    await visit('/offices');
-    await wait(`location.pathname === '/offices' && document.body.textContent.includes('Questura')`);
+    // Removed routes use the existing PageResolver fallback, including detail URLs.
+    for (const route of ['/offices', '/news', '/news/news-001']) {
+      await visit(route);
+      await wait(`location.pathname === '/home' && !!document.querySelector('.home-page')`);
+      assert.equal(await evaluate(`!!document.querySelector('.offices-card')`), false);
+      assert.equal(await evaluate(`[...document.querySelectorAll('.tool-item')].some(node => /News|Notizie/.test(node.textContent))`), false);
+    }
+    // Visible guide labels change in every language; routes and categories do not.
+    for (const [language, title] of [['it', 'Tutte le guide'], ['en', 'All guides'], ['bn', 'সব গাইড']]) {
+      await evaluate(`localStorage.setItem('s2c_lang', ${JSON.stringify(language)})`);
+      await visit('/home');
+      await wait(`!!document.querySelector('.home-page') && [...document.querySelectorAll('.tool-label')].some(node => node.textContent === ${JSON.stringify(title)})`);
+      await evaluate(`document.querySelector('button[aria-label="Menu"]').click()`);
+      assert.equal(await evaluate(`[...document.querySelectorAll('.side-menu-item')].some(node => node.textContent === ${JSON.stringify(title)})`), true);
+      assert.equal(await evaluate(`/Trova uffici|Find offices|অফিস খুঁজুন/.test(document.querySelector('.side-menu').textContent)`), false);
+      await click('.side-menu-item', title);
+      await wait(`location.pathname === '/guides' && document.querySelectorAll('.guide-cat-card').length === 5`);
+    }
+    await evaluate(`localStorage.setItem('s2c_lang', 'it')`);
+    await visit('/library');
+    await wait(`location.pathname === '/library' && !!document.querySelector('.library-list')`);
     await cdp('Page.reload');
-    await wait(`location.pathname === '/offices' && document.body.textContent.includes('Questura')`);
+    await wait(`location.pathname === '/library' && !!document.querySelector('.library-list')`);
     await evaluate(`document.querySelector('button[aria-label="Menu"]').click()`);
     assert.ok(await evaluate(`document.querySelector('.side-menu').textContent.includes('Interno')`));
     role = 'fincantieri_users';
-    await visit('/offices');
+    await visit('/library');
     await wait(`location.pathname === '/home' && !!document.querySelector('.home-page')`);
-    assert.equal(await evaluate(`!!document.querySelector('.offices-card')`), false);
     await evaluate(`document.querySelector('button[aria-label="Menu"]').click()`);
     assert.equal(await evaluate(`document.querySelector('.side-menu').textContent.includes('Trova uffici')`), false);
     await visit('/quiz');
@@ -193,6 +214,14 @@ async function main() {
     console.log('BROWSER_VISIBILITY_PASS: CMS immediate section/page saves, mobile tabs, Altro controls, admin refresh, preview role menu/Home/direct routes and guide filtering.');
     console.log('All API writes intercepted. No live user or S3 data changed.');
   } finally {
+    // Settle intercepted requests before closing Chromium so shutdown cannot
+    // turn a successful journey into a delayed CDP timeout.
+    closing = true;
+    for (const entry of pending.values()) {
+      clearTimeout(entry.timer);
+      entry.reject(new Error('Browser session closed'));
+    }
+    pending.clear();
     socket?.close();
     chrome.kill('SIGTERM');
     await new Promise((resolve) => chrome.once('exit', resolve));

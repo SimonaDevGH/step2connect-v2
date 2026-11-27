@@ -2,7 +2,7 @@ export const SITE_IMAGES_ID = 'app-images';
 
 export const SITE_IMAGE_GROUPS = [
   { key: 'home', label: 'Home' },
-  { key: 'guides', label: 'Guide pratiche' },
+  { key: 'guides', label: 'Tutte le guide' },
   { key: 'guidesDocuments', label: 'Documenti e permessi' },
   { key: 'guidesHealth', label: 'Salute' },
   { key: 'guidesHomeBills', label: 'Casa e bollette' },
