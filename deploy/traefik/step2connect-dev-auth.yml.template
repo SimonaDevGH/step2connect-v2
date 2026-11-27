@@ -1,0 +1,16 @@
+# Protezione con password dedicata a Step2Connect DEV (app-dev.step2connect.it).
+# Copiare in <cartella traefik-dynamic>/step2connect-dev-auth.yml.
+# È separata da dev-basic-auth.yml (comune ai siti di sviluppo B4) per dare
+# l'accesso a chi lavora su Step2Connect senza aprire gli altri progetti.
+#
+# Generare utente e hash sul server (la password va conservata a parte):
+#   PASS=$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-16); echo "$PASS"
+#   openssl passwd -apr1 "$PASS"
+# Per aggiungere una persona, aggiungere una riga "utente:hash" sotto users.
+http:
+  middlewares:
+    step2connect-dev-auth:
+      basicAuth:
+        realm: "Step2Connect DEV"
+        users:
+          - "step2connect:<hash generato con openssl passwd -apr1>"
