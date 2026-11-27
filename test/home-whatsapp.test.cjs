@@ -17,15 +17,16 @@ test('Home and WhatsApp copy exists in all three languages without changing guid
     'waLearnMore', 'waBeforeStarting', 'waAnalyzeDetails', 'waTranslateDetails',
   ];
   for (const [lang, games, guides] of [
-    ['it', 'Games', 'Tutte le guide'],
-    ['en', 'Games', 'All guides'],
-    ['bn', 'গেমস', 'সব গাইড'],
+    ['it', 'Games – Mettiti alla prova', 'Tutte le guide'],
+    ['en', 'Games – Test yourself', 'All guides'],
+    ['bn', 'গেমস – নিজেকে যাচাই করুন', 'সব গাইড'],
   ]) {
     const { default: dictionary } = await import(`../src/i18n/${lang}.js`);
     for (const key of keys) assert.ok(dictionary[key]?.trim(), `${lang}: ${key}`);
     assert.equal(dictionary.botTitle, 'Ask Me');
     assert.equal(dictionary.quiz, games);
     assert.equal(dictionary.quizTitle, games);
+    assert.equal(Object.hasOwn(dictionary, 'toolsTitle'), false);
     assert.equal(dictionary.guidesTitle, guides);
     assert.ok(dictionary.library && dictionary.libraryTitle);
   }

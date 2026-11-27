@@ -50,6 +50,7 @@ async function main() {
         body = { id: 'guida-al-servizio', title, visibility: featuredVisibility, body: '<p>Featured detail fixture</p>' };
       } else if (url.pathname === '/api/quiz') body = { items: [], progress: {} };
       else if (url.pathname === '/api/quiz/progress') body = { results: {} };
+      else if (url.pathname === '/api/quiz/badges') body = { items: [], earned: 0, total: 0 };
       else { body = null; status = 404; }
       await cdp('Fetch.fulfillRequest', {
         requestId, responseCode: status,
@@ -62,7 +63,9 @@ async function main() {
     events['Page.javascriptDialogOpening'] = () => cdp('Page.handleJavaScriptDialog', { accept: true });
     await cdp('Page.enable');
     await cdp('Runtime.enable');
-    await cdp('Fetch.enable', { patterns: [{ urlPattern: '*/api/*' }] });
+    await cdp('Fetch.enable', { patterns: [{ urlPattern: origin + '/api/*' }] });
+    await cdp('Network.enable');
+    await cdp('Network.setBlockedURLs', { urls: ['*liveperson.net*', '*lpsnmedia*'] });
     const token = `e30.${Buffer.from(JSON.stringify({
       email: 'fixture@example.invalid', exp: Math.floor(Date.now() / 1000) + 3600,
     })).toString('base64url')}.fixture`;
@@ -99,6 +102,23 @@ async function main() {
       await visit('/home');
       await wait(`!!document.querySelector('#ask-me') && document.querySelectorAll('.home-page .guide-cat-card').length === 5`);
     };
+    const assertLabelFits = async (selector, text) => {
+      const fits = await evaluate(`(() => {
+        const node = [...document.querySelectorAll(${JSON.stringify(selector)})]
+          .find(node => node.textContent.trim() === ${JSON.stringify(text)});
+        if (!node) return false;
+        const bounds = node.getBoundingClientRect();
+        const container = node.closest('.quiz-page-tabs, .side-menu').getBoundingClientRect();
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        const rects = [...range.getClientRects()];
+        return bounds.width > 0 && rects.length > 0 && rects.every(rect =>
+          rect.left >= Math.max(0, bounds.left, container.left) - 1 &&
+          rect.right <= Math.min(innerWidth, bounds.right, container.right) + 1 &&
+          rect.top >= bounds.top - 1 && rect.bottom <= bounds.bottom + 1);
+      })()`);
+      assert.equal(fits, true, `Complete label fits at 360px: ${text}`);
+    };
 
     // A native logo link must load a new document, even on the Home itself.
     for (const route of ['/translator', '/home']) {
@@ -111,15 +131,18 @@ async function main() {
     }
 
     for (const [lang, games, guides] of [
-      ['it', 'Games', 'Tutte le guide'], ['en', 'Games', 'All guides'], ['bn', 'গেমস', 'সব গাইড'],
+      ['it', 'Games – Mettiti alla prova', 'Tutte le guide'],
+      ['en', 'Games – Test yourself', 'All guides'],
+      ['bn', 'গেমস – নিজেকে যাচাই করুন', 'সব গাইড'],
     ]) {
       const dictionary = (await import(`../src/i18n/${lang}.js`)).default;
+      await cdp('Emulation.setDeviceMetricsOverride', { width: 360, height: 844, deviceScaleFactor: 1, mobile: true });
       await visit('/home');
       await evaluate(`localStorage.setItem('s2c_lang', ${JSON.stringify(lang)})`);
       await showHome();
       await wait(`document.querySelector('.guide-featured-title')?.textContent.trim() === ${JSON.stringify(title)}`);
-      assert.deepEqual(await evaluate(`[...document.querySelectorAll('.tool-item .tool-label')].map(node => node.textContent.trim())`),
-        [games, guides, dictionary.translator, dictionary.analyzeTitle]);
+      assert.equal(await evaluate(`!!document.querySelector('.tools-section, .tools-list, .tool-item')`), false);
+      assert.equal(await evaluate(`document.querySelector('.home-section-heading .section-title').textContent`), guides);
       assert.equal(await evaluate(`!!document.querySelector('#ask-me #LP_DIV_1785257734021')`), true);
       assert.equal(await evaluate(`document.querySelectorAll('.bottom-bar > *').length`), 4);
       assert.equal(await evaluate(`!!document.querySelector('.bottom-bar > :nth-child(3).bottom-btn-whatsapp')`), true);
@@ -133,29 +156,23 @@ async function main() {
       })`), { circles: [68, 76, 68], bot: true, cityFullRow: '1 / -1' });
       await assertLinks(WA_ANALYZE_URL, 0);
       await assertLinks(WA_TRANSLATE_URL, 0);
-      for (const [path, href, label] of [
-        ['/analyze-document', WA_ANALYZE_URL, dictionary.analyzeTitle],
-        ['/translator', WA_TRANSLATE_URL, dictionary.translator],
+      for (const [path, href] of [
+        ['/analyze-document', WA_ANALYZE_URL],
+        ['/translator', WA_TRANSLATE_URL],
       ]) {
         await click(`.quick-actions a[href="${path}"]`);
         await wait(`location.pathname === ${JSON.stringify(path)} && !!document.querySelector('.whatsapp-service-details')`);
         await assertLinks(href, 1);
         await click('.bottom-btn-home');
         await wait(`location.pathname === '/home' && !!document.querySelector('#ask-me')`);
-        await clickText('.tool-item .tool-label', label);
-        await wait(`location.pathname === ${JSON.stringify(path)} && !!document.querySelector('.whatsapp-service-details')`);
-        await assertLinks(href, 1);
-        await click('.bottom-btn-home');
-        await wait(`location.pathname === '/home' && !!document.querySelector('.guide-featured-card')`);
       }
       const order = await evaluate(`(() => {
         const root = document.querySelector('.home-page');
         const featured = root.querySelector('.guide-featured-card');
         const ask = root.querySelector('#ask-me');
-        const tools = root.querySelector('.tools-section');
         return !!(root.querySelector('.hero').compareDocumentPosition(featured) & Node.DOCUMENT_POSITION_FOLLOWING)
           && !!(featured.compareDocumentPosition(ask) & Node.DOCUMENT_POSITION_FOLLOWING)
-          && !!(ask.compareDocumentPosition(tools) & Node.DOCUMENT_POSITION_FOLLOWING);
+          && root.lastElementChild === ask;
       })()`);
       assert.equal(order, true);
       await clickText('.home-page button', 'Ask Me');
@@ -171,6 +188,21 @@ async function main() {
       await wait(`document.querySelector('.guide-featured-title')?.textContent.trim() === ${JSON.stringify(title)}`);
       await click('button[aria-label="Menu"]');
       assert.equal(await evaluate(`document.querySelector('.side-menu').textContent.includes(${JSON.stringify(games)})`), true);
+      await wait(`document.querySelector('.side-menu.open')?.getBoundingClientRect().left === 0`);
+      await assertLabelFits('.side-menu.open .side-menu-item', games);
+      await browser.screenshot(`s2c-games-menu-${lang}-360.png`);
+      await clickText('.side-menu-item', games);
+      await wait(`location.pathname === '/quiz' && !!document.querySelector('.quiz-page-tabs')`);
+      await wait(`document.querySelector('.side-menu').getBoundingClientRect().right <= 0`);
+      await assertLabelFits('.quiz-page-tabs button:first-child', games);
+      await wait(`!!document.querySelector('.quiz-empty')`);
+      await browser.screenshot(`s2c-games-${lang}-360.png`);
+      await click('.quiz-page-tabs button:nth-child(2)');
+      await wait(`location.pathname === '/quiz/badges' && !!document.querySelector('.quiz-page-tabs')`);
+      await assertLabelFits('.quiz-page-tabs button:first-child', games);
+      await clickText('.quiz-page-tabs button', games);
+      await wait(`location.pathname === '/quiz'`);
+      await click('button[aria-label="Menu"]');
       await clickText('.side-menu-item', 'WhatsApp');
       await wait(`location.pathname === '/whatsapp' && document.body.textContent.includes(${JSON.stringify(dictionary.waPageTitle)})`);
       assert.equal(await evaluate(`document.body.textContent.includes('393490645720')`), false);
@@ -263,7 +295,7 @@ async function main() {
     await visit('/guides');
     await wait(`document.querySelector('.guide-featured-title')?.textContent.trim() === 'Guida al servizio'`);
     assert.deepEqual(browser.failures, []);
-    console.log('HOME_WHATSAPP_BROWSER_PASS: IT/EN/BN, five categories, shared CMS featured/fallback/visibility, exact WA links, Ask Me navigation, four bottom slots, mobile 320/390/768, CMS controls, summary and individual service pages with extra details and independent visibility. All API calls simulated; no WhatsApp messages or AWS writes.');
+    console.log('HOME_WHATSAPP_BROWSER_PASS: IT/EN/BN, Home without Tools, full Games labels in menu/quiz/badges at 360px, five categories, shared CMS featured/fallback/visibility, exact WA links, Ask Me navigation, four bottom slots, mobile 320/360/390/768, CMS controls, summary and individual service pages with extra details and independent visibility. All API calls simulated; no WhatsApp messages or AWS writes.');
   } catch (error) {
     console.error('Fixture browser state:', await evaluate(`({
       pathname: location.pathname,

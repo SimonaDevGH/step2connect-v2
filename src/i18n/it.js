@@ -73,7 +73,7 @@ export default {
   // Side menu
   menu: 'Menu',
   services: 'Servizi',
-  quiz: 'Games',
+  quiz: 'Games – Mettiti alla prova',
   library: 'Libreria',
   notifications: 'Notifiche',
   translator: 'Traduttore',
@@ -101,10 +101,9 @@ export default {
   documentsDesc: 'Permesso, carta di identità, rinnovi',
 
   // Tools
-  toolsTitle: 'Strumenti',
 
   // Quiz
-  quizTitle: 'Games',
+  quizTitle: 'Games – Mettiti alla prova',
   gamesSectionLabel: 'Sezione Games',
   gamesGo: 'Vai a Games',
   quizDesc: 'Metti alla prova la tua conoscenza',

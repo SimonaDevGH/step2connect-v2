@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { BookOpen, Bot, Languages, Puzzle, Sparkles } from 'lucide-react';
+import { Bot, Languages, Sparkles } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useSiteImages } from '../context/SiteImagesContext';
@@ -11,13 +11,6 @@ import FeaturedGuideCard from '../components/FeaturedGuideCard';
 import AskMeButton from '../components/AskMeButton';
 import useFeaturedGuide from '../lib/useFeaturedGuide';
 
-const TOOLS = [
-  { key: 'quiz', section: 'quiz', icon: Puzzle, color: '#E9C46A', path: '/quiz' },
-  { key: 'guidesTitle', section: 'guides', icon: BookOpen, color: '#06A77D', path: '/guides' },
-  { key: 'translator', section: 'translator', icon: Languages, color: '#118AB2', path: '/translator' },
-  { key: 'analyzeTitle', section: 'analyze-document', icon: Sparkles, color: '#1E8A4C', path: '/analyze-document' },
-];
-
 export default function HomePage() {
   const { t, lang } = useLanguage();
   const { user, profileReady } = useAuth();
@@ -27,7 +20,6 @@ export default function HomePage() {
   const location = useLocation();
   const { featuredGuide } = useFeaturedGuide();
   const visibleSection = (key) => profileReady && sectionsReady && canSeeSection(key, user, sections);
-  const tools = TOOLS.filter((tool) => visibleSection(tool.section || tool.key));
   const lpPlaceholderRef = useRef(null);
 
   useEffect(() => {
@@ -127,28 +119,6 @@ export default function HomePage() {
           <div id="LP_DIV_1785257734021" className="lp-engagement-container"></div>
         </div>
       </section>
-
-      {/* Tools list */}
-      {tools.length > 0 && <section className="tools-section">
-        <h3 className="section-title">{t('toolsTitle')}</h3>
-        <div className="tools-list">
-          {tools.map(({ key, icon: Icon, color, path, href }) => (
-            href ? (
-              <a key={key} className="tool-item" href={href} target="_blank" rel="noreferrer">
-                <div className="tool-icon" style={{ background: color + '20', color }}><Icon size={22} /></div>
-                <span className="tool-label">{t(key)}</span>
-                <span className="tool-arrow">›</span>
-              </a>
-            ) : (
-              <button key={key} className="tool-item" onClick={() => navigate(path)}>
-                <div className="tool-icon" style={{ background: color + '20', color }}><Icon size={22} /></div>
-                <span className="tool-label">{t(key)}</span>
-                <span className="tool-arrow">›</span>
-              </button>
-            )
-          ))}
-        </div>
-      </section>}
 
     </div>
   );

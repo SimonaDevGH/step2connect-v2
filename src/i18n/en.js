@@ -70,7 +70,7 @@ export default {
 
   menu: 'Menu',
   services: 'Services',
-  quiz: 'Games',
+  quiz: 'Games – Test yourself',
   library: 'Library',
   notifications: 'Notifications',
   translator: 'Translator',
@@ -95,9 +95,8 @@ export default {
   documents: 'Documents & residence permit',
   documentsDesc: 'Permit, ID card, renewals',
 
-  toolsTitle: 'Tools',
 
-  quizTitle: 'Games',
+  quizTitle: 'Games – Test yourself',
   gamesSectionLabel: 'Games section',
   gamesGo: 'Go to Games',
   quizDesc: 'Test your knowledge',

@@ -711,8 +711,9 @@ anche se l’email non esiste, per evitare enumerazione degli account CMS.
 
 Il menu CMS è organizzato per sezioni: Tutte le guide, Quiz, Analizza documento,
 Notifiche, Traduttore, WhatsApp, Immagini app, Altro.
-Il nome “Quiz” resta nel CMS; nell'app la stessa sezione si chiama “Games”
-(“গেমস” in bengalese), con route e dati invariati.
+Il nome “Quiz” resta nel CMS; nell'app la stessa sezione si chiama
+“Games – Mettiti alla prova” (EN: “Games – Test yourself”;
+BN: “গেমস – নিজেকে যাচাই করুন”), con route e dati invariati.
 Su mobile diventa una barra di tab scorrevoli. Altro permette di gestire
 `library` e le pagine generiche `pages`; l'API legacy `type=all` resta disponibile.
 
@@ -912,7 +913,7 @@ immagine della configurazione `site`; per `site` sono ammessi solo upload immagi
 | `/guides/:category/:item` | Dettaglio guida |
 | `/library` | Libreria |
 | `/library/:id` | Dettaglio elemento libreria |
-| `/quiz` | Games |
+| `/quiz` | Games – Mettiti alla prova |
 | `/quiz/:id` | Quiz Vero/Falso collegato a una guida |
 | `/notifications` | Notifiche |
 | `/whatsapp` | Assistenza WhatsApp: analizza documento e traduci |
@@ -996,7 +997,7 @@ cinque righe trilingui e le dimensioni dell'engagement reale. Si nasconde al
 primo contenuto inserito da LP, senza spostare il testo; se LP è bloccato
 rimane visibile senza timeout. Il div gestito da LivePerson resta invariato.
 
-I pulsanti rapidi e gli Strumenti della Home aprono le pagine interne
+I pulsanti rapidi della Home aprono le pagine interne
 `/analyze-document` e `/translator`. I pulsanti dedicati presenti in queste
 pagine e nel riepilogo `/whatsapp` aprono WhatsApp in una nuova scheda.
 Numero e parole chiave sono centralizzati in
@@ -1006,7 +1007,7 @@ dal bot. Il numero non è mostrato come testo nella pagina.
 
 Nel CMS, **WhatsApp** controlla l'accesso alla pagina; **Analizza documento**
 e **Traduttore** controllano separatamente la rispettiva funzione. Questi
-ultimi interruttori agiscono anche su pulsanti rapidi e Strumenti della Home.
+ultimi interruttori agiscono anche sui pulsanti rapidi della Home.
 I collegamenti “Apri pagina” del CMS portano alla rispettiva pagina dedicata:
 `/whatsapp`, `/analyze-document` o `/translator`.
 La pagina WhatsApp è un riepilogo aggiuntivo, non sostituisce le due pagine dei
@@ -1033,7 +1034,9 @@ node --experimental-websocket scripts/check-home-whatsapp-browser.cjs
 ```
 
 Copre IT/EN/BN, guida in evidenza condivisa con fallback e visibilità, cinque
-categorie, scroll Ask Me nella Home, barra inferiore, link WhatsApp
+categorie, assenza della vecchia sezione Strumenti, scroll Ask Me nella Home,
+nuovo nome Games completo in menu, quiz e badge a 360px nelle tre lingue,
+barra inferiore, link WhatsApp
 esatti, controlli CMS indipendenti e layout da 320 a 768 pixel.
 
 La suite copre:
@@ -1238,13 +1241,14 @@ i test e le due prove SMS manuali sono in
   con un caricamento completo della pagina, anche quando la Home è già aperta.
 
 - `/home`, nell'ordine: hero, pulsanti rapidi Analizza documento / Ask Me /
-  Traduci, Tutte le guide, card Ask Me con LivePerson, Strumenti.
+  Traduci, Tutte le guide, card Ask Me con LivePerson.
 - Il blocco guide include “Vedi tutte”, la guida al servizio con dati CMS e
   fallback condivisi con `/guides`, e tutte e cinque le categorie: l'ultima
   occupa l'intera riga su una griglia a due colonne.
-- Gli Strumenti sono Games, Tutte le guide, Traduttore e Analizza documento,
-  ciascuno soggetto alla propria visibilità. Le notifiche restano accessibili
-  dalla campanella e non compaiono negli Strumenti.
+- La precedente sezione Strumenti è stata rimossa dalla Home.
+  Games resta accessibile dal menu laterale, Tutte le guide dal blocco guide,
+  Traduttore e Analizza documento dai pulsanti rapidi. Le notifiche restano
+  accessibili dalla campanella.
 - La barra inferiore ha quattro posizioni uguali: Profilo (apre la sua pagina), Home,
   WhatsApp e uno spazio vuoto. Se WhatsApp non è visibile, anche la terza
   posizione resta vuota.
@@ -1287,7 +1291,12 @@ lo slug CMS `guide-pratiche` e le chiavi S3, inclusi link e visibilità esistent
   allegati non è ancora implementato.
 - Il CMS consente di gestire testi e URL dei materiali, oltre ai media supportati.
 
-### Games
+### Games – Mettiti alla prova
+
+Il nome completo compare nel menu laterale, nella linguetta di `/quiz` e nel
+pulsante di ritorno dalla pagina badge. In inglese è “Games – Test yourself”,
+in bengalese “গেমস – নিজেকে যাচাই করুন”. Route `/quiz`, chiave `quiz`,
+CMS e dati su S3 restano invariati.
 
 - `/quiz`: categorie delle guide con quiz visibili, avanzamento, stelle e badge.
 - `/quiz/:id`: domande Vero/Falso IT/EN/BN, spiegazioni, audio opzionale e link ai
@@ -1607,7 +1616,7 @@ L'API non restituisce nomi, telefoni o risultati individuali.
 
 ### I miei badge
 
-La sezione Games presenta le schede **Games** e **I miei badge**. La seconda ha
+La sezione Games presenta le schede **Games – Mettiti alla prova** e **I miei badge**. La seconda ha
 un indirizzo diretto, `/quiz/badges`, soggetto agli stessi permessi della sezione.
 Mostra sei badge, barra di avanzamento, data di conquista e progresso per
 categoria. I badge bloccati portano ai quiz della rispettiva categoria;

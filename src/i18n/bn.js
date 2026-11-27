@@ -78,7 +78,7 @@ export default {
 
   menu: 'মেনু',
   services: 'সেবা',
-  quiz: 'গেমস',
+  quiz: 'গেমস – নিজেকে যাচাই করুন',
   library: 'লাইব্রেরি',
   notifications: 'বিজ্ঞপ্তি',
   translator: 'অনুবাদক',
@@ -103,9 +103,8 @@ export default {
   documents: 'ডকুমেন্ট ও বাসস্থান পারমিট',
   documentsDesc: 'পারমিট, পরিচয়পত্র, নবায়ন',
 
-  toolsTitle: 'সরঞ্জাম',
 
-  quizTitle: 'গেমস',
+  quizTitle: 'গেমস – নিজেকে যাচাই করুন',
   gamesSectionLabel: 'গেমস বিভাগ',
   gamesGo: 'গেমসে যান',
   quizDesc: 'আপনার জ্ঞান পরীক্ষা করুন',

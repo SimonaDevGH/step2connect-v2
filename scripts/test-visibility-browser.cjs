@@ -174,13 +174,13 @@ async function main() {
       await visit(route);
       await wait(`location.pathname === '/home' && !!document.querySelector('.home-page')`);
       assert.equal(await evaluate(`!!document.querySelector('.offices-card')`), false);
-      assert.equal(await evaluate(`[...document.querySelectorAll('.tool-item')].some(node => /News|Notizie/.test(node.textContent))`), false);
+      assert.equal(await evaluate(`!!document.querySelector('.tools-section')`), false);
     }
     // Visible guide labels change in every language; routes and categories do not.
     for (const [language, title] of [['it', 'Tutte le guide'], ['en', 'All guides'], ['bn', 'সব গাইড']]) {
       await evaluate(`localStorage.setItem('s2c_lang', ${JSON.stringify(language)})`);
       await visit('/home');
-      await wait(`!!document.querySelector('.home-page') && [...document.querySelectorAll('.tool-label')].some(node => node.textContent === ${JSON.stringify(title)})`);
+      await wait(`document.querySelector('.home-section-heading .section-title')?.textContent === ${JSON.stringify(title)}`);
       await evaluate(`document.querySelector('button[aria-label="Menu"]').click()`);
       assert.equal(await evaluate(`[...document.querySelectorAll('.side-menu-item')].some(node => node.textContent === ${JSON.stringify(title)})`), true);
       assert.equal(await evaluate(`/Trova uffici|Find offices|অফিস খুঁজুন/.test(document.querySelector('.side-menu').textContent)`), false);
