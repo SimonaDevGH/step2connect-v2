@@ -1,0 +1,67 @@
+name: Deploy DEV (OVH)
+
+# Ogni push su "develop" esegue test + build e, se i secret del server sono
+# configurati, aggiorna l'ambiente DEV sul server OVH (B4) via SSH.
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch, tag o SHA da distribuire su DEV"
+        required: false
+        default: develop
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # Il lockfile generato su Replit punta al registry interno di Replit.
+      - name: Registry npm pubblico nel lockfile
+        run: sed -i -E 's#https?://package-firewall\.replit\.[a-z]+/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - run: npm run build
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: dev
+    env:
+      OVH_SSH_HOST: ${{ secrets.OVH_SSH_HOST }}
+    steps:
+      - name: Secret server non configurati
+        if: env.OVH_SSH_HOST == ''
+        run: |
+          echo "::warning::OVH_SSH_HOST non configurato, deploy DEV saltato (vedi docs/deploy-ovh.md)."
+
+      - name: Deploy via SSH
+        if: env.OVH_SSH_HOST != ''
+        env:
+          SSH_USER: ${{ secrets.OVH_SSH_USER }}
+          SSH_PORT: ${{ secrets.OVH_SSH_PORT }}
+          SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.OVH_SSH_KNOWN_HOSTS }}
+          DEPLOY_REF: ${{ github.event.inputs.ref || github.sha }}
+          DEPLOY_BASE: ${{ vars.OVH_DEPLOY_BASE || '/opt/step2connect' }}
+        run: |
+          [[ "$DEPLOY_REF" =~ ^[A-Za-z0-9._/-]+$ ]] || { echo "ref non valido: $DEPLOY_REF"; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+          ssh -p "${SSH_PORT:-22}" -o StrictHostKeyChecking=yes \
+            "${SSH_USER:-deploy}@${OVH_SSH_HOST}" \
+            "${DEPLOY_BASE}/dev/app/deploy/scripts/deploy.sh dev '${DEPLOY_REF}'"

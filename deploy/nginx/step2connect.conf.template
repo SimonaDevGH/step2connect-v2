@@ -1,0 +1,35 @@
+# Virtual host Nginx per un ambiente Step2Connect sul server OVH.
+# Generato da deploy/scripts/setup-nginx.sh sostituendo:
+#   __SERVER_NAME__  es. dev.step2connect.it
+#   __HOST_PORT__    es. 5101
+#   __APP_ENV__      dev | prod
+# Il TLS viene aggiunto da certbot (--nginx) dopo la prima emissione.
+
+limit_req_zone $binary_remote_addr zone=s2c___APP_ENV___api:10m rate=20r/s;
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __SERVER_NAME__;
+
+    # Upload CMS: video fino a 100 MB
+    client_max_body_size 110m;
+
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    add_header X-Frame-Options SAMEORIGIN always;
+
+    access_log /var/log/nginx/step2connect-__APP_ENV__.access.log;
+    error_log  /var/log/nginx/step2connect-__APP_ENV__.error.log;
+
+    location /api/ {
+        limit_req zone=s2c___APP_ENV___api burst=40 nodelay;
+        proxy_pass http://127.0.0.1:__HOST_PORT__;
+        include /etc/nginx/snippets/step2connect-proxy.conf;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:__HOST_PORT__;
+        include /etc/nginx/snippets/step2connect-proxy.conf;
+    }
+}

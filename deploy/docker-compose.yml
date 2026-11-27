@@ -1,0 +1,38 @@
+# Uno stack per ambiente, isolati tramite project name (-p) e file .env dedicato.
+# Uso (lo fa deploy/scripts/deploy.sh):
+#   docker compose -p step2connect-dev  --env-file /opt/step2connect/dev/.env  -f deploy/docker-compose.yml up -d
+#   docker compose -p step2connect-prod --env-file /opt/step2connect/prod/.env -f deploy/docker-compose.yml up -d
+#
+# Il file .env serve sia per l'interpolazione (build-arg VITE_*, porta, tag)
+# sia come env_file del container (segreti server).
+
+services:
+  app:
+    image: step2connect:${APP_ENV:?APP_ENV mancante}-${IMAGE_TAG:-latest}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        VITE_COGNITO_USER_POOL_ID: ${VITE_COGNITO_USER_POOL_ID:?}
+        VITE_COGNITO_USER_POOL_CLIENT_ID: ${VITE_COGNITO_USER_POOL_CLIENT_ID:?}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+        GIT_SHA: ${IMAGE_TAG:-unknown}
+    env_file:
+      - ${ENV_FILE:?ENV_FILE mancante}
+    environment:
+      NODE_ENV: production
+      PORT: "5000"
+    # Esposto solo su localhost: il traffico pubblico passa da Nginx (TLS).
+    ports:
+      - "127.0.0.1:${HOST_PORT:?HOST_PORT mancante}:5000"
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
